@@ -128,6 +128,7 @@ const ZigxElement = struct {
     const Child = union(enum) {
         text: []const u8,
         text_expr: []const u8,
+        component_expr: []const u8, // For {(expression)} - already a Component
         element: *ZigxElement,
     };
 
@@ -451,15 +452,35 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
             break;
         }
 
-        // Text expression: .{expr}
+        // Text expression: {expr} or component expression: {(expr)}
         if (i + 1 < content.len and content[i] == '{') {
             i += 1;
             const expr_start = i;
-            while (i < content.len and content[i] != '}') i += 1;
-            const expr = content[expr_start..i];
+
+            // Find the matching closing brace, accounting for nested braces/parens
+            var brace_depth: i32 = 1;
+            while (i < content.len and brace_depth > 0) {
+                if (content[i] == '{') brace_depth += 1;
+                if (content[i] == '}') brace_depth -= 1;
+                if (brace_depth > 0) i += 1;
+            }
+
+            var expr = content[expr_start..i];
             i += 1; // skip }
 
-            try parent.children.append(allocator, .{ .text_expr = expr });
+            // Check if expression is wrapped in parentheses: (expr)
+            // Trim whitespace first
+            while (expr.len > 0 and std.ascii.isWhitespace(expr[0])) expr = expr[1..];
+            while (expr.len > 0 and std.ascii.isWhitespace(expr[expr.len - 1])) expr = expr[0 .. expr.len - 1];
+
+            if (expr.len >= 2 and expr[0] == '(' and expr[expr.len - 1] == ')') {
+                // Component expression: {(expr)} - unwrap the parentheses
+                const component_expr = expr[1 .. expr.len - 1];
+                try parent.children.append(allocator, .{ .component_expr = component_expr });
+            } else {
+                // Regular text expression: {expr}
+                try parent.children.append(allocator, .{ .text_expr = expr });
+            }
             continue;
         }
 
@@ -700,11 +721,11 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
             try addIndentTokens(output, indent + 3);
             switch (child) {
                 .text => |text| {
+                    // Use _zx.txt("text")
+                    try output.addToken(.identifier, "_zx");
                     try output.addToken(.period, ".");
-                    try output.addToken(.l_brace, "{");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "text");
-                    try output.addToken(.equal, "=");
+                    try output.addToken(.identifier, "txt");
+                    try output.addToken(.l_paren, "(");
 
                     const escaped_text = try escapeTextForStringLiteral(allocator, text);
                     defer allocator.free(escaped_text);
@@ -712,18 +733,24 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                     defer allocator.free(text_buf);
                     try output.addToken(.string_literal, text_buf);
 
-                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
                     try output.addToken(.comma, ",");
                     try output.addToken(.invalid, "\n");
                 },
                 .text_expr => |expr| {
+                    // Use _zx.txt(expr)
+                    try output.addToken(.identifier, "_zx");
                     try output.addToken(.period, ".");
-                    try output.addToken(.l_brace, "{");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "text");
-                    try output.addToken(.equal, "=");
+                    try output.addToken(.identifier, "txt");
+                    try output.addToken(.l_paren, "(");
                     try output.addToken(.identifier, expr);
-                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+                },
+                .component_expr => |expr| {
+                    // Component expression: {(expr)} - use directly without wrapping
+                    try output.addToken(.identifier, expr);
                     try output.addToken(.comma, ",");
                     try output.addToken(.invalid, "\n");
                 },
@@ -731,7 +758,6 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                     // Check if this is a custom component
                     if (isCustomComponent(child_elem.tag)) {
                         // For custom components, call the function with allocator and props
-                        try addIndentTokens(output, indent + 3);
                         try output.addToken(.identifier, child_elem.tag);
                         try output.addToken(.l_paren, "(");
                         try output.addToken(.identifier, "allocator");
@@ -771,22 +797,134 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
                     } else {
-                        // Recursively render nested elements
+                        // Use _zx.zx(.tag, .{ ... }) for nested elements
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "zx");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, child_elem.tag);
+                        try output.addToken(.comma, ",");
+
+                        // Options struct
                         try output.addToken(.period, ".");
                         try output.addToken(.l_brace, "{");
                         try output.addToken(.invalid, "\n");
-                        try addIndentTokens(output, indent + 4);
-                        try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "element");
-                        try output.addToken(.equal, "=");
 
-                        // Render the nested element as a recursive zx.zx() call structure
-                        try renderElementAsStruct(allocator, output, child_elem, indent + 4);
+                        // Attributes for nested element
+                        if (child_elem.attributes.items.len > 0) {
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "attributes");
+                            try output.addToken(.equal, "=");
+                            try output.addToken(.ampersand, "&");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
 
-                        try output.addToken(.comma, ",");
-                        try output.addToken(.invalid, "\n");
+                            for (child_elem.attributes.items) |attr| {
+                                try addIndentTokens(output, indent + 5);
+                                try output.addToken(.period, ".");
+                                try output.addToken(.l_brace, "{");
+                                try output.addToken(.period, ".");
+                                try output.addToken(.identifier, "name");
+                                try output.addToken(.equal, "=");
+
+                                const name_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{attr.name});
+                                defer allocator.free(name_buf);
+                                try output.addToken(.string_literal, name_buf);
+                                try output.addToken(.comma, ",");
+
+                                try output.addToken(.period, ".");
+                                try output.addToken(.identifier, "value");
+                                try output.addToken(.equal, "=");
+
+                                switch (attr.value) {
+                                    .static => |val| {
+                                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                                        defer allocator.free(value_buf);
+                                        try output.addToken(.string_literal, value_buf);
+                                    },
+                                    .dynamic => |expr| {
+                                        try output.addToken(.identifier, expr);
+                                    },
+                                }
+
+                                try output.addToken(.r_brace, "}");
+                                try output.addToken(.comma, ",");
+                                try output.addToken(.invalid, "\n");
+                            }
+
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.r_brace, "}");
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, "\n");
+                        }
+
+                        // Children for nested element
+                        if (child_elem.children.items.len > 0) {
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "children");
+                            try output.addToken(.equal, "=");
+                            try output.addToken(.ampersand, "&");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                            for (child_elem.children.items) |nested_child| {
+                                try addIndentTokens(output, indent + 5);
+                                switch (nested_child) {
+                                    .text => |text| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "txt");
+                                        try output.addToken(.l_paren, "(");
+
+                                        const escaped_text = try escapeTextForStringLiteral(allocator, text);
+                                        defer allocator.free(escaped_text);
+                                        const text_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_text});
+                                        defer allocator.free(text_buf);
+                                        try output.addToken(.string_literal, text_buf);
+
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    },
+                                    .text_expr => |expr| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "txt");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, expr);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    },
+                                    .component_expr => |expr| {
+                                        // Component expression: {(expr)} - use directly without wrapping
+                                        try output.addToken(.identifier, expr);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    },
+                                    .element => |nested_elem| {
+                                        // For deeply nested elements, recursively render using renderNestedElement
+                                        try renderNestedElementAsCall(allocator, output, nested_elem, indent + 5);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    },
+                                }
+                            }
+
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.r_brace, "}");
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, "\n");
+                        }
+
                         try addIndentTokens(output, indent + 3);
                         try output.addToken(.r_brace, "}");
+                        try output.addToken(.r_paren, ")");
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
                     }
@@ -807,6 +945,159 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
     try output.addToken(.invalid, "\n");
 
     try addIndentTokens(output, indent);
+    try output.addToken(.r_paren, ")");
+}
+
+/// Render nested elements recursively using _zx.zx() calls
+fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+    // Check if this is a custom component
+    if (isCustomComponent(elem.tag)) {
+        try output.addToken(.identifier, elem.tag);
+        try output.addToken(.l_paren, "(");
+        try output.addToken(.identifier, "allocator");
+        try output.addToken(.comma, ",");
+
+        // Build props struct from attributes
+        if (elem.attributes.items.len > 0) {
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            for (elem.attributes.items, 0..) |attr, i| {
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, attr.name);
+                try output.addToken(.equal, "=");
+                switch (attr.value) {
+                    .static => |val| {
+                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                        defer allocator.free(value_buf);
+                        try output.addToken(.string_literal, value_buf);
+                    },
+                    .dynamic => |expr| {
+                        try output.addToken(.identifier, expr);
+                    },
+                }
+                if (i < elem.attributes.items.len - 1) {
+                    try output.addToken(.comma, ",");
+                }
+            }
+            try output.addToken(.r_brace, "}");
+        } else {
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.r_brace, "}");
+        }
+
+        try output.addToken(.r_paren, ")");
+        return;
+    }
+
+    // For regular elements, use _zx.zx()
+    try output.addToken(.identifier, "_zx");
+    try output.addToken(.period, ".");
+    try output.addToken(.identifier, "zx");
+    try output.addToken(.l_paren, "(");
+    try output.addToken(.period, ".");
+    try output.addToken(.identifier, elem.tag);
+    try output.addToken(.comma, ",");
+    try output.addToken(.period, ".");
+    try output.addToken(.l_brace, "{");
+
+    // Attributes
+    if (elem.attributes.items.len > 0) {
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "attributes");
+        try output.addToken(.equal, "=");
+        try output.addToken(.ampersand, "&");
+        try output.addToken(.period, ".");
+        try output.addToken(.l_brace, "{");
+
+        for (elem.attributes.items) |attr| {
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "name");
+            try output.addToken(.equal, "=");
+
+            const name_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{attr.name});
+            defer allocator.free(name_buf);
+            try output.addToken(.string_literal, name_buf);
+            try output.addToken(.comma, ",");
+
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "value");
+            try output.addToken(.equal, "=");
+
+            switch (attr.value) {
+                .static => |val| {
+                    const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                    defer allocator.free(value_buf);
+                    try output.addToken(.string_literal, value_buf);
+                },
+                .dynamic => |expr| {
+                    try output.addToken(.identifier, expr);
+                },
+            }
+
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.comma, ",");
+        }
+
+        try output.addToken(.r_brace, "}");
+        try output.addToken(.comma, ",");
+    }
+
+    // Children
+    if (elem.children.items.len > 0) {
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "children");
+        try output.addToken(.equal, "=");
+        try output.addToken(.ampersand, "&");
+        try output.addToken(.period, ".");
+        try output.addToken(.l_brace, "{");
+
+        for (elem.children.items) |child| {
+            switch (child) {
+                .text => |text| {
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "txt");
+                    try output.addToken(.l_paren, "(");
+
+                    const escaped_text = try escapeTextForStringLiteral(allocator, text);
+                    defer allocator.free(escaped_text);
+                    const text_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_text});
+                    defer allocator.free(text_buf);
+                    try output.addToken(.string_literal, text_buf);
+
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                },
+                .text_expr => |expr| {
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "txt");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, expr);
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                },
+                .component_expr => |expr| {
+                    // Component expression: {(expr)} - use directly without wrapping
+                    try output.addToken(.identifier, expr);
+                    try output.addToken(.comma, ",");
+                },
+                .element => |nested_elem| {
+                    // Recursively render nested elements
+                    try renderNestedElementAsCall(allocator, output, nested_elem, indent);
+                    try output.addToken(.comma, ",");
+                },
+            }
+        }
+
+        try output.addToken(.r_brace, "}");
+        try output.addToken(.comma, ",");
+    }
+
+    try output.addToken(.r_brace, "}");
     try output.addToken(.r_paren, ")");
 }
 
@@ -920,6 +1211,11 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                     try output.addToken(.equal, "=");
                     try output.addToken(.identifier, expr);
                     try output.addToken(.r_brace, "}");
+                    try output.addToken(.comma, ",");
+                },
+                .component_expr => |expr| {
+                    // Component expression: {(expr)} - use directly without wrapping
+                    try output.addToken(.identifier, expr);
                     try output.addToken(.comma, ",");
                 },
                 .element => |nested_elem| {

@@ -1,0 +1,35 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const dynamic_title = "Dynamic Title!";
+    const button_component = Button(allocator, .{ .title = "From Component Var" });
+    return (
+        <div>
+            <h1>Testing Props</h1>
+            <Button title="Send Message"/>
+            <Button title={dynamic_title}/>
+            <Button/>
+            <p>Three buttons with different titles!</p>
+            <div>
+                <p>Testing component expression syntax:</p>
+                {(button_component)}
+            </div>
+        </div>
+    );
+}
+
+const std = @import("std");
+const zx = @import("zx");
+
+const ButtonProps = struct {
+    title: []const u8 = "Click Me",  // Default value
+};
+
+// Custom Button component with props
+fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
+    return (
+        <button class="btn">{props.title}
+            <span>
+                ZigX
+            </span>
+        </button>
+    );
+}

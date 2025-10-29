@@ -1,0 +1,9 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    return (
+        <body>
+            <h1>About</h1>
+        </body>
+    );
+}
+
+const zx = @import("zx");

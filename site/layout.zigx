@@ -1,0 +1,18 @@
+pub fn Layout(allocator: zx.Allocator, children: zx.Component) zx.Component {
+    return (
+        <html lang="en-US">
+        <head id="head">
+            <title id="title">Zig Programming Language</title>
+        </head>
+
+        <body>
+            <div id="content" role="main">
+                {(children)}
+            </div>
+        </body>
+
+        </html>
+    );
+}
+
+const zx = @import("zx");
