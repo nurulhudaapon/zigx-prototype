@@ -1,5 +1,6 @@
-pub fn Page(allocator: std.mem.Allocator) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const dynamic_title = "Dynamic Title!";
+
     const _zx = zx.init(allocator);
     return _zx.zx(
         .div,
@@ -8,8 +9,13 @@ pub fn Page(allocator: std.mem.Allocator) zx.Component {
                 .{
                     .element = .{
                         .tag = .h1,
-                        .children = &.{
-                            .{ .text = "Testing Props" },
+                        .children = blk: {
+                            const childs = allocator.alloc(zx.Component, 3) catch unreachable;
+                            for (childs, 0..) |*child, i| {
+                                const text = std.fmt.allocPrint(allocator, "Hello {d}", .{i}) catch unreachable;
+                                child.* = zx.Component{ .text = text };
+                            }
+                            break :blk childs;
                         },
                     },
                 },
@@ -37,7 +43,7 @@ const ButtonProps = struct {
 };
 
 // Custom Button component with props
-fn Button(allocator: std.mem.Allocator, props: ButtonProps) zx.Component {
+fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
     const _zx = zx.init(allocator);
     return _zx.zx(
         .button,

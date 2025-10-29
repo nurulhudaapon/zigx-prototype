@@ -44,7 +44,7 @@ pub fn main() !void {
     var result = try zx.Ast.parse(allocator, source_z);
     defer result.deinit(allocator);
 
-    try writeFileIfChanged("src/zigx/examples/zig/index.zig", result.zig_source);
+    // try writeFileIfChanged("src/zigx/examples/zig/index.zig", result.zig_source);
 
     var aw: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
     defer aw.deinit();
