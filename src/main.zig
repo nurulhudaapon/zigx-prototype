@@ -37,7 +37,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = @embedFile("zigx/examples/index.zigx");
+    const source = @embedFile("zigx/examples/zx_custom.zigx");
     const source_z = try allocator.dupeZ(u8, source);
     defer allocator.free(source_z);
 
@@ -49,7 +49,21 @@ pub fn main() !void {
     var aw: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
     defer aw.deinit();
 
-    try Page().element.render(&aw.writer);
+    const render_options = zx.RenderOptions{
+        .whitespace = .indent_2,
+        .current_depth = 0,
+        .max_width = 80,
+    };
+
+    // Use arena allocator for component tree - frees everything at once
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const page_allocator = arena.allocator();
+
+    const page = Page(page_allocator);
+    // No need to call page.deinit() - arena frees everything
+
+    try page.element.render(&aw.writer, render_options);
     std.debug.print("{s}\n", .{aw.written()});
     try writeFileIfChanged("src/zigx/examples/html/index.html", aw.written());
     aw.clearRetainingCapacity();

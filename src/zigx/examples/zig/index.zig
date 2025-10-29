@@ -1,71 +1,23 @@
-pub fn Page() zx.Component {
-    const dynamic_class = "btn-class";
-	const hero_title = "Zigx";
-	const sub_title = "ZigX is a modern web framework powered by Zig. Experience unprecedented performance and developer experience.";
-
-    return zx.zx (
-        .html,
+pub fn Page(allocator: std.mem.Allocator) zx.Component {
+    const dynamic_title = "Dynamic Title!";
+    const _zx= zx.init (allocator);
+return _zx.zx (
+        .div,
         .{
             .children=&.{
                 .{
                     .element= .{
-                        .tag= .head,
-                        .children=&.{.{.element= .{
-                            .tag= .meta,
-                            .attributes=&.{.{.name= "charset", .value= "UTF-8"}, .{.name= "class", .value= dynamic_class}, },
-                        }}, .{.element= .{
-                            .tag= .meta,
-                            .attributes=&.{.{.name= "name", .value= "viewport"}, .{.name= "content", .value= "width=device-width, initial-scale=1.0"}, },
-                        }}, .{.element= .{
-                            .tag= .title,
-                            .children=&.{.{.text= "ZigX - Modern Web Framework"}, },
-                        }}, .{.element= .{
-                            .tag= .link,
-                            .attributes=&.{.{.name= "rel", .value= "stylesheet"}, .{.name= "href", .value= "index.css"}, },
-                        }}, },
+                        .tag= .h1,
+                        .children=&.{.{.text= "Testing Props"}, },
                     },
                 },
+                                Button (allocator, .{.title= "Send Message"}),
+                                Button (allocator, .{.title= dynamic_title}),
+                                Button (allocator, .{}),
                 .{
                     .element= .{
-                        .tag= .body,
-                        .children=&.{.{.element= .{
-                            .tag= .header,
-                            .children=&.{.{.element= .{
-                                .tag= .nav,
-                                .attributes=&.{.{.name= "class", .value= "container"}, },
-                                .children=&.{.{.element= .{
-                                    .tag= .div,
-                                    .attributes=&.{.{.name= "class", .value= "logo"}, },
-                                    .children=&.{.{.text= "ZigX ⚡"}, },
-                                }}, },
-                            }}, },
-                        }}, .{.element= .{
-                            .tag= .section,
-                            .attributes=&.{.{.name= "class", .value= "hero"}, .{.name= "id", .value= "home"}, },
-                            .children=&.{.{.element= .{
-                                .tag= .div,
-                                .attributes=&.{.{.name= "class", .value= "container"}, },
-                                .children=&.{.{.element= .{
-                                    .tag= .h1,
-                                    .children=&.{.{.text= hero_title}, },
-                                }}, .{.element= .{
-                                    .tag= .h1,
-                                    .children=&.{.{.text= hero_title}, },
-                                }}, .{.element= .{
-                                    .tag= .h1,
-                                    .children=&.{.{.text= hero_title}, },
-                                }}, .{.element= .{
-                                    .tag= .h1,
-                                    .children=&.{.{.text= hero_title}, },
-                                }}, .{.element= .{
-                                    .tag= .h1,
-                                    .children=&.{.{.text= hero_title}, },
-                                }}, .{.element= .{
-                                    .tag= .p,
-                                    .children=&.{.{.text= sub_title}, },
-                                }}, },
-                            }}, },
-                        }}, },
+                        .tag= .p,
+                        .children=&.{.{.text= "Three buttons with different titles!"}, },
                     },
                 },
             },
@@ -73,4 +25,25 @@ pub fn Page() zx.Component {
     );
 }
 
+const std = @import("std");
 const zx = @import("zx");
+
+const ButtonProps = struct {
+    title: []const u8 = "Click Me",  // Default value
+};
+
+// Custom Button component with props
+fn Button(allocator: std.mem.Allocator, props: ButtonProps) zx.Component {
+    const _zx= zx.init (allocator);
+return _zx.zx (
+        .button,
+        .{
+            .attributes=&.{
+                .{.name= "class", .value= "btn"},
+            },
+            .children=&.{
+                .{.text= props.title},
+            },
+        },
+    );
+}

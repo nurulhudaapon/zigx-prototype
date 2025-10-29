@@ -1,24 +1,9 @@
 pub fn Button() zx.Component {
     const dynamic_class = "btn";
     return (
-			<div class=.{dynamic_class}>
-				<h2 class="section-title">Get In Touch</h2>
-				<form class="contact-form">
-					<div class="form-group">
-						<input type="text" placeholder="Your Name">
-					</div>
-					<div class="form-group">
-						<input type="email" placeholder="Your Email">
-					</div>
-					<div class="form-group">
-						<input type="text" placeholder="Subject">
-					</div>
-					<div class="form-group">
-						<textarea placeholder="Your Message"></textarea>
-					</div>
-					<button type="submit" class="btn">Send Message</button>
-				</form>
-			</div>
+			<button class={dynamic_class}>
+				Button Title
+			</button>
     );
 }
 

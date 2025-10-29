@@ -222,6 +222,19 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
                         var output = TokenBuilder.init(allocator);
                         defer output.deinit();
 
+                        // Add allocator context initialization
+                        try output.addToken(.keyword_const, "const");
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.identifier, "zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "init");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
                         try output.addToken(.keyword_return, "return");
                         try renderJsxAsTokens(allocator, &output, jsx_elem, 1);
 
@@ -373,13 +386,21 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
         }
     }
 
-    // Skip to >
-    while (i < content.len and content[i] != '>') i += 1;
+    // Check for self-closing tag (/>)
+    var is_self_closing = false;
+    while (i < content.len and content[i] != '>') {
+        if (content[i] == '/' and i + 1 < content.len and content[i + 1] == '>') {
+            is_self_closing = true;
+            i += 1; // skip /
+            break;
+        }
+        i += 1;
+    }
     if (i < content.len) i += 1; // skip >
 
-    // Check if this is a void element (no children/closing tag)
-    if (isVoidElement(tag_name)) {
-        // Void elements don't have children or closing tags
+    // Check if this is a void element or self-closing tag (no children/closing tag)
+    if (isVoidElement(tag_name) or is_self_closing) {
+        // Void elements and self-closing tags don't have children or closing tags
         return elem;
     }
 
@@ -424,6 +445,11 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
         while (i < content.len and std.ascii.isWhitespace(content[i])) i += 1;
 
         if (i >= content.len) break;
+
+        // Check for closing tag
+        if (content[i] == '<' and i + 1 < content.len and content[i + 1] == '/') {
+            break;
+        }
 
         // Text expression: .{expr}
         if (i + 1 < content.len and content[i] == '{') {
@@ -536,10 +562,58 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
     }
 }
 
+/// Check if a tag name is a custom component (starts with uppercase)
+fn isCustomComponent(tag: []const u8) bool {
+    if (tag.len == 0) return false;
+    return std.ascii.isUpper(tag[0]);
+}
+
 /// Render JSX element as zx.zx() function call using tokens
 fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
-    // zx.zx(
-    try output.addToken(.identifier, "zx");
+    // Check if this is a custom component
+    if (isCustomComponent(elem.tag)) {
+        // For custom components, call the function with allocator and props
+        try output.addToken(.identifier, elem.tag);
+        try output.addToken(.l_paren, "(");
+        try output.addToken(.identifier, "allocator");
+        try output.addToken(.comma, ",");
+
+        // Build props struct from attributes
+        if (elem.attributes.items.len > 0) {
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            for (elem.attributes.items, 0..) |attr, i| {
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, attr.name);
+                try output.addToken(.equal, "=");
+                switch (attr.value) {
+                    .static => |val| {
+                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                        defer allocator.free(value_buf);
+                        try output.addToken(.string_literal, value_buf);
+                    },
+                    .dynamic => |expr| {
+                        try output.addToken(.identifier, expr);
+                    },
+                }
+                if (i < elem.attributes.items.len - 1) {
+                    try output.addToken(.comma, ",");
+                }
+            }
+            try output.addToken(.r_brace, "}");
+        } else {
+            // Empty props struct
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.r_brace, "}");
+        }
+
+        try output.addToken(.r_paren, ")");
+        return;
+    }
+
+    // _zx.zx(
+    try output.addToken(.identifier, "_zx");
     try output.addToken(.period, ".");
     try output.addToken(.identifier, "zx");
     try output.addToken(.l_paren, "(");
@@ -654,24 +728,68 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                     try output.addToken(.invalid, "\n");
                 },
                 .element => |child_elem| {
-                    // Recursively render nested elements
-                    try output.addToken(.period, ".");
-                    try output.addToken(.l_brace, "{");
-                    try output.addToken(.invalid, "\n");
-                    try addIndentTokens(output, indent + 4);
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "element");
-                    try output.addToken(.equal, "=");
+                    // Check if this is a custom component
+                    if (isCustomComponent(child_elem.tag)) {
+                        // For custom components, call the function with allocator and props
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.identifier, child_elem.tag);
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.comma, ",");
 
-                    // Render the nested element as a recursive zx.zx() call structure
-                    try renderElementAsStruct(allocator, output, child_elem, indent + 4);
+                        // Build props struct from attributes
+                        if (child_elem.attributes.items.len > 0) {
+                            try output.addToken(.period, ".");
+                            try output.addToken(.l_brace, "{");
+                            for (child_elem.attributes.items, 0..) |attr, i| {
+                                try output.addToken(.period, ".");
+                                try output.addToken(.identifier, attr.name);
+                                try output.addToken(.equal, "=");
+                                switch (attr.value) {
+                                    .static => |val| {
+                                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                                        defer allocator.free(value_buf);
+                                        try output.addToken(.string_literal, value_buf);
+                                    },
+                                    .dynamic => |expr| {
+                                        try output.addToken(.identifier, expr);
+                                    },
+                                }
+                                if (i < child_elem.attributes.items.len - 1) {
+                                    try output.addToken(.comma, ",");
+                                }
+                            }
+                            try output.addToken(.r_brace, "}");
+                        } else {
+                            // Empty props struct
+                            try output.addToken(.period, ".");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.r_brace, "}");
+                        }
 
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-                    try addIndentTokens(output, indent + 3);
-                    try output.addToken(.r_brace, "}");
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    } else {
+                        // Recursively render nested elements
+                        try output.addToken(.period, ".");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+                        try addIndentTokens(output, indent + 4);
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "element");
+                        try output.addToken(.equal, "=");
+
+                        // Render the nested element as a recursive zx.zx() call structure
+                        try renderElementAsStruct(allocator, output, child_elem, indent + 4);
+
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    }
                 },
             }
         }
@@ -694,6 +812,17 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
 
 /// Render an element as a struct (for nested elements)
 fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+    // Check if this is a custom component
+    if (isCustomComponent(elem.tag)) {
+        // For custom components, call the function and get its .element
+        try output.addToken(.identifier, elem.tag);
+        try output.addToken(.l_paren, "(");
+        try output.addToken(.r_paren, ")");
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "element");
+        return;
+    }
+
     try output.addToken(.period, ".");
     try output.addToken(.l_brace, "{");
     try output.addToken(.invalid, "\n");
