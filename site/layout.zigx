@@ -1,4 +1,4 @@
-pub fn Layout(allocator: zx.Allocator, children: zx.Component) zx.Component {
+pub fn Layout(allocator: zx.Allocator, component: zx.Component) zx.Component {
     return (
         <html lang="en-US">
         <head id="head">
@@ -7,8 +7,12 @@ pub fn Layout(allocator: zx.Allocator, children: zx.Component) zx.Component {
 
         <body>
             <div id="content" role="main">
-                {(children)}
+                {(component)}
             </div>
+            <form>
+                <input autofocus="true" type="text" name="name" placeholder="Enter your name" autocomplete="off" />
+                <button type="submit">Submit</button>
+            </form>
         </body>
 
         </html>

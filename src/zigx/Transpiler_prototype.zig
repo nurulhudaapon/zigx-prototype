@@ -129,6 +129,7 @@ const ZigxElement = struct {
         text: []const u8,
         text_expr: []const u8,
         component_expr: []const u8, // For {(expression)} - already a Component
+        format_expr: struct { expr: []const u8, format: []const u8 }, // For {[expr:fmt]}
         element: *ZigxElement,
     };
 
@@ -452,7 +453,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
             break;
         }
 
-        // Text expression: {expr} or component expression: {(expr)}
+        // Text expression: {expr}, component: {(expr)}, or format: {[expr:fmt]}
         if (i + 1 < content.len and content[i] == '{') {
             i += 1;
             const expr_start = i;
@@ -468,17 +469,46 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
             var expr = content[expr_start..i];
             i += 1; // skip }
 
-            // Check if expression is wrapped in parentheses: (expr)
             // Trim whitespace first
             while (expr.len > 0 and std.ascii.isWhitespace(expr[0])) expr = expr[1..];
             while (expr.len > 0 and std.ascii.isWhitespace(expr[expr.len - 1])) expr = expr[0 .. expr.len - 1];
 
+            // Check for component expression: {(expr)}
             if (expr.len >= 2 and expr[0] == '(' and expr[expr.len - 1] == ')') {
-                // Component expression: {(expr)} - unwrap the parentheses
                 const component_expr = expr[1 .. expr.len - 1];
                 try parent.children.append(allocator, .{ .component_expr = component_expr });
-            } else {
-                // Regular text expression: {expr}
+            }
+            // Check for format expression: {[expr:format]} or {[expr]}
+            else if (expr.len >= 2 and expr[0] == '[' and expr[expr.len - 1] == ']') {
+                // Remove the brackets
+                var inner = expr[1 .. expr.len - 1];
+
+                // Trim whitespace from inner content
+                while (inner.len > 0 and std.ascii.isWhitespace(inner[0])) inner = inner[1..];
+                while (inner.len > 0 and std.ascii.isWhitespace(inner[inner.len - 1])) inner = inner[0 .. inner.len - 1];
+
+                // Check for format specifier after colon
+                if (std.mem.indexOfScalar(u8, inner, ':')) |colon_pos| {
+                    // Split at colon: expr:format
+                    const expr_part = inner[0..colon_pos];
+                    var format_part = inner[colon_pos + 1 ..];
+
+                    // Trim whitespace from both parts
+                    var trimmed_expr = expr_part;
+                    while (trimmed_expr.len > 0 and std.ascii.isWhitespace(trimmed_expr[0])) trimmed_expr = trimmed_expr[1..];
+                    while (trimmed_expr.len > 0 and std.ascii.isWhitespace(trimmed_expr[trimmed_expr.len - 1])) trimmed_expr = trimmed_expr[0 .. trimmed_expr.len - 1];
+
+                    while (format_part.len > 0 and std.ascii.isWhitespace(format_part[0])) format_part = format_part[1..];
+                    while (format_part.len > 0 and std.ascii.isWhitespace(format_part[format_part.len - 1])) format_part = format_part[0 .. format_part.len - 1];
+
+                    try parent.children.append(allocator, .{ .format_expr = .{ .expr = trimmed_expr, .format = format_part } });
+                } else {
+                    // No format specifier, default to "d" for decimal
+                    try parent.children.append(allocator, .{ .format_expr = .{ .expr = inner, .format = "d" } });
+                }
+            }
+            // Regular text expression: {expr}
+            else {
                 try parent.children.append(allocator, .{ .text_expr = expr });
             }
             continue;
@@ -748,6 +778,28 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                     try output.addToken(.comma, ",");
                     try output.addToken(.invalid, "\n");
                 },
+                .format_expr => |fmt| {
+                    // Use _zx.fmt("{format}", .{expr})
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "fmt");
+                    try output.addToken(.l_paren, "(");
+
+                    // Format string: "{format}"
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
+                    try output.addToken(.comma, ",");
+
+                    // Expression wrapped in tuple: .{expr}
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+                },
                 .component_expr => |expr| {
                     // Component expression: {(expr)} - use directly without wrapping
                     try output.addToken(.identifier, expr);
@@ -897,6 +949,26 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                                         try output.addToken(.identifier, "txt");
                                         try output.addToken(.l_paren, "(");
                                         try output.addToken(.identifier, expr);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    },
+                                    .format_expr => |fmt| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "fmt");
+                                        try output.addToken(.l_paren, "(");
+
+                                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                                        defer allocator.free(format_str);
+                                        try output.addToken(.string_literal, format_str);
+                                        try output.addToken(.comma, ",");
+
+                                        // Expression wrapped in tuple: .{expr}
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.identifier, fmt.expr);
+                                        try output.addToken(.r_brace, "}");
                                         try output.addToken(.r_paren, ")");
                                         try output.addToken(.comma, ",");
                                         try output.addToken(.invalid, "\n");
@@ -1080,6 +1152,25 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                     try output.addToken(.r_paren, ")");
                     try output.addToken(.comma, ",");
                 },
+                .format_expr => |fmt| {
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "fmt");
+                    try output.addToken(.l_paren, "(");
+
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
+                    try output.addToken(.comma, ",");
+
+                    // Expression wrapped in tuple: .{expr}
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                },
                 .component_expr => |expr| {
                     // Component expression: {(expr)} - use directly without wrapping
                     try output.addToken(.identifier, expr);
@@ -1210,6 +1301,37 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                     try output.addToken(.identifier, "text");
                     try output.addToken(.equal, "=");
                     try output.addToken(.identifier, expr);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.comma, ",");
+                },
+                .format_expr => |fmt| {
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "text");
+                    try output.addToken(.equal, "=");
+
+                    // Generate: std.fmt.allocPrint(allocator, "{format}", .{expr})
+                    try output.addToken(.identifier, "std");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "fmt");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "allocPrint");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, "allocator");
+                    try output.addToken(.comma, ",");
+
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
+                    try output.addToken(.comma, ",");
+
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+
                     try output.addToken(.r_brace, "}");
                     try output.addToken(.comma, ",");
                 },
