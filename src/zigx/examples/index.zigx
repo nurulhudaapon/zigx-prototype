@@ -1,0 +1,34 @@
+pub fn Page() zx.Component {
+    const dynamic_class = "btn-class";
+	const hero_title = "Zigx";
+	const sub_title = "ZigX is a modern web framework powered by Zig. Experience unprecedented performance and developer experience.";
+
+    return (<html>
+			<head>
+				<meta charset="UTF-8" class={dynamic_class}>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>ZigX - Modern Web Framework</title>
+				<link rel="stylesheet" href="index.css">
+			</head>
+			<body>
+				<header>
+					<nav class="container">
+						<div class="logo">ZigX ⚡</div>
+					</nav>
+				</header>
+				<section class="hero" id="home">
+					<div class="container">
+						<h1>{hero_title}</h1>
+						<h1>{hero_title}</h1>
+						<h1>{hero_title}</h1>
+						<h1>{hero_title}</h1>
+						<h1>{hero_title}</h1>
+						<p>
+							{sub_title}
+						</p>
+				</section>
+			</body>
+		</html>);
+}
+
+const zx = @import("zx");
