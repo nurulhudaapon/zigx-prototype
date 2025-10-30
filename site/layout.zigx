@@ -6,7 +6,9 @@ pub fn Layout(allocator: zx.Allocator, children: zx.Component) zx.Component {
       </head>
 
       <body>
-        <div id="root">{(children)}</div>
+        <template shadowrootmode="open">
+          {(children)}
+        </template>
       </body>
     </html>
   );

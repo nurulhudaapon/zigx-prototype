@@ -623,10 +623,12 @@ fn isCustomComponent(tag: []const u8) bool {
 fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
-        // For custom components, call the function with allocator and props
-        try output.addToken(.identifier, elem.tag);
+        // For custom components, wrap in lazy: _zx.lazy(Component, props)
+        try output.addToken(.identifier, "_zx");
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "lazy");
         try output.addToken(.l_paren, "(");
-        try output.addToken(.identifier, "allocator");
+        try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
         // Build props struct from attributes
@@ -809,10 +811,12 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                 .element => |child_elem| {
                     // Check if this is a custom component
                     if (isCustomComponent(child_elem.tag)) {
-                        // For custom components, call the function with allocator and props
-                        try output.addToken(.identifier, child_elem.tag);
+                        // For custom components, wrap in lazy: _zx.lazy(Component, props)
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "lazy");
                         try output.addToken(.l_paren, "(");
-                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.identifier, child_elem.tag);
                         try output.addToken(.comma, ",");
 
                         // Build props struct from attributes
@@ -1024,9 +1028,12 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
 fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
-        try output.addToken(.identifier, elem.tag);
+        // For custom components, wrap in lazy: _zx.lazy(Component, props)
+        try output.addToken(.identifier, "_zx");
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "lazy");
         try output.addToken(.l_paren, "(");
-        try output.addToken(.identifier, "allocator");
+        try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
         // Build props struct from attributes
