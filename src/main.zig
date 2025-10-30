@@ -1,4 +1,4 @@
-const Page = @import("zigx/examples/zig/index.zig").Page;
+const Page = @import("examples/index.zig").Page;
 
 fn writeFileIfChanged(sub_path: []const u8, data: []const u8) !void {
     // Try to read existing file

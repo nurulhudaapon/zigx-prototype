@@ -4,7 +4,7 @@ const std = @import("std");
 pub const Ast = @import("zigx/Ast.zig");
 pub const Allocator = std.mem.Allocator;
 
-pub const ElementTag = enum { svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
+const ElementTag = enum { svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
 const SELF_CLOSING_ONLY: []const ElementTag = &.{ .br, .hr, .img, .input, .link, .source, .track, .wbr };
 const NO_CHILDREN_ONLY: []const ElementTag = &.{ .meta, .link, .input };
 
@@ -85,22 +85,27 @@ pub const Component = union(enum) {
             },
         }
     }
+
+    pub fn action(self: @This(), _: anytype, _: anytype, res: anytype) !void {
+        res.content_type = .HTML;
+        try self.render(&res.buffer.writer);
+    }
 };
 
-pub const Element = struct {
+const Element = struct {
+    const Attribute = struct {
+        name: []const u8,
+        value: ?[]const u8 = null,
+    };
+
     tag: ElementTag,
     children: ?[]const Component = null,
     attributes: ?[]const Attribute = null,
 };
 
-pub const ZxOptions = struct {
+const ZxOptions = struct {
     children: ?[]const Component = null,
-    attributes: ?[]const Attribute = null,
-};
-
-pub const Attribute = struct {
-    name: []const u8,
-    value: ?[]const u8 = null,
+    attributes: ?[]const Element.Attribute = null,
 };
 
 pub fn zx(tag: ElementTag, options: ZxOptions) Component {
@@ -112,7 +117,7 @@ pub fn zx(tag: ElementTag, options: ZxOptions) Component {
 }
 
 /// Context for creating components with allocator support
-pub const ZxContext = struct {
+const ZxContext = struct {
     allocator: std.mem.Allocator,
 
     pub fn zx(self: ZxContext, tag: ElementTag, options: ZxOptions) Component {
@@ -125,7 +130,7 @@ pub const ZxContext = struct {
 
         // Allocate and copy attributes if provided
         const attributes_copy = if (options.attributes) |attributes| blk: {
-            const copy = self.allocator.alloc(Attribute, attributes.len) catch @panic("OOM");
+            const copy = self.allocator.alloc(Element.Attribute, attributes.len) catch @panic("OOM");
             @memcpy(copy, attributes);
             break :blk copy;
         } else null;
@@ -153,3 +158,5 @@ pub const ZxContext = struct {
 pub fn init(allocator: std.mem.Allocator) ZxContext {
     return .{ .allocator = allocator };
 }
+
+pub const App = @import("app.zig").App;
