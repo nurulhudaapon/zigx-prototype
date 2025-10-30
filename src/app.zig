@@ -69,6 +69,10 @@ pub const App = struct {
                 page = layout(allocator, page);
             }
 
+            writer.write("<!DOCTYPE html>\n") catch |err| {
+                std.debug.print("Error writing HTML: {}\n", .{err});
+                return true;
+            };
             page.render(writer) catch |err| {
                 std.debug.print("Error rendering page: {}\n", .{err});
                 return true;

@@ -151,7 +151,7 @@ fn transpileCommand(allocator: std.mem.Allocator, path: []const u8) !void {
 }
 
 fn runDefaultBehavior(allocator: std.mem.Allocator) !void {
-    const source = @embedFile("zigx/examples/zx_custom.zigx");
+    const source = @embedFile("examples/index.zig");
     const source_z = try allocator.dupeZ(u8, source);
     defer allocator.free(source_z);
 

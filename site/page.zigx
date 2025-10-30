@@ -1,6 +1,7 @@
-pub fn Page(allocator: zx.Allocator, user_string: []const u8) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const dynamic_title = "Dynamic Title!";
     const button_component = Button(allocator, .{ .title = "From Component Var" });
+    const user_string = "John Doe";
 
     return (
         <div class={user_string}>
