@@ -443,11 +443,6 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
     var i: usize = 0;
 
     while (i < content.len) {
-        // Skip whitespace
-        while (i < content.len and std.ascii.isWhitespace(content[i])) i += 1;
-
-        if (i >= content.len) break;
-
         // Check for closing tag
         if (content[i] == '<' and i + 1 < content.len and content[i + 1] == '/') {
             break;
@@ -596,17 +591,25 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
 
         // Regular text
         const text_start = i;
-        while (i < content.len and content[i] != '<' and !(i + 1 < content.len and content[i] == '.' and content[i + 1] == '{')) {
+        while (i < content.len and content[i] != '<' and content[i] != '{') {
             i += 1;
         }
 
         if (i > text_start) {
-            var text = content[text_start..i];
-            // Trim text
-            while (text.len > 0 and std.ascii.isWhitespace(text[0])) text = text[1..];
-            while (text.len > 0 and std.ascii.isWhitespace(text[text.len - 1])) text = text[0 .. text.len - 1];
+            const text = content[text_start..i];
 
-            if (text.len > 0) {
+            // Check if text has any non-whitespace content
+            var has_content = false;
+            for (text) |c| {
+                if (!std.ascii.isWhitespace(c)) {
+                    has_content = true;
+                    break;
+                }
+            }
+
+            // Only add if it has non-whitespace content
+            // Preserve spaces as they may be meaningful (e.g., " #" should keep the space)
+            if (has_content) {
                 try parent.children.append(allocator, .{ .text = text });
             }
         }
@@ -631,9 +634,13 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
         try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
-        // Build props struct from attributes
+        // Generate props type name (ComponentName + "Props")
+        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{elem.tag});
+        defer allocator.free(props_type_name);
+
+        // Build props struct from attributes with explicit type
         if (elem.attributes.items.len > 0) {
-            try output.addToken(.period, ".");
+            try output.addToken(.identifier, props_type_name);
             try output.addToken(.l_brace, "{");
             for (elem.attributes.items, 0..) |attr, i| {
                 try output.addToken(.period, ".");
@@ -655,8 +662,8 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
             }
             try output.addToken(.r_brace, "}");
         } else {
-            // Empty props struct
-            try output.addToken(.period, ".");
+            // Empty props struct with explicit type
+            try output.addToken(.identifier, props_type_name);
             try output.addToken(.l_brace, "{");
             try output.addToken(.r_brace, "}");
         }
@@ -819,9 +826,13 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                         try output.addToken(.identifier, child_elem.tag);
                         try output.addToken(.comma, ",");
 
-                        // Build props struct from attributes
+                        // Generate props type name (ComponentName + "Props")
+                        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{child_elem.tag});
+                        defer allocator.free(props_type_name);
+
+                        // Build props struct from attributes with explicit type
                         if (child_elem.attributes.items.len > 0) {
-                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, props_type_name);
                             try output.addToken(.l_brace, "{");
                             for (child_elem.attributes.items, 0..) |attr, i| {
                                 try output.addToken(.period, ".");
@@ -843,8 +854,8 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
                             }
                             try output.addToken(.r_brace, "}");
                         } else {
-                            // Empty props struct
-                            try output.addToken(.period, ".");
+                            // Empty props struct with explicit type
+                            try output.addToken(.identifier, props_type_name);
                             try output.addToken(.l_brace, "{");
                             try output.addToken(.r_brace, "}");
                         }
@@ -1036,9 +1047,13 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
         try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
-        // Build props struct from attributes
+        // Generate props type name (ComponentName + "Props")
+        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{elem.tag});
+        defer allocator.free(props_type_name);
+
+        // Build props struct from attributes with explicit type
         if (elem.attributes.items.len > 0) {
-            try output.addToken(.period, ".");
+            try output.addToken(.identifier, props_type_name);
             try output.addToken(.l_brace, "{");
             for (elem.attributes.items, 0..) |attr, i| {
                 try output.addToken(.period, ".");
@@ -1060,7 +1075,8 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
             }
             try output.addToken(.r_brace, "}");
         } else {
-            try output.addToken(.period, ".");
+            // Empty props struct with explicit type
+            try output.addToken(.identifier, props_type_name);
             try output.addToken(.l_brace, "{");
             try output.addToken(.r_brace, "}");
         }
