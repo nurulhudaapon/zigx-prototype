@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "zigx_prototype",
+        .name = "zigx",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -55,14 +55,15 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 }
+
 pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
-    const zigx_dep = b.dependency("zigx_prototype", .{
+    const zigx_dep = b.dependency("zigx", .{
         // .target = options.root_module.target,
         // .optimize = options.root_module.optimize,
     });
 
     // --- 1. Get the zigx executable artifact ---
-    const zigx_exe = zigx_dep.artifact("zigx_prototype");
+    const zigx_exe = zigx_dep.artifact("zigx");
 
     // --- 2. Define the transpilation run command ---
     // This command generates the missing files in 'site/.zigx'
