@@ -130,6 +130,8 @@ const ZigxElement = struct {
         text_expr: []const u8,
         component_expr: []const u8, // For {(expression)} - already a Component
         format_expr: struct { expr: []const u8, format: []const u8 }, // For {[expr:fmt]}
+        conditional_expr: struct { condition: []const u8, if_branch: *ZigxElement, else_branch: *ZigxElement }, // For {if (cond) (<JSX>) else (<JSX>)}
+        for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZigxElement }, // For {for (iterable) |item| (<JSX>)}
         element: *ZigxElement,
     };
 
@@ -149,6 +151,14 @@ const ZigxElement = struct {
             if (child == .element) {
                 child.element.deinit();
                 self.allocator.destroy(child.element);
+            } else if (child == .conditional_expr) {
+                child.conditional_expr.if_branch.deinit();
+                self.allocator.destroy(child.conditional_expr.if_branch);
+                child.conditional_expr.else_branch.deinit();
+                self.allocator.destroy(child.conditional_expr.else_branch);
+            } else if (child == .for_loop_expr) {
+                child.for_loop_expr.body.deinit();
+                self.allocator.destroy(child.for_loop_expr.body);
             }
         }
         self.children.deinit(self.allocator);
@@ -502,6 +512,220 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
                     try parent.children.append(allocator, .{ .format_expr = .{ .expr = inner, .format = "d" } });
                 }
             }
+            // Check for conditional expression with JSX: {if (cond) (<JSX>) else (<JSX>)}
+            else if (std.mem.startsWith(u8, expr, "if")) {
+                var parsed_conditional = true;
+                if (std.mem.indexOf(u8, expr, "else")) |else_pos| {
+                    // Extract condition: everything from "if" to "else"
+                    var condition_start: usize = 2; // Skip "if"
+                    // Skip whitespace after "if"
+                    while (condition_start < else_pos and std.ascii.isWhitespace(expr[condition_start])) condition_start += 1;
+                    // Find the start of the condition (usually a '(')
+                    // Actually, the condition might be "(condition)" or just "condition"
+                    // For now, we'll take everything up to the first ')' or to the space before "else"
+                    var condition_end = condition_start;
+                    var paren_depth: i32 = 0;
+                    while (condition_end < else_pos) {
+                        if (expr[condition_end] == '(') paren_depth += 1;
+                        if (expr[condition_end] == ')') {
+                            paren_depth -= 1;
+                            if (paren_depth == 0) {
+                                condition_end += 1;
+                                break;
+                            }
+                        }
+                        condition_end += 1;
+                    }
+                    // If no parens found, take up to "else"
+                    if (condition_end == condition_start) {
+                        condition_end = else_pos;
+                        // Trim whitespace at end
+                        while (condition_end > condition_start and std.ascii.isWhitespace(expr[condition_end - 1])) condition_end -= 1;
+                    }
+
+                    const condition = expr[condition_start..condition_end];
+
+                    // Extract if branch: after condition, skip whitespace, find opening paren
+                    var if_start = condition_end;
+                    while (if_start < else_pos and (std.ascii.isWhitespace(expr[if_start]) or expr[if_start] == ')')) if_start += 1;
+                    // Find opening paren for JSX
+                    while (if_start < else_pos and expr[if_start] != '(') if_start += 1;
+                    if (if_start < else_pos and expr[if_start] == '(') {
+                        if_start += 1; // Skip opening paren
+                        // Find matching closing paren
+                        var if_end = if_start;
+                        paren_depth = 1;
+                        while (if_end < else_pos and paren_depth > 0) {
+                            if (expr[if_end] == '(') paren_depth += 1;
+                            if (expr[if_end] == ')') paren_depth -= 1;
+                            if (paren_depth > 0) if_end += 1;
+                        }
+                        const if_jsx_content = expr[if_start..if_end];
+
+                        // Extract else branch: after "else", skip whitespace, find opening paren
+                        var else_start = else_pos + 4; // Skip "else"
+                        while (else_start < expr.len and std.ascii.isWhitespace(expr[else_start])) else_start += 1;
+                        // Find opening paren
+                        while (else_start < expr.len and expr[else_start] != '(') else_start += 1;
+                        if (else_start < expr.len and expr[else_start] == '(') {
+                            else_start += 1; // Skip opening paren
+                            // Find matching closing paren
+                            var else_end = else_start;
+                            paren_depth = 1;
+                            while (else_end < expr.len and paren_depth > 0) {
+                                if (expr[else_end] == '(') paren_depth += 1;
+                                if (expr[else_end] == ')') paren_depth -= 1;
+                                if (paren_depth > 0) else_end += 1;
+                            }
+                            const else_jsx_content = expr[else_start..else_end];
+
+                            // Parse both JSX branches
+                            if (parseJsx(allocator, if_jsx_content)) |if_elem| {
+                                if (parseJsx(allocator, else_jsx_content)) |else_elem| {
+                                    try parent.children.append(allocator, .{ .conditional_expr = .{
+                                        .condition = condition,
+                                        .if_branch = if_elem,
+                                        .else_branch = else_elem,
+                                    } });
+                                    continue;
+                                } else |_| {
+                                    // Cleanup if branch on error
+                                    if_elem.deinit();
+                                    allocator.destroy(if_elem);
+                                    parsed_conditional = false;
+                                }
+                            } else |_| {
+                                parsed_conditional = false;
+                            }
+                        }
+                    }
+                }
+                // If we couldn't parse as conditional with JSX, fall through to regular text expression
+                if (!parsed_conditional) {
+                    try parent.children.append(allocator, .{ .text_expr = expr });
+                }
+            }
+            // Check for for loop expression: {for (iterable) |item| (<JSX>)}
+            else if (std.mem.startsWith(u8, expr, "for")) {
+                // Pattern: for (iterable) |item| (<JSX>)
+                var parsed_for_loop = true;
+
+                // Find opening paren after "for"
+                var for_pos: usize = 3; // Skip "for"
+                while (for_pos < expr.len and std.ascii.isWhitespace(expr[for_pos])) for_pos += 1;
+
+                if (for_pos < expr.len and expr[for_pos] == '(') {
+                    for_pos += 1; // Skip opening paren
+                    // Find iterable (text between ( and ))
+                    const iterable_start = for_pos;
+                    var iterable_end = iterable_start;
+                    var paren_depth: i32 = 1;
+                    while (iterable_end < expr.len and paren_depth > 0) {
+                        if (expr[iterable_end] == '(') paren_depth += 1;
+                        if (expr[iterable_end] == ')') paren_depth -= 1;
+                        if (paren_depth > 0) iterable_end += 1;
+                    }
+                    const iterable = expr[iterable_start..iterable_end];
+
+                    // Skip closing paren and whitespace
+                    var pipe_pos = iterable_end + 1;
+                    while (pipe_pos < expr.len and std.ascii.isWhitespace(expr[pipe_pos])) pipe_pos += 1;
+
+                    // Find |item| pattern
+                    if (pipe_pos < expr.len and expr[pipe_pos] == '|') {
+                        pipe_pos += 1; // Skip opening |
+                        const item_start = pipe_pos;
+                        while (pipe_pos < expr.len and expr[pipe_pos] != '|') pipe_pos += 1;
+
+                        if (pipe_pos < expr.len and expr[pipe_pos] == '|') {
+                            const item_name = expr[item_start..pipe_pos];
+                            pipe_pos += 1; // Skip closing |
+
+                            // Skip whitespace after |
+                            while (pipe_pos < expr.len and std.ascii.isWhitespace(expr[pipe_pos])) pipe_pos += 1;
+
+                            var jsx_content_start = pipe_pos;
+                            var jsx_content_end: usize = undefined;
+                            var found_jsx = false;
+
+                            // Check for opening paren: {for (iterable) |item| (<JSX>)}
+                            if (pipe_pos < expr.len and expr[pipe_pos] == '(') {
+                                pipe_pos += 1; // Skip opening paren
+                                // Find matching closing paren
+                                jsx_content_start = pipe_pos;
+                                jsx_content_end = pipe_pos;
+                                paren_depth = 1;
+                                while (jsx_content_end < expr.len and paren_depth > 0) {
+                                    if (expr[jsx_content_end] == '(') paren_depth += 1;
+                                    if (expr[jsx_content_end] == ')') paren_depth -= 1;
+                                    if (paren_depth > 0) jsx_content_end += 1;
+                                }
+                                found_jsx = true;
+                            }
+                            // Check for opening brace: {for (iterable) |item| { (<JSX>) }}
+                            else if (pipe_pos < expr.len and expr[pipe_pos] == '{') {
+                                pipe_pos += 1; // Skip opening brace
+                                // Find matching closing brace
+                                var brace_end = pipe_pos;
+                                var for_brace_depth: i32 = 1;
+                                while (brace_end < expr.len and for_brace_depth > 0) {
+                                    if (expr[brace_end] == '{') for_brace_depth += 1;
+                                    if (expr[brace_end] == '}') for_brace_depth -= 1;
+                                    if (for_brace_depth > 0) brace_end += 1;
+                                }
+
+                                // Now look for (<JSX>) inside the braces
+                                var inner_start = pipe_pos;
+                                // Skip whitespace at the start
+                                while (inner_start < brace_end and std.ascii.isWhitespace(expr[inner_start])) inner_start += 1;
+
+                                if (inner_start < brace_end and expr[inner_start] == '(') {
+                                    inner_start += 1; // Skip opening paren
+                                    jsx_content_start = inner_start;
+                                    jsx_content_end = inner_start;
+                                    var for_paren_depth: i32 = 1;
+                                    while (jsx_content_end < brace_end and for_paren_depth > 0) {
+                                        if (expr[jsx_content_end] == '(') for_paren_depth += 1;
+                                        if (expr[jsx_content_end] == ')') for_paren_depth -= 1;
+                                        if (for_paren_depth > 0) jsx_content_end += 1;
+                                    }
+                                    found_jsx = true;
+                                }
+                            }
+
+                            if (found_jsx) {
+                                const jsx_content = expr[jsx_content_start..jsx_content_end];
+
+                                // Parse JSX body
+                                if (parseJsx(allocator, jsx_content)) |body_elem| {
+                                    try parent.children.append(allocator, .{ .for_loop_expr = .{
+                                        .iterable = iterable,
+                                        .item_name = item_name,
+                                        .body = body_elem,
+                                    } });
+                                    continue;
+                                } else |_| {
+                                    // Parsing failed
+                                    parsed_for_loop = false;
+                                }
+                            } else {
+                                parsed_for_loop = false;
+                            }
+                        } else {
+                            parsed_for_loop = false;
+                        }
+                    } else {
+                        parsed_for_loop = false;
+                    }
+                } else {
+                    parsed_for_loop = false;
+                }
+
+                // If we couldn't parse as for loop, treat as regular expression
+                if (!parsed_for_loop) {
+                    try parent.children.append(allocator, .{ .text_expr = expr });
+                }
+            }
             // Regular text expression: {expr}
             else {
                 try parent.children.append(allocator, .{ .text_expr = expr });
@@ -624,6 +848,11 @@ fn isCustomComponent(tag: []const u8) bool {
 
 /// Render JSX element as zx.zx() function call using tokens
 fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+    try renderJsxAsTokensWithLoopContext(allocator, output, elem, indent, null, null);
+}
+
+/// Render JSX element with optional loop context for variable substitution
+fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // For custom components, wrap in lazy: _zx.lazy(Component, props)
@@ -751,278 +980,360 @@ fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: 
         try output.addToken(.period, ".");
         try output.addToken(.identifier, "children");
         try output.addToken(.equal, "=");
-        try output.addToken(.ampersand, "&");
-        try output.addToken(.period, ".");
-        try output.addToken(.l_brace, "{");
-        try output.addToken(.invalid, "\n");
 
-        for (elem.children.items) |child| {
+        // Special case: if the only child is a for_loop_expr, assign it directly (blk returns an array)
+        if (elem.children.items.len == 1 and elem.children.items[0] == .for_loop_expr) {
+            const for_loop = elem.children.items[0].for_loop_expr;
+
+            // Render the blk directly without &.{ ... } wrapper
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "blk");
+            try output.addToken(.colon, ":");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.invalid, "\n");
+
+            // const __zx_children = allocator.alloc(zx.Component, iterable.len) catch unreachable;
             try addIndentTokens(output, indent + 3);
-            switch (child) {
-                .text => |text| {
-                    // Use _zx.txt("text")
-                    try output.addToken(.identifier, "_zx");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "txt");
-                    try output.addToken(.l_paren, "(");
+            try output.addToken(.keyword_const, "const");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "allocator");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "alloc");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.identifier, "zx");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "Component");
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, for_loop.iterable);
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "len");
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.keyword_catch, "catch");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.keyword_unreachable, "unreachable");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
 
-                    const escaped_text = try escapeTextForStringLiteral(allocator, text);
-                    defer allocator.free(escaped_text);
-                    const text_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_text});
-                    defer allocator.free(text_buf);
-                    try output.addToken(.string_literal, text_buf);
+            // for (iterable, 0..) |item, i| {
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_for, "for");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.identifier, for_loop.iterable);
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "0");
+            try output.addToken(.period, ".");
+            try output.addToken(.period, ".");
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.pipe, "|");
+            try output.addToken(.identifier, for_loop.item_name);
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "i");
+            try output.addToken(.pipe, "|");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.invalid, "\n");
 
-                    try output.addToken(.r_paren, ")");
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-                },
-                .text_expr => |expr| {
-                    // Use _zx.txt(expr)
-                    try output.addToken(.identifier, "_zx");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "txt");
-                    try output.addToken(.l_paren, "(");
-                    try output.addToken(.identifier, expr);
-                    try output.addToken(.r_paren, ")");
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-                },
-                .format_expr => |fmt| {
-                    // Use _zx.fmt("{format}", .{expr})
-                    try output.addToken(.identifier, "_zx");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "fmt");
-                    try output.addToken(.l_paren, "(");
+            // __zx_children[i] = _zx.zx(...);
+            try addIndentTokens(output, indent + 4);
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.l_bracket, "[");
+            try output.addToken(.identifier, "i");
+            try output.addToken(.r_bracket, "]");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 4, for_loop.iterable, for_loop.item_name);
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
 
-                    // Format string: "{format}"
-                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                    defer allocator.free(format_str);
-                    try output.addToken(.string_literal, format_str);
-                    try output.addToken(.comma, ",");
+            // }
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.invalid, "\n");
 
-                    // Expression wrapped in tuple: .{expr}
-                    try output.addToken(.period, ".");
-                    try output.addToken(.l_brace, "{");
-                    try output.addToken(.identifier, fmt.expr);
-                    try output.addToken(.r_brace, "}");
-                    try output.addToken(.r_paren, ")");
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-                },
-                .component_expr => |expr| {
-                    // Component expression: {(expr)} - use directly without wrapping
-                    try output.addToken(.identifier, expr);
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-                },
-                .element => |child_elem| {
-                    // Check if this is a custom component
-                    if (isCustomComponent(child_elem.tag)) {
-                        // For custom components, wrap in lazy: _zx.lazy(Component, props)
+            // break :blk __zx_children;
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_break, "break");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.colon, ":");
+            try output.addToken(.identifier, "blk");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // }
+            try addIndentTokens(output, indent + 2);
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, "\n");
+        } else {
+            // Multiple children or non-for-loop child: use array syntax
+            try output.addToken(.ampersand, "&");
+            try output.addToken(.period, ".");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.invalid, "\n");
+
+            for (elem.children.items) |child| {
+                try addIndentTokens(output, indent + 3);
+                switch (child) {
+                    .text => |text| {
+                        // Use _zx.txt("text")
                         try output.addToken(.identifier, "_zx");
                         try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "lazy");
+                        try output.addToken(.identifier, "txt");
                         try output.addToken(.l_paren, "(");
-                        try output.addToken(.identifier, child_elem.tag);
-                        try output.addToken(.comma, ",");
 
-                        // Generate props type name (ComponentName + "Props")
-                        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{child_elem.tag});
-                        defer allocator.free(props_type_name);
-
-                        // Build props struct from attributes with explicit type
-                        if (child_elem.attributes.items.len > 0) {
-                            try output.addToken(.identifier, props_type_name);
-                            try output.addToken(.l_brace, "{");
-                            for (child_elem.attributes.items, 0..) |attr, i| {
-                                try output.addToken(.period, ".");
-                                try output.addToken(.identifier, attr.name);
-                                try output.addToken(.equal, "=");
-                                switch (attr.value) {
-                                    .static => |val| {
-                                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                                        defer allocator.free(value_buf);
-                                        try output.addToken(.string_literal, value_buf);
-                                    },
-                                    .dynamic => |expr| {
-                                        try output.addToken(.identifier, expr);
-                                    },
-                                }
-                                if (i < child_elem.attributes.items.len - 1) {
-                                    try output.addToken(.comma, ",");
-                                }
-                            }
-                            try output.addToken(.r_brace, "}");
-                        } else {
-                            // Empty props struct with explicit type
-                            try output.addToken(.identifier, props_type_name);
-                            try output.addToken(.l_brace, "{");
-                            try output.addToken(.r_brace, "}");
-                        }
+                        const escaped_text = try escapeTextForStringLiteral(allocator, text);
+                        defer allocator.free(escaped_text);
+                        const text_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_text});
+                        defer allocator.free(text_buf);
+                        try output.addToken(.string_literal, text_buf);
 
                         try output.addToken(.r_paren, ")");
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
-                    } else {
-                        // Use _zx.zx(.tag, .{ ... }) for nested elements
+                    },
+                    .text_expr => |expr| {
+                        // Use _zx.txt(expr)
                         try output.addToken(.identifier, "_zx");
                         try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "zx");
+                        try output.addToken(.identifier, "txt");
                         try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, expr);
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .format_expr => |fmt| {
+                        // Use _zx.fmt("{format}", .{expr})
+                        try output.addToken(.identifier, "_zx");
                         try output.addToken(.period, ".");
-                        try output.addToken(.identifier, child_elem.tag);
+                        try output.addToken(.identifier, "fmt");
+                        try output.addToken(.l_paren, "(");
+
+                        // Format string: "{format}"
+                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                        defer allocator.free(format_str);
+                        try output.addToken(.string_literal, format_str);
                         try output.addToken(.comma, ",");
 
-                        // Options struct
+                        // Expression wrapped in tuple: .{expr}
+                        // If we're in a loop and expr matches loop item, use the loop item directly
                         try output.addToken(.period, ".");
                         try output.addToken(.l_brace, "{");
-                        try output.addToken(.invalid, "\n");
-
-                        // Attributes for nested element
-                        if (child_elem.attributes.items.len > 0) {
-                            try addIndentTokens(output, indent + 4);
-                            try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "attributes");
-                            try output.addToken(.equal, "=");
-                            try output.addToken(.ampersand, "&");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.l_brace, "{");
-                            try output.addToken(.invalid, "\n");
-
-                            for (child_elem.attributes.items) |attr| {
-                                try addIndentTokens(output, indent + 5);
-                                try output.addToken(.period, ".");
-                                try output.addToken(.l_brace, "{");
-                                try output.addToken(.period, ".");
-                                try output.addToken(.identifier, "name");
-                                try output.addToken(.equal, "=");
-
-                                const name_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{attr.name});
-                                defer allocator.free(name_buf);
-                                try output.addToken(.string_literal, name_buf);
-                                try output.addToken(.comma, ",");
-
-                                try output.addToken(.period, ".");
-                                try output.addToken(.identifier, "value");
-                                try output.addToken(.equal, "=");
-
-                                switch (attr.value) {
-                                    .static => |val| {
-                                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                                        defer allocator.free(value_buf);
-                                        try output.addToken(.string_literal, value_buf);
-                                    },
-                                    .dynamic => |expr| {
-                                        try output.addToken(.identifier, expr);
-                                    },
-                                }
-
-                                try output.addToken(.r_brace, "}");
-                                try output.addToken(.comma, ",");
-                                try output.addToken(.invalid, "\n");
+                        if (loop_item) |item| {
+                            if (std.mem.eql(u8, fmt.expr, item)) {
+                                // Use the loop item directly (already captured in the loop)
+                                try output.addToken(.identifier, item);
+                            } else {
+                                try output.addToken(.identifier, fmt.expr);
                             }
-
-                            try addIndentTokens(output, indent + 4);
-                            try output.addToken(.r_brace, "}");
-                            try output.addToken(.comma, ",");
-                            try output.addToken(.invalid, "\n");
+                        } else {
+                            try output.addToken(.identifier, fmt.expr);
                         }
-
-                        // Children for nested element
-                        if (child_elem.children.items.len > 0) {
-                            try addIndentTokens(output, indent + 4);
-                            try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "children");
-                            try output.addToken(.equal, "=");
-                            try output.addToken(.ampersand, "&");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.l_brace, "{");
-                            try output.addToken(.invalid, "\n");
-
-                            for (child_elem.children.items) |nested_child| {
-                                try addIndentTokens(output, indent + 5);
-                                switch (nested_child) {
-                                    .text => |text| {
-                                        try output.addToken(.identifier, "_zx");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "txt");
-                                        try output.addToken(.l_paren, "(");
-
-                                        const escaped_text = try escapeTextForStringLiteral(allocator, text);
-                                        defer allocator.free(escaped_text);
-                                        const text_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_text});
-                                        defer allocator.free(text_buf);
-                                        try output.addToken(.string_literal, text_buf);
-
-                                        try output.addToken(.r_paren, ")");
-                                        try output.addToken(.comma, ",");
-                                        try output.addToken(.invalid, "\n");
-                                    },
-                                    .text_expr => |expr| {
-                                        try output.addToken(.identifier, "_zx");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "txt");
-                                        try output.addToken(.l_paren, "(");
-                                        try output.addToken(.identifier, expr);
-                                        try output.addToken(.r_paren, ")");
-                                        try output.addToken(.comma, ",");
-                                        try output.addToken(.invalid, "\n");
-                                    },
-                                    .format_expr => |fmt| {
-                                        try output.addToken(.identifier, "_zx");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "fmt");
-                                        try output.addToken(.l_paren, "(");
-
-                                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                                        defer allocator.free(format_str);
-                                        try output.addToken(.string_literal, format_str);
-                                        try output.addToken(.comma, ",");
-
-                                        // Expression wrapped in tuple: .{expr}
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.l_brace, "{");
-                                        try output.addToken(.identifier, fmt.expr);
-                                        try output.addToken(.r_brace, "}");
-                                        try output.addToken(.r_paren, ")");
-                                        try output.addToken(.comma, ",");
-                                        try output.addToken(.invalid, "\n");
-                                    },
-                                    .component_expr => |expr| {
-                                        // Component expression: {(expr)} - use directly without wrapping
-                                        try output.addToken(.identifier, expr);
-                                        try output.addToken(.comma, ",");
-                                        try output.addToken(.invalid, "\n");
-                                    },
-                                    .element => |nested_elem| {
-                                        // For deeply nested elements, recursively render using renderNestedElement
-                                        try renderNestedElementAsCall(allocator, output, nested_elem, indent + 5);
-                                        try output.addToken(.comma, ",");
-                                        try output.addToken(.invalid, "\n");
-                                    },
-                                }
-                            }
-
-                            try addIndentTokens(output, indent + 4);
-                            try output.addToken(.r_brace, "}");
-                            try output.addToken(.comma, ",");
-                            try output.addToken(.invalid, "\n");
-                        }
-
-                        try addIndentTokens(output, indent + 3);
                         try output.addToken(.r_brace, "}");
                         try output.addToken(.r_paren, ")");
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
-                    }
-                },
-            }
-        }
+                    },
+                    .component_expr => |expr| {
+                        // Component expression: {(expr)} - use directly without wrapping
+                        try output.addToken(.identifier, expr);
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .conditional_expr => |cond| {
+                        // Conditional expression: {if (cond) (<JSX>) else (<JSX>)}
+                        // Render as: if (condition) <render if_branch> else <render else_branch>
+                        try output.addToken(.keyword_if, "if");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, cond.condition);
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
 
-        try addIndentTokens(output, indent + 2);
-        try output.addToken(.r_brace, "}");
-        try output.addToken(.comma, ",");
-        try output.addToken(.invalid, "\n");
+                        // Render if branch
+                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 3, loop_iterable, loop_item);
+
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.keyword_else, "else");
+                        try output.addToken(.invalid, " ");
+
+                        // Render else branch
+                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 3, loop_iterable, loop_item);
+
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .for_loop_expr => |for_loop| {
+                        // For loop expression: {for (iterable) |item| (<JSX>)}
+                        // Render as: blk: { const children = allocator.alloc(...); for (...) { ... }; break :blk children; }
+                        try output.addToken(.identifier, "blk");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+
+                        // const __zx_children = allocator.alloc(zx.Component, iterable.len) catch unreachable;
+                        try addIndentTokens(output, indent + 4);
+                        try output.addToken(.keyword_const, "const");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "alloc");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "Component");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, for_loop.iterable);
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "len");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.keyword_catch, "catch");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.keyword_unreachable, "unreachable");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // for (__zx_children, 0..) |*__zx_child, i| {
+                        try addIndentTokens(output, indent + 4);
+                        try output.addToken(.keyword_for, "for");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "0");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.pipe, "|");
+                        try output.addToken(.asterisk, "*");
+                        try output.addToken(.identifier, "__zx_child");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "i");
+                        try output.addToken(.pipe, "|");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+
+                        // __zx_child.* = _zx.zx(...);
+                        try addIndentTokens(output, indent + 5);
+                        try output.addToken(.identifier, "__zx_child");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.asterisk, "*");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name);
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // }
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.invalid, "\n");
+
+                        // break :blk __zx_children;
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.keyword_break, "break");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.identifier, "blk");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // }
+                        try addIndentTokens(output, indent + 2);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .element => |child_elem| {
+                        // Check if this is a custom component
+                        if (isCustomComponent(child_elem.tag)) {
+                            // For custom components, wrap in lazy: _zx.lazy(Component, props)
+                            try output.addToken(.identifier, "_zx");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "lazy");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, child_elem.tag);
+                            try output.addToken(.comma, ",");
+
+                            // Generate props type name (ComponentName + "Props")
+                            const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{child_elem.tag});
+                            defer allocator.free(props_type_name);
+
+                            // Build props struct from attributes with explicit type
+                            if (child_elem.attributes.items.len > 0) {
+                                try output.addToken(.identifier, props_type_name);
+                                try output.addToken(.l_brace, "{");
+                                for (child_elem.attributes.items, 0..) |attr, i| {
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, attr.name);
+                                    try output.addToken(.equal, "=");
+                                    switch (attr.value) {
+                                        .static => |val| {
+                                            const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+                                            defer allocator.free(value_buf);
+                                            try output.addToken(.string_literal, value_buf);
+                                        },
+                                        .dynamic => |expr| {
+                                            try output.addToken(.identifier, expr);
+                                        },
+                                    }
+                                    if (i < child_elem.attributes.items.len - 1) {
+                                        try output.addToken(.comma, ",");
+                                    }
+                                }
+                                try output.addToken(.r_brace, "}");
+                            } else {
+                                // Empty props struct with explicit type
+                                try output.addToken(.identifier, props_type_name);
+                                try output.addToken(.l_brace, "{");
+                                try output.addToken(.r_brace, "}");
+                            }
+
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, "\n");
+                        } else {
+                            // Use _zx.zx(.tag, .{ ... }) for nested elements - recursively call with loop context
+                            try renderJsxAsTokensWithLoopContext(allocator, output, child_elem, indent + 3, loop_iterable, loop_item);
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, "\n");
+                        }
+                    },
+                }
+            }
+
+            try addIndentTokens(output, indent + 2);
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, "\n");
+        }
     }
 
     // Close options struct
@@ -1197,6 +1508,101 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                 .component_expr => |expr| {
                     // Component expression: {(expr)} - use directly without wrapping
                     try output.addToken(.identifier, expr);
+                    try output.addToken(.comma, ",");
+                },
+                .conditional_expr => |cond| {
+                    // Conditional expression: {if (cond) (<JSX>) else (<JSX>)}
+                    try output.addToken(.keyword_if, "if");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, cond.condition);
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.invalid, " ");
+
+                    // Render if branch
+                    try renderNestedElementAsCall(allocator, output, cond.if_branch, indent);
+
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.keyword_else, "else");
+                    try output.addToken(.invalid, " ");
+
+                    // Render else branch
+                    try renderNestedElementAsCall(allocator, output, cond.else_branch, indent);
+
+                    try output.addToken(.comma, ",");
+                },
+                .for_loop_expr => |for_loop| {
+                    // For loop expression - same structure but adjust indentation
+                    try output.addToken(.identifier, "blk");
+                    try output.addToken(.colon, ":");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_brace, "{");
+
+                    try output.addToken(.keyword_const, "const");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "children");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.equal, "=");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "allocator");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "alloc");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, "zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "Component");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, for_loop.iterable);
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "len");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.keyword_catch, "catch");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.keyword_unreachable, "unreachable");
+                    try output.addToken(.semicolon, ";");
+
+                    try output.addToken(.keyword_for, "for");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, "children");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "0");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.pipe, "|");
+                    try output.addToken(.asterisk, "*");
+                    try output.addToken(.identifier, "child");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "i");
+                    try output.addToken(.pipe, "|");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_brace, "{");
+
+                    try output.addToken(.identifier, "child");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.asterisk, "*");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.equal, "=");
+                    try output.addToken(.invalid, " ");
+                    try renderNestedElementAsCall(allocator, output, for_loop.body, indent);
+                    try output.addToken(.semicolon, ";");
+
+                    try output.addToken(.r_brace, "}");
+
+                    try output.addToken(.keyword_break, "break");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.colon, ":");
+                    try output.addToken(.identifier, "blk");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "children");
+                    try output.addToken(.semicolon, ";");
+
+                    try output.addToken(.r_brace, "}");
                     try output.addToken(.comma, ",");
                 },
                 .element => |nested_elem| {

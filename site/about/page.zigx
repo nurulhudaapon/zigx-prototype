@@ -1,9 +1,49 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
+    const is_loading = true;
+    const test_chars = "abcdefghijklmnopqrstuvwxyz";
+    const names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
+
     return (
         <body>
             <h1>About</h1>
+
+            <section>
+                {if (is_loading) ("Loading...") else ("Loaded")}
+            </section>
+
+            <section>
+                {if (is_loading) (<h1>Loading...</h1>) else (<h1>Loaded</h1>)}
+            </section>
+
+            <section>
+                {for (test_chars) |cc| (<span>{[cc:c]}</span>)}
+            </section>
+
+            <section>
+                {for (test_chars) |cc| {
+                    (<span>{[cc:c]}</span>)
+                }}
+            </section>
+
+            <section>
+                {for (names) |name| (<span>{name}</span>)}
+            </section>
+
+            <section>
+                {for (names) |name| {
+                    (<p>{name}</p>)
+                }}
+            </section>
+                        
+            <section>
+                {for (test_chars) |cc| {
+                    (<h1><span>{[cc:c]}</span></h1>)
+                }}
+            </section>
+
         </body>
     );
 }
 
 const zx = @import("zx");
+
