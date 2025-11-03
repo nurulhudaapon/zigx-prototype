@@ -44,12 +44,16 @@ pub const App = struct {
         }
     };
 
+    allocator: std.mem.Allocator,
     meta: *const Meta,
     handler: Handler,
     server: httpz.Server(*Handler),
 
-    pub fn init(allocator: std.mem.Allocator, config: AppConfig) !App {
-        var app: App = undefined;
+    pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
+        const app = try allocator.create(App);
+        errdefer allocator.destroy(app);
+
+        app.allocator = allocator;
         app.meta = config.meta;
         app.handler = Handler{ .meta = config.meta };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
@@ -58,8 +62,10 @@ pub const App = struct {
     }
 
     pub fn deinit(self: *App) void {
+        const allocator = self.allocator;
         self.server.stop();
         self.server.deinit();
+        allocator.destroy(self);
     }
 
     pub fn start(self: *App) !void {

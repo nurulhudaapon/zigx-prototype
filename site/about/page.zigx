@@ -41,9 +41,26 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 }}
             </section>
 
+            <section>
+                {for (users) |user| {
+                    (<p>{user.name} - {[user.age:d]}</p>)
+                }}
+            </section>
+
         </body>
     );
 }
 
 const zx = @import("zx");
 
+const User = struct {
+    name: []const u8,
+    age: u32,
+};
+
+const users = [_]User{
+    .{ .name = "John", .age = 20 },
+    .{ .name = "Jane", .age = 21 },
+    .{ .name = "Jim", .age = 22 },
+    .{ .name = "Jill", .age = 23 },
+};
