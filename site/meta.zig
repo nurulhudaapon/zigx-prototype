@@ -1,3 +1,5 @@
+const zx = @import("zx");
+
 pub const routes = [_]zx.App.Meta.Route{
     .{
         .path = "/",
@@ -21,10 +23,16 @@ pub const routes = [_]zx.App.Meta.Route{
                             },
                         },
                     },
+                    .{
+                        .path = "/time",
+                        .page = @import("time/page.zig").Page,
+                    },
                 },
             },
         },
     },
 };
 
-const zx = @import("zx");
+pub const meta = zx.App.Meta{
+    .routes = &routes,
+};

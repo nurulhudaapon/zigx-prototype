@@ -1,3 +1,5 @@
+const httpz = @import("httpz");
+
 pub const App = struct {
     pub const Meta = struct {
         pub const Route = struct {
@@ -8,34 +10,60 @@ pub const App = struct {
         };
         routes: []const Route,
     };
+    pub const AppConfig = struct {
+        server: httpz.Config,
+        meta: *const Meta,
+    };
 
-    meta: Meta,
+    const Handler = struct {
+        meta: *const App.Meta,
 
-    pub fn init(meta: Meta) App {
-        return .{ .meta = meta };
+        pub fn handle(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
+            const allocator = req.arena;
+            const path = req.url.path;
+            const writer = &res.buffer.writer;
+
+            const request_path = normalizePath(allocator, path) catch {
+                res.body = "Internal Server Error";
+                return;
+            };
+
+            const empty_layouts: []const *const fn (allocator: Allocator, component: Component) Component = &.{};
+
+            for (self.meta.routes) |route| {
+                const rendered = matchRoute(request_path, route, empty_layouts, allocator, writer) catch {
+                    res.body = "Internal Server Error";
+                    return;
+                };
+                if (rendered) {
+                    return;
+                }
+            }
+
+            res.body = "Not found";
+        }
+    };
+
+    meta: *const Meta,
+    handler: Handler,
+    server: httpz.Server(*Handler),
+
+    pub fn init(allocator: std.mem.Allocator, config: AppConfig) !App {
+        var app: App = undefined;
+        app.meta = config.meta;
+        app.handler = Handler{ .meta = config.meta };
+        app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
+
+        return app;
     }
 
-    // Generic handler that doesn't depend on httpz
-    pub fn handle(
-        self: App,
-        allocator: std.mem.Allocator,
-        writer: *std.Io.Writer,
-        path: []const u8,
-    ) !?[]const u8 {
-        const request_path = normalizePath(allocator, path) catch {
-            return "Internal Server Error";
-        };
+    pub fn deinit(self: *App) void {
+        self.server.stop();
+        self.server.deinit();
+    }
 
-        const empty_layouts: []const *const fn (allocator: Allocator, component: Component) Component = &.{};
-
-        for (self.meta.routes) |route| {
-            const rendered = try matchRoute(request_path, route, empty_layouts, allocator, writer);
-            if (rendered) {
-                return null; // Successfully rendered to writer
-            }
-        }
-
-        return "Not found";
+    pub fn start(self: *App) !void {
+        try self.server.listen();
     }
 
     fn normalizePath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
