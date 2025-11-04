@@ -41,7 +41,6 @@ body {
 .nav-header {
     padding: 0 2rem 2rem;
     border-bottom: 2px solid var(--border-color);
-    margin-bottom: 1rem;
 }
 
 .nav-header h1 {
@@ -492,8 +491,7 @@ code[class*="language-"] {
     }
     
     .example-code {
-        height: 400px;
-        min-height: 250px;
+        min-height: 40px;
     }
     
     /* Smaller fonts on medium screens */
@@ -570,8 +568,7 @@ code[class*="language-"] {
     }
     
     .example-code {
-        height: 400px;
-        min-height: 200px;
+        min-height: 40px;
     }
     
     /* Smaller fonts on mobile */
