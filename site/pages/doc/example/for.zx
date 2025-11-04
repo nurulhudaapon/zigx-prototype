@@ -1,0 +1,11 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const chars = "Hello, World!";
+
+    return (
+        <section>
+            {for (chars) |char| (<span>{[char:c]}</span>)}
+        </section>
+    );
+}
+
+const zx = @import("zx");

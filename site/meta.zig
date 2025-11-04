@@ -26,7 +26,15 @@ pub const routes = [_]zx.App.Meta.Route{
                     },
                 },
             },
+            .{
+                .path = "/example",
+                .page = @import(".zx/pages/doc/example/page.zig").Page,
+            },
         },
+    },
+    .{
+        .path = "/doc",
+        .page = @import(".zx/pages/doc/page.zig").Page,
     },
 };
 

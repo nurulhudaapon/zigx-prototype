@@ -1,0 +1,16 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const count = 42;
+    const hex_value = 255;
+    const percentage = 75;
+
+    return (
+        <section>
+            <p>Count: {[count:d]}</p>
+            <p>Hex: 0x{[hex_value:x]}</p>
+            <p>Percentage: {[percentage:d]}%</p>
+        </section>
+    );
+}
+
+const zx = @import("zx");
+

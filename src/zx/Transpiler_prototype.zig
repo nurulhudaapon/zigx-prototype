@@ -286,6 +286,106 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
             tokenizer.index = saved_index;
         }
 
+        // Check if this is a const declaration followed by JSX
+        if (token.tag == .keyword_const) {
+            // Store the const token start
+            const const_start = token.loc.start;
+
+            // Look ahead for identifier, =, and then (
+            const saved_index = tokenizer.index;
+            var next_token = tokenizer.next();
+
+            // Skip any whitespace/comments
+            while (next_token.tag == .invalid or next_token.tag == .doc_comment or next_token.tag == .container_doc_comment) {
+                next_token = tokenizer.next();
+            }
+
+            // Check if next meaningful token is an identifier (variable name)
+            if (next_token.tag == .identifier) {
+                const var_name_start = next_token.loc.start;
+                const var_name_end = next_token.loc.end;
+                const var_name = source[var_name_start..var_name_end];
+
+                // Skip whitespace and look for =
+                next_token = tokenizer.next();
+                while (next_token.tag == .invalid or next_token.tag == .doc_comment or next_token.tag == .container_doc_comment) {
+                    next_token = tokenizer.next();
+                }
+
+                if (next_token.tag == .equal) {
+                    // Skip whitespace and look for (
+                    next_token = tokenizer.next();
+                    while (next_token.tag == .invalid or next_token.tag == .doc_comment or next_token.tag == .container_doc_comment) {
+                        next_token = tokenizer.next();
+                    }
+
+                    // Check if next meaningful token is (
+                    if (next_token.tag == .l_paren) {
+                        // Look for JSX opening tag by scanning ahead
+                        const paren_start = next_token.loc.end;
+                        const jsx_start = findJsxStart(source, paren_start);
+
+                        if (jsx_start) |jsx_pos| {
+                            // Find the matching closing paren for the JSX block
+                            const jsx_end = findMatchingCloseParen(source, next_token.loc.end);
+
+                            if (jsx_end > jsx_pos) {
+                                // Append everything from last_pos up to (not including) const keyword
+                                if (last_pos < const_start) {
+                                    try result.appendSlice(allocator, source[last_pos..const_start]);
+                                }
+
+                                // Extract JSX content (between < and closing ))
+                                const jsx_content = source[jsx_pos .. jsx_end - 1];
+
+                                // Parse JSX
+                                const jsx_elem = try parseJsx(allocator, jsx_content);
+                                defer {
+                                    jsx_elem.deinit();
+                                    allocator.destroy(jsx_elem);
+                                }
+
+                                // Build as tokens and convert to string
+                                var output = TokenBuilder.init(allocator);
+                                defer output.deinit();
+
+                                // Add allocator context initialization
+                                try output.addToken(.keyword_const, "const");
+                                try output.addToken(.identifier, "_zx");
+                                try output.addToken(.equal, "=");
+                                try output.addToken(.identifier, "zx");
+                                try output.addToken(.period, ".");
+                                try output.addToken(.identifier, "init");
+                                try output.addToken(.l_paren, "(");
+                                try output.addToken(.identifier, "allocator");
+                                try output.addToken(.r_paren, ")");
+                                try output.addToken(.semicolon, ";");
+                                try output.addToken(.invalid, "\n");
+
+                                // const var_name = _zx.zx(...)
+                                try output.addToken(.keyword_const, "const");
+                                try output.addToken(.identifier, var_name);
+                                try output.addToken(.equal, "=");
+                                try renderJsxAsTokens(allocator, &output, jsx_elem, 1);
+
+                                const jsx_output = try output.toString();
+                                defer allocator.free(jsx_output);
+                                try result.appendSlice(allocator, jsx_output);
+
+                                // Move tokenizer and last_pos forward past the JSX block
+                                tokenizer.index = jsx_end;
+                                last_pos = jsx_end;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Not JSX, restore tokenizer position and continue normal processing
+            tokenizer.index = saved_index;
+        }
+
         // For all non-JSX tokens, we don't update last_pos
         // This allows the original source to be preserved
     }

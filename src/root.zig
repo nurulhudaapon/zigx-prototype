@@ -4,7 +4,7 @@ const std = @import("std");
 pub const Ast = @import("zx/Ast.zig");
 pub const Allocator = std.mem.Allocator;
 
-const ElementTag = enum { slot, svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
+const ElementTag = enum { iframe, slot, svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
 const SELF_CLOSING_ONLY: []const ElementTag = &.{ .br, .hr, .img, .input, .link, .source, .track, .wbr };
 const NO_CHILDREN_ONLY: []const ElementTag = &.{ .meta, .link, .input };
 
@@ -14,6 +14,21 @@ fn isSelfClosing(tag: ElementTag) bool {
 
 fn isNoClosing(tag: ElementTag) bool {
     return std.mem.indexOfScalar(ElementTag, NO_CHILDREN_ONLY, tag) != null;
+}
+
+/// Escape HTML attribute values to prevent XSS attacks
+/// Escapes: & < > " '
+fn escapeAttributeValueToWriter(writer: *std.Io.Writer, value: []const u8) !void {
+    for (value) |char| {
+        switch (char) {
+            '&' => try writer.writeAll("&amp;"),
+            '<' => try writer.writeAll("&lt;"),
+            '>' => try writer.writeAll("&gt;"),
+            '"' => try writer.writeAll("&quot;"),
+            '\'' => try writer.writeAll("&#x27;"),
+            else => try writer.writeByte(char),
+        }
+    }
 }
 
 pub const Component = union(enum) {
@@ -158,7 +173,11 @@ pub const Component = union(enum) {
                     for (attributes) |attribute| {
                         try writer.print(" {s}", .{attribute.name});
                         if (attribute.value) |value| {
-                            try writer.print("=\"{s}\"", .{value});
+                            // HTML escape attribute values to prevent XSS
+                            // Escape quotes, ampersands, and other HTML special characters
+                            try writer.writeAll("=\"");
+                            try escapeAttributeValueToWriter(writer, value);
+                            try writer.writeAll("\"");
                         }
                     }
                 }
@@ -226,6 +245,61 @@ pub fn lazy(allocator: Allocator, comptime func: anytype, props: anytype) Compon
 const ZxContext = struct {
     allocator: std.mem.Allocator,
 
+    fn escapeHtml(self: ZxContext, text: []const u8) []const u8 {
+        // First pass: calculate the escaped length
+        var escaped_len: usize = 0;
+        for (text) |char| {
+            escaped_len += switch (char) {
+                '&' => 5, // &amp;
+                '<' => 4, // &lt;
+                '>' => 4, // &gt;
+                '"' => 6, // &quot;
+                '\'' => 6, // &#x27;
+                else => 1,
+            };
+        }
+
+        // If no escaping needed, return original text
+        if (escaped_len == text.len) {
+            const copy = self.allocator.alloc(u8, text.len) catch @panic("OOM");
+            @memcpy(copy, text);
+            return copy;
+        }
+
+        // Second pass: allocate and escape
+        const escaped = self.allocator.alloc(u8, escaped_len) catch @panic("OOM");
+        var i: usize = 0;
+        for (text) |char| {
+            switch (char) {
+                '&' => {
+                    @memcpy(escaped[i..][0..5], "&amp;");
+                    i += 5;
+                },
+                '<' => {
+                    @memcpy(escaped[i..][0..4], "&lt;");
+                    i += 4;
+                },
+                '>' => {
+                    @memcpy(escaped[i..][0..4], "&gt;");
+                    i += 4;
+                },
+                '"' => {
+                    @memcpy(escaped[i..][0..6], "&quot;");
+                    i += 6;
+                },
+                '\'' => {
+                    @memcpy(escaped[i..][0..6], "&#x27;");
+                    i += 6;
+                },
+                else => {
+                    escaped[i] = char;
+                    i += 1;
+                },
+            }
+        }
+        return escaped;
+    }
+
     pub fn zx(self: ZxContext, tag: ElementTag, options: ZxOptions) Component {
         // Allocate and copy children if provided
         const children_copy = if (options.children) |children| blk: {
@@ -249,9 +323,8 @@ const ZxContext = struct {
     }
 
     pub fn txt(self: ZxContext, text: []const u8) Component {
-        const copy = self.allocator.alloc(u8, text.len) catch @panic("OOM");
-        @memcpy(copy, text);
-        return .{ .text = copy };
+        const escaped = self.escapeHtml(text);
+        return .{ .text = escaped };
     }
 
     pub fn fmt(self: ZxContext, comptime format: []const u8, args: anytype) Component {

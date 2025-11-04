@@ -1,0 +1,542 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --border-color: #e0e0e0;
+    --text-color: #333;
+    --link-color: #0066cc;
+    --code-bg: #ffffff;
+    --nav-bg: #ffffff;
+    --sidebar-width: 250px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text-color);
+    line-height: 1.6;
+    background: white;
+}
+
+.container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: var(--nav-bg);
+    border-right: 2px solid var(--border-color);
+    overflow-y: auto;
+    padding: 2rem 0;
+}
+
+.nav-header {
+    padding: 0 2rem 2rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.nav-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.nav-subtitle {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.nav-menu {
+    list-style: none;
+    padding: 0;
+}
+
+.nav-menu li {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-menu a {
+    display: block;
+    padding: 1rem 2rem;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: background-color 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.nav-menu a:hover {
+    background: white;
+    border-left-color: var(--link-color);
+}
+
+/* Main Content */
+.content {
+    margin-left: var(--sidebar-width);
+    padding: 3rem 4rem;
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.section {
+    margin-bottom: 4rem;
+    scroll-margin-top: 2rem;
+}
+
+.section h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.section h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.section h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.section p {
+    margin-bottom: 1rem;
+}
+
+.section ul {
+    margin-left: 2rem;
+    margin-bottom: 1rem;
+}
+
+.section li {
+    margin-bottom: 0.5rem;
+}
+
+code {
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.9em;
+    border: 1px solid var(--border-color);
+}
+
+pre {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 0;
+    overflow-x: visible;
+    overflow-y: auto;
+    margin: 1.5rem 0;
+    border: 2px solid var(--border-color);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: normal;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: normal;
+}
+
+.pane-header {
+    padding: 0.75rem 1rem;
+    background: var(--nav-bg);
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+}
+
+/* Tabs */
+.tab-buttons {
+    display: flex;
+    gap: 0;
+}
+
+.tab-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tab-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+    margin-left: 0.5rem;
+}
+
+.tab-btn:hover {
+    color: var(--text-color);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.tab-content {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Hide all tab content by default */
+.example-code .tab-content {
+    display: none;
+}
+
+/* Show preview tab by default - match any preview tab in the same example-code container */
+.example-code:has(.tab-radio[id$="-preview"]:checked) .tab-content[id^="tab-preview-"],
+.example-code:has(.tab-radio[id$="-preview"]:not(:checked)) .tab-content[id^="tab-preview-"]:first-of-type,
+.example-code .tab-content[id^="tab-preview-"]:first-of-type {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Show html tab when html radio is checked */
+.example-code:has(.tab-radio[id$="-html"]:checked) .tab-content[id^="tab-html-"] {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Show zig tab when zig radio is checked */
+.example-code:has(.tab-radio[id$="-zig"]:checked) .tab-content[id^="tab-zig-"] {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hide preview when other tabs are checked */
+.example-code:has(.tab-radio[id$="-html"]:checked) .tab-content[id^="tab-preview-"],
+.example-code:has(.tab-radio[id$="-zig"]:checked) .tab-content[id^="tab-preview-"] {
+    display: none;
+}
+
+/* Style active tab button based on checked radio */
+.example-code .tab-radio[id$="-preview"]:checked ~ .pane-header .tab-btn[for$="-preview"],
+.example-code .tab-radio[id$="-html"]:checked ~ .pane-header .tab-btn[for$="-html"],
+.example-code .tab-radio[id$="-zig"]:checked ~ .pane-header .tab-btn[for$="-zig"] {
+    color: var(--link-color);
+    border-bottom-color: var(--link-color);
+}
+
+/* Code Wrapper */
+.code-wrapper {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.code-wrapper pre {
+    margin: 0;
+    border: none;
+    padding: 1.5rem;
+    height: 100%;
+    background: white;
+    overflow-x: visible;
+    overflow-y: auto;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: normal;
+}
+
+.code-wrapper code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: normal;
+    display: block;
+    overflow-x: visible;
+}
+
+code[contenteditable="true"] {
+    outline: none;
+    display: block;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: normal;
+    cursor: text;
+    height: 100%;
+    width: 100%;
+}
+
+code[contenteditable="true"]:focus {
+    background: transparent;
+    outline: none;
+}
+
+/* Preview */
+.preview-wrapper {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: white;
+    padding: 10px;
+}
+
+.preview-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    overflow: hidden;
+}
+
+/* Code Examples */
+.code-example {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 1.5rem 0;
+    width: 100%;
+}
+
+.example-code {
+    border: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 60px;
+}
+
+.example-code:first-child {
+    border-right: 1px solid var(--border-color);
+}
+
+.example-code:last-child {
+    border-left: 1px solid var(--border-color);
+}
+
+.example-code h4 {
+    padding: 0.75rem 1rem;
+    background: var(--nav-bg);
+    border-bottom: 2px solid var(--border-color);
+    margin: 0;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+}
+
+.example-code pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    padding: 1.5rem;
+    overflow-x: visible;
+    overflow-y: auto;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: normal;
+    background: #ffffff;
+    flex: 1;
+    min-height: 0;
+}
+
+.example-code pre code {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: normal;
+    display: block;
+    overflow-x: visible;
+    height: 100%;
+    width: 100%;
+}
+
+/* Prism.js overrides for white background */
+pre[class*="language-"] {
+    background: #ffffff !important;
+}
+
+code[class*="language-"] {
+    background: #ffffff !important;
+    /* Don't override text color - let tokens handle it */
+}
+
+/* Ensure Prism tokens have colors - only override if they're black */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #708090 !important;
+}
+
+.token.punctuation {
+    color: #999 !important;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #905 !important;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #690 !important;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+    color: #9a6e3a !important;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+    color: #07a !important;
+}
+
+.token.function,
+.token.class-name {
+    color: #dd4a68 !important;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+    color: #e90 !important;
+}
+
+/* JSX specific */
+.token.tag {
+    color: #905 !important;
+}
+
+.token.attr-name {
+    color: #690 !important;
+}
+
+.token.attr-value .token.punctuation {
+    color: #690 !important;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .code-example {
+        grid-template-columns: 1fr;
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%;
+    }
+    
+    .example-code:first-child {
+        border-right: 2px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .example-code:last-child {
+        border-left: 2px solid var(--border-color);
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .content {
+        margin-left: 0;
+        padding: 2rem;
+    }
+    
+    .example-code {
+        height: 400px;
+        min-height: 300px;
+    }
+    
+    /* Smaller fonts on mobile */
+    pre {
+        font-size: 0.75rem;
+        padding: 1rem;
+    }
+    
+    pre code {
+        font-size: 0.75rem;
+    }
+    
+    .code-wrapper pre {
+        font-size: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .code-wrapper code {
+        font-size: 0.75rem;
+    }
+    
+    .example-code pre {
+        font-size: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .example-code pre code {
+        font-size: 0.75rem;
+    }
+    
+    code {
+        font-size: 0.8em;
+    }
+    
+    .section h2 {
+        font-size: 1.5rem;
+    }
+    
+    .section h3 {
+        font-size: 1.25rem;
+    }
+    
+    .section h4 {
+        font-size: 1rem;
+    }
+}

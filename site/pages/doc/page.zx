@@ -1,0 +1,202 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+
+    // If example
+    var aw_if: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_if = @embedFile("../../../pages/doc/example/if.zx");
+    const zig_example_if = @embedFile("../doc/example/if.zig");
+    const html_page_if = @import("../doc/example/if.zig").Page(allocator);
+    html_page_if.render(&aw_if.writer) catch unreachable;
+    const html_example_if = allocator.dupe(u8, aw_if.written()) catch unreachable;
+    
+    // Switch example
+    var aw_switch: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_switch = @embedFile("../../../pages/doc/example/switch.zx");
+    const zig_example_switch = @embedFile("../doc/example/switch.zig");
+    const html_page_switch = @import("../doc/example/switch.zig").Page(allocator);
+    html_page_switch.render(&aw_switch.writer) catch unreachable;
+    const html_example_switch = allocator.dupe(u8, aw_switch.written()) catch unreachable;
+    
+    // For example
+    var aw_for: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_for = @embedFile("../../../pages/doc/example/for.zx");
+    const zig_example_for = @embedFile("../doc/example/for.zig");
+    const html_page_for = @import("../doc/example/for.zig").Page(allocator);
+    html_page_for.render(&aw_for.writer) catch unreachable;
+    const html_example_for = allocator.dupe(u8, aw_for.written()) catch unreachable;
+    
+    // Component expression example
+    var aw_component: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_component = @embedFile("../../../pages/doc/example/component.zx");
+    const zig_example_component = @embedFile("../doc/example/component.zig");
+    const html_page_component = @import("../doc/example/component.zig").Page(allocator);
+    html_page_component.render(&aw_component.writer) catch unreachable;
+    const html_example_component = allocator.dupe(u8, aw_component.written()) catch unreachable;
+    
+    // Text expression example
+    var aw_text: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_text = @embedFile("../../../pages/doc/example/text.zx");
+    const zig_example_text = @embedFile("../doc/example/text.zig");
+    const html_page_text = @import("../doc/example/text.zig").Page(allocator);
+    html_page_text.render(&aw_text.writer) catch unreachable;
+    const html_example_text = allocator.dupe(u8, aw_text.written()) catch unreachable;
+    
+    // Format expression example
+    var aw_format: std.io.Writer.Allocating = .init(allocator);
+    const zx_example_format = @embedFile("../../../pages/doc/example/format.zx");
+    const zig_example_format = @embedFile("../doc/example/format.zig");
+    const html_page_format = @import("../doc/example/format.zig").Page(allocator);
+    html_page_format.render(&aw_format.writer) catch unreachable;
+    const html_example_format = allocator.dupe(u8, aw_format.written()) catch unreachable;
+
+    const cmp_expr = "{(expression)}";
+    const txt_expr = "{expression}";
+    const fmt_expr = "{[expression:format]}";
+
+    return (
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZX Documentation - JSX-like Syntax for Zig</title>
+    <link rel="stylesheet" href="./assets/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
+    <style>
+        {[@embedFile("../../assets/doc.css"):s]}
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <nav class="sidebar">
+            <div class="nav-header">
+                <h1>ZX</h1>
+                <p class="nav-subtitle">JSX for Zig</p>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#introduction">Introduction</a></li>
+                <li><a href="#getting-started">Getting Started</a></li>
+                <li><a href="#control-flow">Control Flow</a></li>
+                <li><a href="#expressions">Expressions</a></li>
+                <li><a href="#examples">Examples</a></li>
+                <li><a href="#api">API Reference</a></li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <section id="introduction" class="section">
+                <h2>Introduction</h2>
+                <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
+                    components using familiar JSX patterns, transpiled to efficient Zig code.</p>
+                <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
+                    fast, type-safe web applications.</p>
+            </section>
+
+            <section id="getting-started" class="section"></section>
+
+            <section id="control-flow" class="section">
+                <h2>Control Flow</h2>
+                <p>ZX supports conditional rendering and iteration using familiar Zig control flow constructs. These expressions allow you to conditionally render components or iterate over collections to build dynamic UIs.</p>
+                
+                <h3>If Statements</h3>
+                <p>Use <code>if</code> expressions to conditionally render components based on boolean conditions. The <code>else</code> branch is optional and can render alternative content when the condition is false.</p>
+                <ExampleBlock id="if" zx_code={zx_example_if} zig_code={zig_example_if} html_code={html_example_if} />
+                
+                <h3>Switch Statements</h3>
+                <p>Use <code>switch</code> expressions to match against enum values or other types. Each case can return either a string literal or a component. Switch expressions are particularly useful for rendering different UI based on state or user roles.</p>
+                <ExampleBlock id="switch" zx_code={zx_example_switch} zig_code={zig_example_switch} html_code={html_example_switch} />
+                
+                <h3>For Loops</h3>
+                <p>Use <code>for</code> loops to iterate over arrays, slices, or strings and render a component for each item. The loop variable can be used within the component body to display item-specific content. This is ideal for rendering lists, tables, or any repeating UI patterns.</p>
+                <ExampleBlock id="for" zx_code={zx_example_for} zig_code={zig_example_for} html_code={html_example_for} />
+            </section>
+
+            <section id="expressions" class="section">
+                <h2>Expressions</h2>
+                <p>ZX provides different expression syntaxes for embedding dynamic content. Each syntax serves a specific purpose: rendering components, displaying text safely, or formatting values with custom format specifiers.</p>
+                
+                <h3>Component Expressions</h3>
+                <p>Use <code>{cmp_expr}</code> to embed a component directly. The expression must evaluate to a <code>zx.Component</code> type. This is useful when you want to conditionally render or reuse components dynamically.</p>
+                <ExampleBlock id="component" zx_code={zx_example_component} zig_code={zig_example_component} html_code={html_example_component} />
+                
+                <h3>Text Expressions</h3>
+                <p>Use <code>{txt_expr}</code> to embed text content. All text is automatically HTML-escaped to prevent XSS attacks. This is the safe way to display user input or dynamic text content.</p>
+                <ExampleBlock id="text" zx_code={zx_example_text} zig_code={zig_example_text} html_code={html_example_text} />
+                
+                <h3>Format Expressions</h3>
+                <p>Use <code>{fmt_expr}</code> to format values with custom format specifiers. The format string follows Zig's standard format specifier syntax (e.g., <code>d</code> for decimal, <code>x</code> for hexadecimal). Unlike text expressions, format expressions are not HTML-escaped, making them suitable for numeric formatting and other non-HTML content.</p>
+                <ExampleBlock id="format" zx_code={zx_example_format} zig_code={zig_example_format} html_code={html_example_format} />
+            </section>
+
+            <section id="examples" class="section"></section>
+
+            <section id="api" class="section"></section>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script type="module">
+        {[@embedFile("../../assets/doc.js"):s]}
+    </script>
+</body>
+</html>
+    );
+}
+
+const ExampleBlockProps = struct {
+    id: []const u8,
+    zx_code: []const u8,
+    zig_code: []const u8,
+    html_code: []const u8,
+};
+
+fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component {
+    const preview_id = std.fmt.allocPrint(allocator, "tab-{s}-preview", .{props.id}) catch unreachable;
+    const html_id = std.fmt.allocPrint(allocator, "tab-{s}-html", .{props.id}) catch unreachable;
+    const zig_id = std.fmt.allocPrint(allocator, "tab-{s}-zig", .{props.id}) catch unreachable;
+    const name_id = std.fmt.allocPrint(allocator, "tab-{s}", .{props.id}) catch unreachable;
+    const preview_content_id = std.fmt.allocPrint(allocator, "tab-preview-{s}", .{props.id}) catch unreachable;
+    const html_content_id = std.fmt.allocPrint(allocator, "tab-html-{s}", .{props.id}) catch unreachable;
+    const zig_content_id = std.fmt.allocPrint(allocator, "tab-zig-{s}", .{props.id}) catch unreachable;
+    const zx_code_id = std.fmt.allocPrint(allocator, "zx-code-{s}", .{props.id}) catch unreachable;
+    
+    return (
+        <div class="code-example">
+            <div class="example-code">
+                <h4>ZX</h4>
+            <pre><code id={zx_code_id} class="language-jsx" contenteditable="true">{props.zx_code}</code></pre>
+                </div>
+                <div class="example-code">
+                    <input type="radio" id={preview_id} name={name_id} class="tab-radio" checked>
+                    <input type="radio" id={html_id} name={name_id} class="tab-radio">
+                    <input type="radio" id={zig_id} name={name_id} class="tab-radio">
+                    <div class="pane-header">
+                        <div class="tab-buttons">
+                            <label for={preview_id} class="tab-btn">Preview</label>
+                            <label for={html_id} class="tab-btn">HTML</label>
+                            <label for={zig_id} class="tab-btn">Zig</label>
+                        </div>
+                    </div>
+                    <div class="tab-content" id={preview_content_id}>
+                        <div class="preview-wrapper">
+                            <iframe class="preview-frame" srcdoc={props.html_code}></iframe>
+                        </div>
+                    </div>
+                    <div class="tab-content" id={html_content_id}>
+                        <div class="code-wrapper">
+                            <pre><code class="language-markup">{props.html_code}</code></pre>
+                        </div>
+                    </div>
+                    <div class="tab-content" id={zig_content_id}>
+                        <div class="code-wrapper">
+                            <pre><code class="language-zig">{props.zig_code}</code></pre>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    );
+}
+
+const zx = @import("zx");
+const std = @import("std");

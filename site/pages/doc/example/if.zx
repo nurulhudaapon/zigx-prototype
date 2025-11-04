@@ -1,0 +1,11 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const is_admin = true;
+
+    return (
+        <section>
+            {if (is_admin) (<p>Admin</p>) else (<p>User</p>)}
+        </section>
+    );
+}
+
+const zx = @import("zx");
