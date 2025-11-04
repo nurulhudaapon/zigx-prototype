@@ -1,24 +1,17 @@
 const Metadata = @import("meta.zig");
 const std = @import("std");
 const zx = @import("zx");
+
 const PORT = 5882;
-const VERSION = "0.0.1";
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
-    var app = try zx.App.init(allocator, .{
-        .server = .{ .port = PORT },
-        .meta = &Metadata.meta,
-    });
+    const app = try zx.App.init(allocator, .{ .server = .{ .port = PORT, .address = "0.0.0.0" }, .meta = &Metadata.meta });
+    defer app.deinit();
 
-    defer {
-        app.server.stop();
-        app.server.deinit();
-    }
-
-    std.debug.print("ZigX {s}\n  - Local: http://localhost:{d}\n", .{ VERSION, PORT });
-    try app.server.listen();
+    std.debug.print("ZigX {s}\n  - Local: http://localhost:{d}\n", .{ zx.App.Version, PORT });
+    try app.start();
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const zon = @import("build.zig.zon");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -25,6 +26,13 @@ pub fn build(b: *std.Build) void {
     const httpz_dep = b.dependency("httpz", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("httpz", httpz_dep.module("httpz"));
     mod.addImport("httpz", httpz_dep.module("httpz"));
+
+    // 2. Define an options struct to pass the version at comptime
+    const options = b.addOptions();
+    options.addOption([]const u8, "version_string", zon.version);
+
+    // 3. Add the options module to your executable's root module
+    mod.addOptions("zx_info", options);
 
     b.installArtifact(exe);
 

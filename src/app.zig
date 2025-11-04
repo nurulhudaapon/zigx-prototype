@@ -1,4 +1,5 @@
 const httpz = @import("httpz");
+const module_config = @import("zx_info");
 
 pub const App = struct {
     pub const Meta = struct {
@@ -43,6 +44,8 @@ pub const App = struct {
             res.body = "Not found";
         }
     };
+
+    pub const Version = module_config.version_string;
 
     allocator: std.mem.Allocator,
     meta: *const Meta,

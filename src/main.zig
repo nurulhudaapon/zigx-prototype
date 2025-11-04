@@ -88,6 +88,115 @@ fn hasZigxSyntax(allocator: std.mem.Allocator, file_path: []const u8) !bool {
     return false;
 }
 
+/// Copy a directory recursively from source to destination
+fn copyDirectory(
+    allocator: std.mem.Allocator,
+    source_dir: []const u8,
+    dest_dir: []const u8,
+) !void {
+    var source = try std.fs.cwd().openDir(source_dir, .{ .iterate = true });
+    defer source.close();
+
+    // Create destination directory if it doesn't exist
+    std.fs.cwd().makePath(dest_dir) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+
+    var dest = try std.fs.cwd().openDir(dest_dir, .{});
+    defer dest.close();
+
+    var walker = try source.walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
+        const src_path = try std.fs.path.join(allocator, &.{ source_dir, entry.path });
+        defer allocator.free(src_path);
+
+        const dst_path = try std.fs.path.join(allocator, &.{ dest_dir, entry.path });
+        defer allocator.free(dst_path);
+
+        switch (entry.kind) {
+            .file => {
+                // Create parent directory if needed
+                if (std.fs.path.dirname(dst_path)) |parent| {
+                    std.fs.cwd().makePath(parent) catch |err| switch (err) {
+                        error.PathAlreadyExists => {},
+                        else => return err,
+                    };
+                }
+
+                // Copy file
+                try std.fs.cwd().copyFile(src_path, std.fs.cwd(), dst_path, .{});
+            },
+            .directory => {
+                // Create directory if needed
+                std.fs.cwd().makePath(dst_path) catch |err| switch (err) {
+                    error.PathAlreadyExists => {},
+                    else => return err,
+                };
+            },
+            else => continue,
+        }
+    }
+}
+
+/// Copy asset directories (assets and public) if they exist in the input path
+fn copyAssetDirectories(
+    allocator: std.mem.Allocator,
+    input_path: []const u8,
+    output_dir: []const u8,
+) !void {
+    // Determine the base directory to check for assets
+    const base_dir = if (std.fs.path.dirname(input_path)) |dir| dir else input_path;
+
+    // Check for 'assets' directory
+    const assets_src = try std.fs.path.join(allocator, &.{ base_dir, "assets" });
+    defer allocator.free(assets_src);
+
+    const assets_dest = try std.fs.path.join(allocator, &.{ output_dir, "assets" });
+    defer allocator.free(assets_dest);
+
+    if (std.fs.cwd().openDir(assets_src, .{})) |dir_result| {
+        var dir = dir_result;
+        defer dir.close();
+        // Directory exists, copy it
+        std.debug.print("Copying assets directory: {s} -> {s}\n", .{ assets_src, assets_dest });
+        copyDirectory(allocator, assets_src, assets_dest) catch |copy_err| {
+            std.debug.print("Warning: Failed to copy assets directory: {}\n", .{copy_err});
+        };
+    } else |err| switch (err) {
+        error.FileNotFound => {},
+        error.NotDir => {},
+        else => {
+            std.debug.print("Warning: Failed to check assets directory: {}\n", .{err});
+        },
+    }
+
+    // Check for 'public' directory
+    const public_src = try std.fs.path.join(allocator, &.{ base_dir, "public" });
+    defer allocator.free(public_src);
+
+    const public_dest = try std.fs.path.join(allocator, &.{ output_dir, "public" });
+    defer allocator.free(public_dest);
+
+    if (std.fs.cwd().openDir(public_src, .{})) |dir_result| {
+        var dir = dir_result;
+        defer dir.close();
+        // Directory exists, copy it
+        std.debug.print("Copying public directory: {s} -> {s}\n", .{ public_src, public_dest });
+        copyDirectory(allocator, public_src, public_dest) catch |copy_err| {
+            std.debug.print("Warning: Failed to copy public directory: {}\n", .{copy_err});
+        };
+    } else |err| switch (err) {
+        error.FileNotFound => {},
+        error.NotDir => {},
+        else => {
+            std.debug.print("Warning: Failed to check public directory: {}\n", .{err});
+        },
+    }
+}
+
 fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8) !void {
     // Read the source file
     const source = try std.fs.cwd().readFileAlloc(
@@ -179,6 +288,11 @@ fn transpileDirectory(
             continue;
         };
     }
+
+    // Copy asset directories after transpiling all files
+    copyAssetDirectories(allocator, dir_path, output_dir) catch |err| {
+        std.debug.print("Warning: Failed to copy asset directories: {}\n", .{err});
+    };
 }
 
 fn transpileCommand(
@@ -237,6 +351,12 @@ fn transpileCommand(
         defer allocator.free(output_path);
 
         try transpileFile(allocator, path, output_path);
+
+        // Copy asset directories after transpiling the file
+        copyAssetDirectories(allocator, path, output_dir) catch |err| {
+            std.debug.print("Warning: Failed to copy asset directories: {}\n", .{err});
+        };
+
         std.debug.print("Done!\n", .{});
     } else {
         std.debug.print("Error: Path must be a file or directory\n", .{});
