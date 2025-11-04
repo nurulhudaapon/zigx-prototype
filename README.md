@@ -63,6 +63,18 @@ const users = [_]User{
 - **Server-Side Rendering (SSR)** - Generate HTML on the server
 - **Static Site Generation (SSG)** - Pre-render pages at build time
 
+## Similar Projects
+
+* [Zap](https://github.com/zigzap/zap)
+* [http.zig](https://github.com/karlseguin/http.zig) (_ZX_'s backend)
+* [tokamak](https://github.com/cztomsik/tokamak)
+* [zig-router](https://github.com/Cloudef/zig-router)
+* [zig-webui](https://github.com/webui-dev/zig-webui/)
+* [ZTS](https://github.com/zigster64/zts)
+* [Zine](https://github.com/kristoff-it/zine)
+* [Zinc](https://github.com/zon-dev/zinc/)
+* [zUI](https://github.com/thienpow/zui)
+
 ## Documentation
 
 For complete documentation, examples, and guides, visit **[https://zx.nuhu.dev](https://zx.nuhu.dev)**
