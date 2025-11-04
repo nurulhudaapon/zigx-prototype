@@ -463,8 +463,8 @@ code[class*="language-"] {
     color: #690 !important;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
+/* Responsive - Medium screens */
+@media (max-width: 1024px) and (min-width: 769px) {
     .code-example {
         grid-template-columns: 1fr;
         margin-left: 0;
@@ -493,7 +493,85 @@ code[class*="language-"] {
     
     .example-code {
         height: 400px;
-        min-height: 300px;
+        min-height: 250px;
+    }
+    
+    /* Smaller fonts on medium screens */
+    pre {
+        font-size: 0.8rem;
+        padding: 1rem;
+    }
+    
+    pre code {
+        font-size: 0.8rem;
+    }
+    
+    .code-wrapper pre {
+        font-size: 0.8rem;
+        padding: 1rem;
+    }
+    
+    .code-wrapper code {
+        font-size: 0.8rem;
+    }
+    
+    .example-code pre {
+        font-size: 0.8rem;
+        padding: 1rem;
+    }
+    
+    .example-code pre code {
+        font-size: 0.8rem;
+    }
+    
+    code {
+        font-size: 0.85em;
+    }
+    
+    .section h2 {
+        font-size: 1.5rem;
+    }
+    
+    .section h3 {
+        font-size: 1.25rem;
+    }
+    
+    .section h4 {
+        font-size: 1rem;
+    }
+}
+
+/* Responsive - Mobile screens */
+@media (max-width: 768px) {
+    .code-example {
+        grid-template-columns: 1fr;
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%;
+    }
+    
+    .example-code:first-child {
+        border-right: 2px solid var(--border-color);
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .example-code:last-child {
+        border-left: 2px solid var(--border-color);
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .content {
+        margin-left: 0;
+        padding: 2rem;
+    }
+    
+    .example-code {
+        height: 400px;
+        min-height: 200px;
     }
     
     /* Smaller fonts on mobile */
