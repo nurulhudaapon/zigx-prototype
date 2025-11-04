@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "zigx",
+        .name = "zx",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -65,22 +65,22 @@ pub fn build(b: *std.Build) void {
 }
 
 pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
-    const zigx_dep = b.dependency("zigx", .{
+    const zx_dep = b.dependency("zx", .{
         // .target = options.root_module.target,
         // .optimize = options.root_module.optimize,
     });
 
-    // --- 1. Get the zigx executable artifact ---
-    const zigx_exe = zigx_dep.artifact("zigx");
+    // --- 1. Get the zx executable artifact ---
+    const zx_exe = zx_dep.artifact("zx");
 
     // --- 2. Define the transpilation run command ---
-    // This command generates the missing files in 'site/.zigx'
-    const transpile_cmd = b.addRunArtifact(zigx_exe);
+    // This command generates the missing files in 'site/.zx'
+    const transpile_cmd = b.addRunArtifact(zx_exe);
     transpile_cmd.addArgs(&[_][:0]const u8{
         "transpile",
         "site",
         "--output",
-        "site/.zigx",
+        "site/.zx",
     });
     // Ensure the build fails if transpilation fails
     // transpile_cmd.expect_exit_code = 0;
@@ -92,7 +92,7 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     // include path to help the compiler resolve paths to generated files
     // once the transpilation step has completed.
     exe.addIncludePath(b.path("."));
-    exe.root_module.addImport("zx", zigx_dep.module("zx"));
+    exe.root_module.addImport("zx", zx_dep.module("zx"));
 
     // CRITICAL FIX: Force the compilation of the main executable to wait
     // until the transpilation command has completed and generated all files.
@@ -101,11 +101,11 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     b.installArtifact(exe);
 
     // --- 4. Define the explicit 'transpile' step ---
-    const transpile_step = b.step("transpile", "Transpile ZigX components before running");
+    const transpile_step = b.step("transpile", "Transpile Zx components before running");
     transpile_step.dependOn(&transpile_cmd.step);
 
     // --- 5. Define the 'serve' step ---
-    const run_step = b.step("serve", "Run the ZigX website");
+    const run_step = b.step("serve", "Run the Zx website");
     const run_cmd = b.addRunArtifact(exe);
 
     // Ensure running (serving) also depends on transpilation finishing first.

@@ -109,7 +109,7 @@ const TokenBuilder = struct {
 };
 
 /// JSX Element representation
-const ZigxElement = struct {
+const ZXElement = struct {
     tag: []const u8,
     attributes: std.ArrayList(Attribute),
     children: std.ArrayList(Child),
@@ -131,7 +131,7 @@ const ZigxElement = struct {
 
         const SwitchCaseValue = union(enum) {
             string_literal: []const u8, // For ("Admin")
-            jsx_element: *ZigxElement, // For (<p>Admin</p>)
+            jsx_element: *ZXElement, // For (<p>Admin</p>)
         };
     };
 
@@ -140,14 +140,14 @@ const ZigxElement = struct {
         text_expr: []const u8,
         component_expr: []const u8, // For {(expression)} - already a Component
         format_expr: struct { expr: []const u8, format: []const u8 }, // For {[expr:fmt]}
-        conditional_expr: struct { condition: []const u8, if_branch: *ZigxElement, else_branch: *ZigxElement }, // For {if (cond) (<JSX>) else (<JSX>)}
-        for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZigxElement }, // For {for (iterable) |item| (<JSX>)}
+        conditional_expr: struct { condition: []const u8, if_branch: *ZXElement, else_branch: *ZXElement }, // For {if (cond) (<JSX>) else (<JSX>)}
+        for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZXElement }, // For {for (iterable) |item| (<JSX>)}
         switch_expr: struct { expr: []const u8, cases: std.ArrayList(SwitchCase) }, // For {switch (expr) { case => value, ... }}
-        element: *ZigxElement,
+        element: *ZXElement,
     };
 
-    fn init(allocator: std.mem.Allocator, tag: []const u8) !*ZigxElement {
-        const elem = try allocator.create(ZigxElement);
+    fn init(allocator: std.mem.Allocator, tag: []const u8) !*ZXElement {
+        const elem = try allocator.create(ZXElement);
         elem.* = .{
             .tag = tag,
             .attributes = std.ArrayList(Attribute){},
@@ -157,7 +157,7 @@ const ZigxElement = struct {
         return elem;
     }
 
-    fn deinit(self: *ZigxElement) void {
+    fn deinit(self: *ZXElement) void {
         for (self.children.items) |child| {
             if (child == .element) {
                 child.element.deinit();
@@ -186,7 +186,7 @@ const ZigxElement = struct {
     }
 };
 
-/// Transpile a .zigx file to .zig by transforming JSX syntax
+/// Transpile a .zx file to .zig by transforming JSX syntax
 pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const u8 {
     var result = std.ArrayList(u8){};
     try result.ensureTotalCapacity(allocator, source.len);
@@ -349,7 +349,7 @@ fn isVoidElement(tag: []const u8) bool {
 }
 
 /// Parse JSX syntax into a JsxElement
-fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx, OutOfMemory }!*ZigxElement {
+fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx, OutOfMemory }!*ZXElement {
     var i: usize = 0;
 
     // Skip whitespace
@@ -367,7 +367,7 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
     }
     const tag_name = content[tag_start..i];
 
-    const elem = try ZigxElement.init(allocator, tag_name);
+    const elem = try ZXElement.init(allocator, tag_name);
     errdefer {
         elem.deinit();
         allocator.destroy(elem);
@@ -469,7 +469,7 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
 }
 
 /// Parse JSX children (text, expressions, nested elements)
-fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content: []const u8) error{ InvalidJsx, OutOfMemory }!void {
+fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: []const u8) error{ InvalidJsx, OutOfMemory }!void {
     var i: usize = 0;
 
     while (i < content.len) {
@@ -776,7 +776,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
                         brace_pos += 1; // Skip opening brace
 
                         // Parse cases
-                        var cases = std.ArrayList(ZigxElement.SwitchCase){};
+                        var cases = std.ArrayList(ZXElement.SwitchCase){};
                         defer cases.deinit(allocator);
 
                         var case_start = brace_pos;
@@ -867,7 +867,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
 
                         if (parsed_switch and cases.items.len > 0) {
                             // Create switch_expr child
-                            var cases_owned = std.ArrayList(ZigxElement.SwitchCase){};
+                            var cases_owned = std.ArrayList(ZXElement.SwitchCase){};
                             try cases_owned.appendSlice(allocator, cases.items);
                             try parent.children.append(allocator, .{ .switch_expr = .{
                                 .expr = switch_expr,
@@ -1008,12 +1008,12 @@ fn isCustomComponent(tag: []const u8) bool {
 }
 
 /// Render JSX element as zx.zx() function call using tokens
-fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize) !void {
     try renderJsxAsTokensWithLoopContext(allocator, output, elem, indent, null, null);
 }
 
 /// Render JSX element with optional loop context for variable substitution
-fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8) !void {
+fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // For custom components, wrap in lazy: _zx.lazy(Component, props)
@@ -1563,7 +1563,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 }
 
 /// Render nested elements recursively using _zx.zx() calls
-fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // For custom components, wrap in lazy: _zx.lazy(Component, props)
@@ -1838,7 +1838,7 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
 }
 
 /// Render an element as a struct (for nested elements)
-fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZigxElement, indent: usize) !void {
+fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // For custom components, call the function and get its .element

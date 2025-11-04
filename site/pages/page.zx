@@ -5,7 +5,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
         <html lang="en-US">
 
         <head>
-            <title>ZigX - Props Demo</title>
+            <title>ZX - Props Demo</title>
         </head>
 
         <body>
@@ -65,7 +65,7 @@ fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
     return (
         <button class={props.class}>{props.title}
             <span>
-                ZigX
+                ZX
             </span>
         </button>
     );

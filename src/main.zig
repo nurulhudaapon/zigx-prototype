@@ -44,8 +44,8 @@ fn getBasename(path: []const u8) []const u8 {
     return path;
 }
 
-/// Check if a .zig file contains zigx syntax (JSX-like patterns)
-fn hasZigxSyntax(allocator: std.mem.Allocator, file_path: []const u8) !bool {
+/// Check if a .zig file contains zx syntax (JSX-like patterns)
+fn hasZXSyntax(allocator: std.mem.Allocator, file_path: []const u8) !bool {
     const source = std.fs.cwd().readFileAlloc(
         allocator,
         file_path,
@@ -245,21 +245,21 @@ fn transpileDirectory(
     while (try walker.next()) |entry| {
         if (entry.kind != .file) continue;
 
-        const is_zigx = std.mem.endsWith(u8, entry.path, ".zigx");
+        const is_zx = std.mem.endsWith(u8, entry.path, ".zx");
         const is_zig = std.mem.endsWith(u8, entry.path, ".zig");
 
         // Skip files that don't match our criteria
-        if (!is_zigx and !(include_zig and is_zig)) continue;
+        if (!is_zx and !(include_zig and is_zig)) continue;
 
         // Build input path
         const input_path = try std.fs.path.join(allocator, &.{ dir_path, entry.path });
         defer allocator.free(input_path);
 
-        // For .zig files with --zig flag, check if they contain zigx syntax
+        // For .zig files with --zig flag, check if they contain zx syntax
         if (is_zig and include_zig) {
-            const has_zigx = hasZigxSyntax(allocator, input_path) catch false;
-            if (!has_zigx) {
-                // Skip .zig files that don't contain zigx syntax
+            const has_zx = hasZXSyntax(allocator, input_path) catch false;
+            if (!has_zx) {
+                // Skip .zig files that don't contain zx syntax
                 continue;
             }
         }
@@ -268,10 +268,10 @@ fn transpileDirectory(
         const relative_path = entry.path;
         var output_rel_path: []const u8 = undefined;
 
-        if (is_zigx) {
-            // Remove .zigx and add .zig
+        if (is_zx) {
+            // Remove .zx and add .zig
             output_rel_path = try std.mem.concat(allocator, u8, &.{
-                relative_path[0 .. relative_path.len - 5], // Remove .zigx
+                relative_path[0 .. relative_path.len - (".zx").len], // Remove .zx
                 ".zig",
             });
         } else {
@@ -312,19 +312,19 @@ fn transpileCommand(
         try transpileDirectory(allocator, path, output_dir, include_zig);
         std.debug.print("Done!\n", .{});
     } else if (stat.kind == .file) {
-        const is_zigx = std.mem.endsWith(u8, path, ".zigx");
+        const is_zx = std.mem.endsWith(u8, path, ".zx");
         const is_zig = std.mem.endsWith(u8, path, ".zig");
 
-        if (!is_zigx and !(include_zig and is_zig)) {
-            std.debug.print("Error: File must have .zigx extension, or use --zig flag for .zig files\n", .{});
+        if (!is_zx and !(include_zig and is_zig)) {
+            std.debug.print("Error: File must have .zx extension, or use --zig flag for .zig files\n", .{});
             return error.InvalidFileExtension;
         }
 
-        // For .zig files with --zig flag, check if they contain zigx syntax
+        // For .zig files with --zig flag, check if they contain zx syntax
         if (is_zig and include_zig) {
-            const has_zigx = try hasZigxSyntax(allocator, path);
-            if (!has_zigx) {
-                std.debug.print("Info: File '{s}' does not contain zigx syntax, skipping\n", .{path});
+            const has_zx = try hasZXSyntax(allocator, path);
+            if (!has_zx) {
+                std.debug.print("Info: File '{s}' does not contain zx syntax, skipping\n", .{path});
                 return;
             }
         }
@@ -336,10 +336,10 @@ fn transpileCommand(
         var output_rel_path: []const u8 = undefined;
         defer allocator.free(output_rel_path);
 
-        if (is_zigx) {
-            // Remove .zigx and add .zig
+        if (is_zx) {
+            // Remove .zx and add .zig
             output_rel_path = try std.mem.concat(allocator, u8, &.{
-                basename[0 .. basename.len - 5], // Remove .zigx
+                basename[0 .. basename.len - (".zx").len], // Remove .zx
                 ".zig",
             });
         } else {
@@ -372,7 +372,7 @@ fn runDefaultBehavior(allocator: std.mem.Allocator) !void {
     var result = try zx.Ast.parse(allocator, source_z);
     defer result.deinit(allocator);
 
-    // try writeFileIfChanged("src/zigx/examples/zig/index.zig", result.zig_source);
+    // try writeFileIfChanged("src/zx/examples/zig/index.zig", result.zig_source);
 
     var aw: std.Io.Writer.Allocating = .init(std.heap.page_allocator);
     defer aw.deinit();
@@ -387,7 +387,7 @@ fn runDefaultBehavior(allocator: std.mem.Allocator) !void {
 
     try page.render(&aw.writer);
     std.debug.print("{s}\n", .{aw.written()});
-    try writeFileIfChanged("src/zigx/examples/html/index.html", aw.written());
+    try writeFileIfChanged("src/zx/examples/html/index.html", aw.written());
     aw.clearRetainingCapacity();
 }
 
@@ -404,15 +404,15 @@ pub fn main() !void {
     if (args.len >= 2 and std.mem.eql(u8, args[1], "transpile")) {
         if (args.len < 3) {
             std.debug.print("Usage: {s} transpile <path> [options]\n", .{args[0]});
-            std.debug.print("  <path> can be a .zigx file or a directory\n", .{});
+            std.debug.print("  <path> can be a .zx file or a directory\n", .{});
             std.debug.print("  Options:\n", .{});
-            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zigx/site)\n", .{});
-            std.debug.print("    --zig                     Also transpile .zig files containing zigx syntax\n", .{});
+            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zx/site)\n", .{});
+            std.debug.print("    --zig                     Also transpile .zig files containing zx syntax\n", .{});
             return error.MissingArgument;
         }
 
         // Parse arguments
-        var output_dir: []const u8 = ".zigx/site";
+        var output_dir: []const u8 = ".zx/site";
         var include_zig: bool = false;
         var path: ?[]const u8 = null;
         var i: usize = 2;
@@ -440,10 +440,10 @@ pub fn main() !void {
 
         if (path == null) {
             std.debug.print("Usage: {s} transpile <path> [options]\n", .{args[0]});
-            std.debug.print("  <path> can be a .zigx file or a directory\n", .{});
+            std.debug.print("  <path> can be a .zx file or a directory\n", .{});
             std.debug.print("  Options:\n", .{});
-            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zigx/site)\n", .{});
-            std.debug.print("    --zig                     Also transpile .zig files containing zigx syntax\n", .{});
+            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zx/site)\n", .{});
+            std.debug.print("    --zig                     Also transpile .zig files containing zx syntax\n", .{});
             return error.MissingArgument;
         }
 
@@ -456,7 +456,7 @@ pub fn main() !void {
 
 test "test parse" {
     const allocator = std.testing.allocator;
-    const source = @embedFile("zigx/examples/index.zigx");
+    const source = @embedFile("zx/examples/index.zx");
     const source_z = try allocator.dupeZ(u8, source);
     defer allocator.free(source_z);
 

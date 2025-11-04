@@ -1,20 +1,20 @@
 pub const ParseResult = struct {
     zig_ast: std.zig.Ast,
-    zigx_source: [:0]const u8,
+    zx_source: [:0]const u8,
     zig_source: [:0]const u8,
 
     pub fn deinit(self: *ParseResult, allocator: std.mem.Allocator) void {
         self.zig_ast.deinit(allocator);
-        allocator.free(self.zigx_source);
+        allocator.free(self.zx_source);
         allocator.free(self.zig_source);
     }
 };
 
-pub fn parse(allocator: std.mem.Allocator, zigx_source: [:0]const u8) !ParseResult {
-    const zig_source = try Transpiler.transpile(allocator, zigx_source);
+pub fn parse(allocator: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult {
+    const zig_source = try Transpiler.transpile(allocator, zx_source);
     errdefer allocator.free(zig_source);
 
-    // std.debug.print("Transpiled ZigX source:\n{s}\n", .{zig_source});
+    // std.debug.print("Transpiled ZX source:\n{s}\n", .{zig_source});
 
     const ast = try std.zig.Ast.parse(allocator, zig_source, .zig);
 
@@ -34,7 +34,7 @@ pub fn parse(allocator: std.mem.Allocator, zigx_source: [:0]const u8) !ParseResu
 
     return ParseResult{
         .zig_ast = ast,
-        .zigx_source = zig_source,
+        .zx_source = zig_source,
         .zig_source = rendered_zig_source_z,
     };
 }

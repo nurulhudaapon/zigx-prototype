@@ -1,4 +1,4 @@
-# ZigX
+# Zx
 
 A Zig library for building web applications with JSX-like syntax.
 
@@ -13,13 +13,13 @@ zig build
 #### Transpiling
 
 ```bash
-zig build run -- transpile site --output site/.zigx
+zig build run -- transpile site --output site/.zx
 ```
 
 #### Syntaxes
 
 ##### For Loops
-```zigx
+```zx
 <section>
     {for (chars) |char| (<span>{[char:c]}</span>)}
 </section>
@@ -41,7 +41,7 @@ _zx.zx(.section, .{ .children = blk: {
 ```
 
 ##### Switch Statements
-```zigx
+```zx
 <section>
     {switch (user.user_type) {
         .admin => ("Admin"),

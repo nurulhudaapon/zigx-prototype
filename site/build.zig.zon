@@ -1,12 +1,16 @@
 .{
-    .name = .zx,
-    .version = "0.0.1-dev.13",
-    .fingerprint = 0xcad77a8d2a3389f2,
+    .name = .zx_site,
+    .version = "0.0.0",
+    .fingerprint = 0xc041515566a276f7,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .httpz = .{
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#9c918865554c82648cd5eeff52b373d291625edc",
             .hash = "httpz-0.0.0-PNVzrBXyBgBR5yTLW6dUTWtXSahqFsLdEwFI3tVy5J72",
+        },
+        .zx = .{
+            .url = "../",
+            .hash = "zx-0.0.1-dev.12-8okzKiMTAgD1qYao8ge7senp1wEtj-_-iWlVgt4e8VwL",
         },
     },
     .paths = .{
