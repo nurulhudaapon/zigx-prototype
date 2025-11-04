@@ -1,0 +1,14 @@
+name: "zx"
+services:
+  doc_site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: "zx.nuhu.dev"
+    restart: unless-stopped
+    networks:
+      - npm
+
+networks:
+  npm:
+    driver: bridge

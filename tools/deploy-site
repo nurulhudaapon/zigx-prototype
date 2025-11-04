@@ -1,0 +1,4 @@
+cd site
+zig fetch --save "git+https://github.com/nurulhudaapon/zx"
+docker compose up -d --build
+git restore build.zig.zon
