@@ -14,7 +14,19 @@ pub fn parse(allocator: std.mem.Allocator, zigx_source: [:0]const u8) !ParseResu
     const zig_source = try Transpiler.transpile(allocator, zigx_source);
     errdefer allocator.free(zig_source);
 
+    // std.debug.print("Transpiled ZigX source:\n{s}\n", .{zig_source});
+
     const ast = try std.zig.Ast.parse(allocator, zig_source, .zig);
+
+    if (ast.errors.len > 0) {
+        for (ast.errors) |err| {
+            var w: std.io.Writer.Allocating = .init(allocator);
+            defer w.deinit();
+            try ast.renderError(err, &w.writer);
+            std.debug.print("{s}\n", .{w.written()});
+        }
+        return error.ParseError;
+    }
 
     const rendered_zig_source = try ast.renderAlloc(allocator);
     const rendered_zig_source_z = try allocator.dupeZ(u8, rendered_zig_source);

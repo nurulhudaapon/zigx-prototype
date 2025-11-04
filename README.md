@@ -39,3 +39,31 @@ _zx.zx(.section, .{ .children = blk: {
         break :blk children;
     } }),
 ```
+
+##### Switch Statements
+```zigx
+<section>
+    {switch (user.user_type) {
+        .admin => ("Admin"),
+        .member => ("Member"),
+    }}
+    {switch (user.user_type) {
+        .admin => (<p>Admin</p>),
+        .member => (<p>Member</p>),
+    }}
+</section>
+```
+to
+
+```zig
+_zx.zx(.section, .{ .children = &.{
+switch (user.user_type) {
+    .admin => _zx.txt("Admin"),
+    .member => _zx.txt("Member"),
+},
+switch (user.user_type) {
+    .admin => _zx.zx(.p, .{ .children = &.{_zx.txt("Admin")} }),
+    .member => _zx.zx(.p, .{ .children = &.{_zx.txt("Member")} }),
+},
+}),
+```

@@ -125,6 +125,16 @@ const ZigxElement = struct {
         dynamic: []const u8, // .{expression}
     };
 
+    const SwitchCase = struct {
+        pattern: []const u8, // e.g., ".admin"
+        value: SwitchCaseValue,
+
+        const SwitchCaseValue = union(enum) {
+            string_literal: []const u8, // For ("Admin")
+            jsx_element: *ZigxElement, // For (<p>Admin</p>)
+        };
+    };
+
     const Child = union(enum) {
         text: []const u8,
         text_expr: []const u8,
@@ -132,6 +142,7 @@ const ZigxElement = struct {
         format_expr: struct { expr: []const u8, format: []const u8 }, // For {[expr:fmt]}
         conditional_expr: struct { condition: []const u8, if_branch: *ZigxElement, else_branch: *ZigxElement }, // For {if (cond) (<JSX>) else (<JSX>)}
         for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZigxElement }, // For {for (iterable) |item| (<JSX>)}
+        switch_expr: struct { expr: []const u8, cases: std.ArrayList(SwitchCase) }, // For {switch (expr) { case => value, ... }}
         element: *ZigxElement,
     };
 
@@ -159,6 +170,15 @@ const ZigxElement = struct {
             } else if (child == .for_loop_expr) {
                 child.for_loop_expr.body.deinit();
                 self.allocator.destroy(child.for_loop_expr.body);
+            } else if (child == .switch_expr) {
+                var switch_expr = child.switch_expr;
+                for (switch_expr.cases.items) |switch_case| {
+                    if (switch_case.value == .jsx_element) {
+                        switch_case.value.jsx_element.deinit();
+                        self.allocator.destroy(switch_case.value.jsx_element);
+                    }
+                }
+                switch_expr.cases.deinit(self.allocator);
             }
         }
         self.children.deinit(self.allocator);
@@ -726,6 +746,147 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZigxElement, content:
                     try parent.children.append(allocator, .{ .text_expr = expr });
                 }
             }
+            // Check for switch expression: {switch (expr) { case => value, ... }}
+            else if (std.mem.startsWith(u8, expr, "switch")) {
+                var parsed_switch = true;
+
+                // Find opening paren after "switch"
+                var switch_pos: usize = 6; // Skip "switch"
+                while (switch_pos < expr.len and std.ascii.isWhitespace(expr[switch_pos])) switch_pos += 1;
+
+                if (switch_pos < expr.len and expr[switch_pos] == '(') {
+                    switch_pos += 1; // Skip opening paren
+                    // Find switch expression (text between ( and ))
+                    const switch_expr_start = switch_pos;
+                    var switch_expr_end = switch_expr_start;
+                    var paren_depth: i32 = 1;
+                    while (switch_expr_end < expr.len and paren_depth > 0) {
+                        if (expr[switch_expr_end] == '(') paren_depth += 1;
+                        if (expr[switch_expr_end] == ')') paren_depth -= 1;
+                        if (paren_depth > 0) switch_expr_end += 1;
+                    }
+                    const switch_expr = expr[switch_expr_start..switch_expr_end];
+
+                    // Skip closing paren and whitespace
+                    var brace_pos = switch_expr_end + 1;
+                    while (brace_pos < expr.len and std.ascii.isWhitespace(expr[brace_pos])) brace_pos += 1;
+
+                    // Find opening brace
+                    if (brace_pos < expr.len and expr[brace_pos] == '{') {
+                        brace_pos += 1; // Skip opening brace
+
+                        // Parse cases
+                        var cases = std.ArrayList(ZigxElement.SwitchCase){};
+                        defer cases.deinit(allocator);
+
+                        var case_start = brace_pos;
+                        while (case_start < expr.len) {
+                            // Skip whitespace
+                            while (case_start < expr.len and std.ascii.isWhitespace(expr[case_start])) case_start += 1;
+                            if (case_start >= expr.len) break;
+
+                            // Check for closing brace
+                            if (expr[case_start] == '}') break;
+
+                            // Parse pattern (e.g., ".admin")
+                            const pattern_start = case_start;
+                            var pattern_end = pattern_start;
+                            while (pattern_end < expr.len and expr[pattern_end] != '=' and !std.ascii.isWhitespace(expr[pattern_end])) {
+                                pattern_end += 1;
+                            }
+                            const pattern = expr[pattern_start..pattern_end];
+
+                            // Skip whitespace and =>
+                            var arrow_pos = pattern_end;
+                            while (arrow_pos < expr.len and std.ascii.isWhitespace(expr[arrow_pos])) arrow_pos += 1;
+                            if (arrow_pos + 1 < expr.len and expr[arrow_pos] == '=' and expr[arrow_pos + 1] == '>') {
+                                arrow_pos += 2; // Skip =>
+                            } else {
+                                parsed_switch = false;
+                                break;
+                            }
+
+                            // Skip whitespace after =>
+                            while (arrow_pos < expr.len and std.ascii.isWhitespace(expr[arrow_pos])) arrow_pos += 1;
+
+                            // Parse value - either ("string") or (<JSX>)
+                            if (arrow_pos < expr.len and expr[arrow_pos] == '(') {
+                                arrow_pos += 1; // Skip opening paren
+                                const value_start = arrow_pos;
+
+                                // Check if it's a string literal or JSX
+                                if (arrow_pos < expr.len and expr[arrow_pos] == '"') {
+                                    // String literal: ("Admin")
+                                    arrow_pos += 1; // Skip opening quote
+                                    const str_start = arrow_pos;
+                                    while (arrow_pos < expr.len and expr[arrow_pos] != '"') arrow_pos += 1;
+                                    const str_value = expr[str_start..arrow_pos];
+                                    arrow_pos += 1; // Skip closing quote
+                                    // Find closing paren
+                                    while (arrow_pos < expr.len and expr[arrow_pos] != ')') arrow_pos += 1;
+                                    arrow_pos += 1; // Skip closing paren
+
+                                    try cases.append(allocator, .{
+                                        .pattern = pattern,
+                                        .value = .{ .string_literal = str_value },
+                                    });
+                                } else {
+                                    // JSX element: (<p>Admin</p>)
+                                    var jsx_paren_depth: i32 = 1;
+                                    var jsx_end = arrow_pos;
+                                    while (jsx_end < expr.len and jsx_paren_depth > 0) {
+                                        if (expr[jsx_end] == '(') jsx_paren_depth += 1;
+                                        if (expr[jsx_end] == ')') jsx_paren_depth -= 1;
+                                        if (jsx_paren_depth > 0) jsx_end += 1;
+                                    }
+                                    const jsx_content = expr[value_start..jsx_end];
+
+                                    if (parseJsx(allocator, jsx_content)) |jsx_elem| {
+                                        try cases.append(allocator, .{
+                                            .pattern = pattern,
+                                            .value = .{ .jsx_element = jsx_elem },
+                                        });
+                                    } else |_| {
+                                        parsed_switch = false;
+                                        break;
+                                    }
+                                    arrow_pos = jsx_end + 1; // Skip closing paren
+                                }
+                            } else {
+                                parsed_switch = false;
+                                break;
+                            }
+
+                            // Skip whitespace and comma if present
+                            while (arrow_pos < expr.len and (std.ascii.isWhitespace(expr[arrow_pos]) or expr[arrow_pos] == ',')) {
+                                arrow_pos += 1;
+                            }
+
+                            case_start = arrow_pos;
+                        }
+
+                        if (parsed_switch and cases.items.len > 0) {
+                            // Create switch_expr child
+                            var cases_owned = std.ArrayList(ZigxElement.SwitchCase){};
+                            try cases_owned.appendSlice(allocator, cases.items);
+                            try parent.children.append(allocator, .{ .switch_expr = .{
+                                .expr = switch_expr,
+                                .cases = cases_owned,
+                            } });
+                            continue;
+                        }
+                    } else {
+                        parsed_switch = false;
+                    }
+                } else {
+                    parsed_switch = false;
+                }
+
+                // If we couldn't parse as switch, treat as regular expression
+                if (!parsed_switch) {
+                    try parent.children.append(allocator, .{ .text_expr = expr });
+                }
+            }
             // Regular text expression: {expr}
             else {
                 try parent.children.append(allocator, .{ .text_expr = expr });
@@ -1267,6 +1428,61 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 
                         // }
                         try addIndentTokens(output, indent + 2);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .switch_expr => |switch_expr| {
+                        // Switch expression: {switch (expr) { case => value, ... }}
+                        // Render as: switch (expr) { case => value, ... }
+                        try output.addToken(.invalid, "switch");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, switch_expr.expr);
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+
+                        for (switch_expr.cases.items) |switch_case| {
+                            try addIndentTokens(output, indent + 4);
+                            // Pattern (e.g., .admin)
+                            // Patterns start with a period, so output it
+                            if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+                                try output.addToken(.period, ".");
+                                if (switch_case.pattern.len > 1) {
+                                    try output.addToken(.identifier, switch_case.pattern[1..]);
+                                }
+                            } else {
+                                try output.addToken(.identifier, switch_case.pattern);
+                            }
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.invalid, "=>");
+                            try output.addToken(.invalid, " ");
+
+                            switch (switch_case.value) {
+                                .string_literal => |str| {
+                                    // String literal: _zx.txt("Admin")
+                                    try output.addToken(.identifier, "_zx");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, "txt");
+                                    try output.addToken(.l_paren, "(");
+                                    const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                    defer allocator.free(str_buf);
+                                    try output.addToken(.string_literal, str_buf);
+                                    try output.addToken(.r_paren, ")");
+                                },
+                                .jsx_element => |jsx_elem| {
+                                    // JSX element: _zx.zx(.p, .{ ... })
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item);
+                                },
+                            }
+
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, "\n");
+                        }
+
+                        try addIndentTokens(output, indent + 3);
                         try output.addToken(.r_brace, "}");
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
