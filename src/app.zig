@@ -11,7 +11,7 @@ pub const App = struct {
         };
         routes: []const Route,
     };
-    pub const AppConfig = struct {
+    pub const Config = struct {
         server: httpz.Config,
         meta: *const Meta,
     };
@@ -45,14 +45,15 @@ pub const App = struct {
         }
     };
 
-    pub const Version = module_config.version_string;
+    pub const version = module_config.version_string;
+    pub const info = std.fmt.comptimePrint("\x1b[1mZigX\x1b[0m \x1b[2m· {s}\x1b[0m", .{version});
 
     allocator: std.mem.Allocator,
     meta: *const Meta,
     handler: Handler,
     server: httpz.Server(*Handler),
 
-    pub fn init(allocator: std.mem.Allocator, config: AppConfig) !*App {
+    pub fn init(allocator: std.mem.Allocator, config: Config) !*App {
         const app = try allocator.create(App);
         errdefer allocator.destroy(app);
 
