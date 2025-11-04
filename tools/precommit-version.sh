@@ -36,8 +36,11 @@ NEW_DEV_NUMBER=$((DEV_NUMBER + 1))
 # Create new version string (replace dev.XX with dev.NEW_NUMBER)
 NEW_VERSION=$(echo "$CURRENT_VERSION" | sed -E "s/dev\.$DEV_NUMBER/dev.$NEW_DEV_NUMBER/")
 
-# Update the file
-sed -i.bak -E "s/(\.version\s*=\s*\")([^\"]+)(\")/\1$NEW_VERSION\3/" "$BUILD_ZON_PATH"
+# Update the file - replace the version string directly
+# Escape dots in NEW_VERSION for sed
+ESCAPED_NEW_VERSION=$(echo "$NEW_VERSION" | sed 's/\./\\./g')
+ESCAPED_CURRENT_VERSION=$(echo "$CURRENT_VERSION" | sed 's/\./\\./g')
+sed -i.bak "s/$ESCAPED_CURRENT_VERSION/$ESCAPED_NEW_VERSION/" "$BUILD_ZON_PATH"
 
 # Remove backup file (created by sed -i.bak)
 rm -f "$BUILD_ZON_PATH.bak"
