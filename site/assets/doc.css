@@ -13,11 +13,32 @@
     --sidebar-width: 250px;
 }
 
+/* Global scrollbar styling - always visible */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 6px;
+    background: transparent;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 30px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(176, 176, 176, 0.5);
+    border-radius: 30px;
+}
+
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: var(--text-color);
     line-height: 1.6;
     background: white;
+    /* Firefox scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(176, 176, 176, 0.5) transparent;
 }
 
 .container {
@@ -36,6 +57,7 @@ body {
     border-right: 2px solid var(--border-color);
     overflow-y: auto;
     padding: 2rem 0;
+    scrollbar-gutter: stable;
 }
 
 .nav-header {
@@ -85,6 +107,7 @@ body {
     flex: 1;
     min-width: 0;
     max-width: 100%;
+    overflow-x: hidden;
 }
 
 .section {
@@ -140,13 +163,14 @@ pre {
     background: #ffffff;
     padding: 1.5rem;
     border-radius: 0;
-    overflow-x: visible;
+    overflow-x: auto;
     overflow-y: auto;
     margin: 1.5rem 0;
     border: 2px solid var(--border-color);
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    word-break: normal;
+    white-space: pre;
+    max-width: 100%;
+    box-sizing: border-box;
+    scrollbar-gutter: stable;
 }
 
 pre code {
@@ -155,9 +179,9 @@ pre code {
     border: none;
     font-size: 0.875rem;
     line-height: 1.6;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    word-break: normal;
+    white-space: pre;
+    display: block;
+    overflow: visible;
 }
 
 .pane-header {
@@ -215,12 +239,10 @@ pre code {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
 }
 
-/* Hide all tab content by default */
-.example-code .tab-content {
-    display: none;
-}
 
 /* Show preview tab by default - higher specificity to override the hide rule above */
 .example-code > .tab-content[id^="tab-preview-"] {
@@ -267,21 +289,23 @@ pre code {
 /* Code Wrapper */
 .code-wrapper {
     flex: 1;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    scrollbar-gutter: stable;
 }
 
 .code-wrapper pre {
     margin: 0;
     border: none;
     padding: 1.5rem;
-    height: 100%;
     background: white;
-    overflow-x: visible;
-    overflow-y: auto;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    word-break: normal;
+    overflow: visible;
+    white-space: pre;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .code-wrapper code {
@@ -290,27 +314,189 @@ pre code {
     padding: 0;
     font-size: 0.875rem;
     line-height: 1.6;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    word-break: normal;
+    white-space: pre;
     display: block;
-    overflow-x: visible;
+    overflow: visible;
 }
 
 code[contenteditable="true"] {
     outline: none;
     display: block;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: normal;
-    cursor: text;
-    height: 100%;
-    width: 100%;
+    white-space: pre;
+    cursor: pointer;
+    overflow: visible;
 }
 
 code[contenteditable="true"]:focus {
     background: transparent;
     outline: none;
+    cursor: text;
+}
+
+/* Overlay on codeblock when tooltip is shown */
+.example-code pre:has(code[contenteditable="true"][data-full-content]:not(:focus))::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 999;
+}
+
+.example-code pre:hover:has(code[contenteditable="true"][data-full-content]:not(:focus))::before {
+    opacity: 1;
+}
+
+/* Fallback for browsers without :has() support */
+.example-code pre code[contenteditable="true"][data-full-content]:not(:focus) {
+    position: relative;
+}
+
+.example-code pre code[contenteditable="true"][data-full-content]:not(:focus)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 998;
+}
+
+.example-code pre:hover code[contenteditable="true"][data-full-content]:not(:focus)::after {
+    opacity: 1;
+}
+
+/* CSS-only content toggle - works without JavaScript */
+code[contenteditable="true"][data-full-content] {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    white-space: pre;
+}
+
+/* Show truncated content when not focused */
+code[contenteditable="true"][data-full-content]:not(:focus) {
+    overflow: hidden;
+}
+
+code[contenteditable="true"][data-full-content]:not(:focus)::before {
+    content: attr(title);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 6px 10px;
+    background: rgba(51, 51, 51, 0.5);
+    color: white;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    border-radius: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.example-code pre:hover code[contenteditable="true"][data-full-content]:not(:focus)::before {
+    opacity: 1;
+}
+
+/* Show full content when focused using CSS content property - works without JS */
+/* Hide CSS overlay when JS has updated the content */
+code[contenteditable="true"][data-full-content]:focus:not(.js-enhanced) {
+    color: transparent;
+    caret-color: #333; /* Show cursor */
+}
+
+code[contenteditable="true"][data-full-content]:focus:not(.js-enhanced)::before {
+    content: attr(data-full-content);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    color: #333;
+    padding: inherit;
+    white-space: pre;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 1;
+    border-radius: 0;
+    transform: none;
+    text-align: left;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: none;
+}
+
+/* When JS has updated content, show actual textContent (with highlighting) */
+code[contenteditable="true"][data-full-content]:focus.js-enhanced {
+    color: inherit; /* Show actual textContent, not transparent */
+}
+
+/* For non-editable code blocks (Zig code) - toggle on hover */
+/* Hide CSS overlay when JS has updated the content */
+code[data-full-content]:not([contenteditable]) {
+    position: relative;
+}
+
+code[data-full-content]:not([contenteditable]):not(:hover):not(.js-enhanced) {
+    overflow: hidden;
+}
+
+code[data-full-content]:not([contenteditable]):hover:not(.js-enhanced) {
+    color: transparent;
+}
+
+code[data-full-content]:not([contenteditable]):hover:not(.js-enhanced)::before {
+    content: attr(data-full-content);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    color: #333;
+    padding: inherit;
+    white-space: pre;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 1;
+    border-radius: 0;
+    transform: none;
+    text-align: left;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: none;
+}
+
+/* When JS has updated content, show actual textContent (with highlighting) */
+code[data-full-content]:not([contenteditable]).js-enhanced {
+    color: inherit; /* Show actual textContent, not transparent */
+    overflow: visible;
 }
 
 /* Preview */
@@ -337,6 +523,8 @@ code[contenteditable="true"]:focus {
     gap: 0;
     margin: 1.5rem 0;
     width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .example-code {
@@ -345,6 +533,9 @@ code[contenteditable="true"]:focus {
     flex-direction: column;
     height: auto;
     min-height: 60px;
+    overflow: hidden;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .example-code:first-child {
@@ -433,29 +624,27 @@ code[contenteditable="true"]:focus {
 }
 
 .example-code pre {
+    position: relative;
     margin: 0;
     border: none;
     border-radius: 0;
     padding: 1.5rem;
-    overflow-x: visible;
+    overflow-x: auto;
     overflow-y: auto;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    word-break: normal;
+    white-space: pre;
     background: #ffffff;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    scrollbar-gutter: stable;
 }
 
 .example-code pre code {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: normal;
+    white-space: pre;
     display: block;
-    overflow-x: visible;
-    height: 100%;
-    width: 100%;
+    overflow: visible;
 }
 
 /* Prism.js overrides for white background */

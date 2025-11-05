@@ -350,8 +350,8 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
     return (
         <div class="code-example">
             <div class="example-code">
-                <h4>ZX<span class="code-tooltip" aria-label="This shows only the ZX code. Click on the editor to see the full code.">ℹ</span></h4>
-            <pre><code id={zx_code_id} class="language-jsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx}>{truncated_zx_code}</code></pre>
+                <h4>ZX</h4>
+            <pre><code id={zx_code_id} class="language-jsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>
                 </div>
                 <div class="example-code">
                     <input type="radio" id={preview_id} name={name_id} class="tab-radio" checked>
@@ -376,7 +376,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
                     </div>
                     <div class="tab-content" id={zig_content_id}>
                         <div class="code-wrapper">
-                            <pre><code class="language-zig" data-full-content={escaped_full_zig}>{truncated_zig_code}</code></pre>
+                            <pre><code class="language-zig" data-full-content={escaped_full_zig} data-truncated-content={truncated_zig_code}>{truncated_zig_code}</code></pre>
                         </div>
                     </div>
                 </div>

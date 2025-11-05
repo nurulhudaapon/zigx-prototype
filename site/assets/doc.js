@@ -31,56 +31,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Setup code truncation toggle for all example blocks
+  // Setup code truncation for Prism.js highlighting (enhancement, not required)
   setupCodeTruncation();
 });
 
 function setupCodeTruncation() {
-  // Find all code elements with data-full-content attribute
   const codeElements = document.querySelectorAll('code[data-full-content]');
   
   codeElements.forEach(codeElement => {
     const fullContent = codeElement.getAttribute('data-full-content');
     if (!fullContent) return;
     
-    // Store truncated content (current displayed content before Prism processing)
-    // Get it from the initial textContent before Prism modifies it
-    const truncatedContent = codeElement.textContent || codeElement.innerText;
-    
-    // Store state to track if we're showing full content
-    let isShowingFull = false;
-    
-    // Function to show truncated content
-    function showTruncatedContent() {
-      if (isShowingFull) {
-        codeElement.textContent = truncatedContent;
-        isShowingFull = false;
-        
-        // Re-highlight with Prism.js
-        if (typeof Prism !== 'undefined') {
-          Prism.highlightElement(codeElement);
-        }
-      }
-    }
-    
-    // Function to show full content
-    function showFullContent() {
-      if (!isShowingFull) {
+    // Update textContent for Prism.js highlighting when JS is enabled
+    codeElement.addEventListener('focus', () => {
+      // Update textContent for Prism.js highlighting
+      if (codeElement.textContent !== fullContent) {
         codeElement.textContent = fullContent;
-        isShowingFull = true;
-        
-        // Re-highlight with Prism.js
+        codeElement.classList.add('js-enhanced'); // Signal that JS has updated content
         if (typeof Prism !== 'undefined') {
           Prism.highlightElement(codeElement);
         }
       }
+    });
+    
+    codeElement.addEventListener('blur', () => {
+      const truncatedContent = codeElement.getAttribute('data-truncated-content') || '';
+      if (truncatedContent && codeElement.textContent !== truncatedContent) {
+        codeElement.textContent = truncatedContent;
+        codeElement.classList.remove('js-enhanced'); // Remove signal when back to truncated
+        if (typeof Prism !== 'undefined') {
+          Prism.highlightElement(codeElement);
+        }
+      }
+    });
+    
+    // Also handle hover for non-editable code blocks
+    if (!codeElement.hasAttribute('contenteditable')) {
+      codeElement.addEventListener('mouseenter', () => {
+        if (codeElement.textContent !== fullContent) {
+          codeElement.textContent = fullContent;
+          codeElement.classList.add('js-enhanced');
+          if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(codeElement);
+          }
+        }
+      });
+      
+      codeElement.addEventListener('mouseleave', () => {
+        const truncatedContent = codeElement.getAttribute('data-truncated-content') || '';
+        if (truncatedContent && codeElement.textContent !== truncatedContent) {
+          codeElement.textContent = truncatedContent;
+          codeElement.classList.remove('js-enhanced');
+          if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(codeElement);
+          }
+        }
+      });
     }
-    
-    // Show full content when code is clicked/focused
-    codeElement.addEventListener('focus', showFullContent);
-    codeElement.addEventListener('click', showFullContent);
-    
-    // Show truncated content when code loses focus
-    codeElement.addEventListener('blur', showTruncatedContent);
   });
 }
