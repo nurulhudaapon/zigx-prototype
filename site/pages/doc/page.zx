@@ -189,7 +189,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
     return (
         <div class="code-example">
             <div class="example-code">
-                <h4>ZX</h4>
+                <h4>ZX<span class="code-tooltip" aria-label="This shows only the ZX code. Click on the editor to see the full code.">ℹ</span></h4>
             <pre><code id={zx_code_id} class="language-jsx" contenteditable="true" spellcheck="false">{props.zx_code}</code></pre>
                 </div>
                 <div class="example-code">

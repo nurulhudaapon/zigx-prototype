@@ -355,6 +355,67 @@ code[contenteditable="true"]:focus {
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+}
+
+.code-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #0066cc;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: normal;
+    font-style: normal;
+    cursor: help;
+    margin-left: auto;
+    margin-right: 0;
+    flex-shrink: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.code-tooltip::after {
+    content: attr(aria-label);
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #333;
+    color: white;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    border-radius: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.code-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    right: 8px;
+    margin-bottom: 4px;
+    border: 4px solid transparent;
+    border-top-color: #333;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+.code-tooltip:hover::after,
+.code-tooltip:hover::before {
+    opacity: 1;
 }
 
 .example-code pre {

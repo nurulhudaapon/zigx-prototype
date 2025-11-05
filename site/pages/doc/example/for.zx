@@ -1,10 +1,17 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
-    const chars = "Hello, World!";
+    const chars = "ABC";
+    const user_names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
 
     return (
-        <section>
-            {for (chars) |char| (<span>{[char:c]}</span>)}
-        </section>
+        <main>
+            <section>
+                {for (chars) |char| (<i>{[char:c]}</i>)}
+            </section>
+ 
+            <section>
+                {for (user_names) |name| (<p>{name}</p>)}
+            </section>
+        </main>
     );
 }
 
