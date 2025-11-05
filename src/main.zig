@@ -302,9 +302,12 @@ fn transpileCommand(
     include_zig: bool,
 ) !void {
     // Check if path is a file or directory
-    const stat = std.fs.cwd().statFile(path) catch |err| {
-        std.debug.print("Error: Could not access path '{s}': {}\n", .{ path, err });
-        return err;
+    const stat = std.fs.cwd().statFile(path) catch |err| switch (err) {
+        error.IsDir => std.fs.File.Stat{ .kind = .directory, .size = 0, .mode = 0, .atime = 0, .mtime = 0, .ctime = 0, .inode = 0 },
+        else => {
+            std.debug.print("Error: Could not access path '{s}': {}\n", .{ path, err });
+            return err;
+        },
     };
 
     if (stat.kind == .directory) {
