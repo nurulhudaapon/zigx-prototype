@@ -2,16 +2,20 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const user_swtc = users[0];
 
     return (
-        <section>
-            {switch (user_swtc.user_type) {
-                .admin => ("Admin"),
-                .member => ("Member"),
-            }}
-            {switch (user_swtc.user_type) {
-                .admin => (<p>Admin</p>),
-                .member => (<p>Member</p>),
-            }}
-        </section>
+        <main>
+            <section>
+                {switch (user_swtc.user_type) {
+                    .admin => ("Admin"),
+                    .member => ("Member"),
+                }}
+            </section>
+            <section>
+                {switch (user_swtc.user_type) {
+                    .admin => (<p>Powerful</p>),
+                    .member => (<p>Powerless</p>),
+                }}
+            </section>
+        </main>
     );
 }
 

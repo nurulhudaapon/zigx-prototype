@@ -204,6 +204,12 @@ pre code {
     background: rgba(0, 0, 0, 0.05);
 }
 
+/* Default active state for preview tab button (since it's checked by default) */
+.example-code .tab-btn[for$="-preview"] {
+    color: var(--link-color);
+    border-bottom-color: var(--link-color);
+}
+
 .tab-content {
     display: none;
     flex: 1;
@@ -216,11 +222,9 @@ pre code {
     display: none;
 }
 
-/* Show preview tab by default - match any preview tab in the same example-code container */
-.example-code:has(.tab-radio[id$="-preview"]:checked) .tab-content[id^="tab-preview-"],
-.example-code:has(.tab-radio[id$="-preview"]:not(:checked)) .tab-content[id^="tab-preview-"]:first-of-type,
-.example-code .tab-content[id^="tab-preview-"]:first-of-type {
-    display: flex;
+/* Show preview tab by default - higher specificity to override the hide rule above */
+.example-code > .tab-content[id^="tab-preview-"] {
+    display: flex !important;
     flex-direction: column;
 }
 
@@ -236,18 +240,28 @@ pre code {
     flex-direction: column;
 }
 
-/* Hide preview when other tabs are checked */
+/* Hide preview when html or zig tabs are checked */
 .example-code:has(.tab-radio[id$="-html"]:checked) .tab-content[id^="tab-preview-"],
 .example-code:has(.tab-radio[id$="-zig"]:checked) .tab-content[id^="tab-preview-"] {
-    display: none;
+    display: none !important;
+}
+
+/* Reset preview button when other tabs are checked */
+.example-code:has(.tab-radio[id$="-html"]:checked) .tab-btn[for$="-preview"],
+.example-code:has(.tab-radio[id$="-zig"]:checked) .tab-btn[for$="-preview"] {
+    color: #666 !important;
+    border-bottom-color: transparent !important;
 }
 
 /* Style active tab button based on checked radio */
 .example-code .tab-radio[id$="-preview"]:checked ~ .pane-header .tab-btn[for$="-preview"],
 .example-code .tab-radio[id$="-html"]:checked ~ .pane-header .tab-btn[for$="-html"],
-.example-code .tab-radio[id$="-zig"]:checked ~ .pane-header .tab-btn[for$="-zig"] {
-    color: var(--link-color);
-    border-bottom-color: var(--link-color);
+.example-code .tab-radio[id$="-zig"]:checked ~ .pane-header .tab-btn[for$="-zig"],
+.example-code:has(.tab-radio[id$="-preview"]:checked) .tab-btn[for$="-preview"],
+.example-code:has(.tab-radio[id$="-html"]:checked) .tab-btn[for$="-html"],
+.example-code:has(.tab-radio[id$="-zig"]:checked) .tab-btn[for$="-zig"] {
+    color: var(--link-color) !important;
+    border-bottom-color: var(--link-color) !important;
 }
 
 /* Code Wrapper */
