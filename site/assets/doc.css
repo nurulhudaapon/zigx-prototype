@@ -409,18 +409,16 @@ pre code {
 /* Code Wrapper */
 .code-wrapper {
     flex: 1;
-    overflow-x: auto;
-    overflow-y: auto;
     min-height: 0;
     min-width: 0;
     max-width: 100%;
-    scrollbar-gutter: stable;
+    overflow: visible;
 }
 
 .code-wrapper pre {
     margin: 0;
     border: none;
-    padding: 1.5rem;
+    padding: 0;
     background: white;
     overflow: visible;
     white-space: pre;
@@ -431,12 +429,23 @@ pre code {
 .code-wrapper code {
     background: none;
     border: none;
-    padding: 0;
+    padding: 1.5rem;
     font-size: 0.875rem;
     line-height: 1.6;
     white-space: pre;
     display: block;
-    overflow: visible;
+    scrollbar-gutter: stable;
+    box-sizing: border-box;
+}
+
+/* Code elements with data-full-content */
+.code-wrapper code[data-full-content] {
+    max-height: 60vh;
+}
+
+.code-wrapper code[data-full-content]:hover {
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 code[contenteditable="true"] {
@@ -502,11 +511,18 @@ code[contenteditable="true"][data-full-content] {
     height: 100%;
     display: block;
     white-space: pre;
+    max-height: 60vh;
 }
 
 /* Show truncated content when not focused */
 code[contenteditable="true"][data-full-content]:not(:focus) {
     overflow: hidden;
+}
+
+/* Ensure code element has scrollbars when focused */
+code[contenteditable="true"][data-full-content]:focus {
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 code[contenteditable="true"][data-full-content]:not(:focus)::before {
@@ -536,66 +552,21 @@ code[contenteditable="true"][data-full-content]:not(:focus)::before {
 }
 
 /* Show full content when focused using CSS content property - works without JS */
-/* Hide CSS overlay when JS has updated the content */
-code[contenteditable="true"][data-full-content]:focus:not(.js-enhanced) {
-    color: transparent;
-    caret-color: #333; /* Show cursor */
-}
-
-code[contenteditable="true"][data-full-content]:focus:not(.js-enhanced)::before {
-    content: attr(data-full-content);
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    color: #333;
-    padding: inherit;
-    white-space: pre;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    overflow: visible;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 1;
-    border-radius: 0;
-    transform: none;
-    text-align: left;
-    font-weight: inherit;
-    letter-spacing: inherit;
-    text-transform: none;
-}
-
-/* When JS has updated content, show actual textContent (with highlighting) */
-code[contenteditable="true"][data-full-content]:focus.js-enhanced {
-    color: inherit; /* Show actual textContent, not transparent */
-}
-
-/* For non-editable code blocks (Zig code) - toggle on hover */
-/* Hide CSS overlay when JS has updated the content */
-code[data-full-content]:not([contenteditable]) {
+code[contenteditable="true"][data-full-content]:focus {
+    overflow-x: auto;
+    overflow-y: auto;
     position: relative;
 }
 
-code[data-full-content]:not([contenteditable]):not(:hover):not(.js-enhanced) {
-    overflow: hidden;
-}
-
-code[data-full-content]:not([contenteditable]):hover:not(.js-enhanced) {
-    color: transparent;
-}
-
-code[data-full-content]:not([contenteditable]):hover:not(.js-enhanced)::before {
+/* CSS fallback for when JS is disabled - show full content via ::before */
+code[contenteditable="true"][data-full-content]:focus::before {
     content: attr(data-full-content);
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
-    background: transparent;
-    color: #333;
+    background: #ffffff;
+    color: #333 !important;
     padding: inherit;
     white-space: pre;
     font-family: inherit;
@@ -613,10 +584,70 @@ code[data-full-content]:not([contenteditable]):hover:not(.js-enhanced)::before {
     text-transform: none;
 }
 
-/* When JS has updated content, show actual textContent (with highlighting) */
-code[data-full-content]:not([contenteditable]).js-enhanced {
-    color: inherit; /* Show actual textContent, not transparent */
+/* Hide CSS fallback when JS has updated content */
+code[contenteditable="true"][data-full-content][data-expanded]::before {
+    display: none;
+}
+
+/* Ensure textContent is visible and on top when JS has updated it */
+code[contenteditable="true"][data-full-content][data-expanded] {
+    color: inherit;
+    position: relative;
+    z-index: 2;
+}
+
+
+/* For non-editable code blocks (Zig code) - toggle on hover */
+code[data-full-content]:not([contenteditable]) {
+    position: relative;
+    max-height: 60vh;
+}
+
+code[data-full-content]:not([contenteditable]):not(:hover) {
+    overflow: hidden;
+}
+
+code[data-full-content]:not([contenteditable]):hover {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+/* CSS fallback for when JS is disabled - show full content via ::before */
+code[data-full-content]:not([contenteditable]):hover::before {
+    content: attr(data-full-content);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    color: #333 !important;
+    padding: inherit;
+    white-space: pre;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     overflow: visible;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 1;
+    border-radius: 0;
+    transform: none;
+    text-align: left;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: none;
+}
+
+/* Hide CSS fallback when JS has updated content */
+code[data-full-content]:not([contenteditable])[data-expanded]::before {
+    display: none;
+}
+
+/* Ensure textContent is visible and on top when JS has updated it */
+code[data-full-content]:not([contenteditable])[data-expanded] {
+    color: inherit;
+    position: relative;
+    z-index: 2;
 }
 
 /* Preview */
@@ -748,9 +779,8 @@ code[data-full-content]:not([contenteditable]).js-enhanced {
     margin: 0;
     border: none;
     border-radius: 0;
-    padding: 1.5rem;
-    overflow-x: auto;
-    overflow-y: auto;
+    padding: 0;
+    overflow: visible;
     white-space: pre;
     background: #ffffff;
     flex: 1;
@@ -758,14 +788,27 @@ code[data-full-content]:not([contenteditable]).js-enhanced {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
-    scrollbar-gutter: stable;
 }
 
 .example-code pre code {
     white-space: pre;
     display: block;
-    overflow: visible;
+    padding: 1.5rem;
+    scrollbar-gutter: stable;
+    min-height: 100%;
+    box-sizing: border-box;
 }
+
+/* Code elements with data-full-content */
+.example-code pre code[data-full-content] {
+    max-height: 60vh;
+}
+
+.example-code pre code[data-full-content]:focus {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
 
 /* Prism.js overrides for white background */
 pre[class*="language-"] {
@@ -775,75 +818,6 @@ pre[class*="language-"] {
 code[class*="language-"] {
     background: #ffffff !important;
     /* Don't override text color - let tokens handle it */
-}
-
-/* Ensure Prism tokens have colors - only override if they're black */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-    color: #708090 !important;
-}
-
-.token.punctuation {
-    color: #999 !important;
-}
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-    color: #905 !important;
-}
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-    color: #690 !important;
-}
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-    color: #9a6e3a !important;
-}
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-    color: #07a !important;
-}
-
-.token.function,
-.token.class-name {
-    color: #dd4a68 !important;
-}
-
-.token.regex,
-.token.important,
-.token.variable {
-    color: #e90 !important;
-}
-
-/* JSX specific */
-.token.tag {
-    color: #905 !important;
-}
-
-.token.attr-name {
-    color: #690 !important;
-}
-
-.token.attr-value .token.punctuation {
-    color: #690 !important;
 }
 
 /* Responsive - Medium screens */
@@ -890,20 +864,20 @@ code[class*="language-"] {
     
     .code-wrapper pre {
         font-size: 0.8rem;
-        padding: 1rem;
     }
     
     .code-wrapper code {
         font-size: 0.8rem;
+        padding: 1rem;
     }
     
     .example-code pre {
         font-size: 0.8rem;
-        padding: 1rem;
     }
     
     .example-code pre code {
         font-size: 0.8rem;
+        padding: 1rem;
     }
     
     code {
@@ -977,20 +951,20 @@ code[class*="language-"] {
     
     .code-wrapper pre {
         font-size: 0.75rem;
-        padding: 1rem;
     }
     
     .code-wrapper code {
         font-size: 0.75rem;
+        padding: 1rem;
     }
     
     .example-code pre {
         font-size: 0.75rem;
-        padding: 1rem;
     }
     
     .example-code pre code {
         font-size: 0.75rem;
+        padding: 1rem;
     }
     
     code {

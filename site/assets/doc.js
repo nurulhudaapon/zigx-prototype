@@ -31,60 +31,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Setup code truncation for Prism.js highlighting (enhancement, not required)
-  setupCodeTruncation();
+  // Setup Prism highlighting for expandable code blocks
+  setupCodeHighlighting();
 });
 
-function setupCodeTruncation() {
+function setupCodeHighlighting() {
   const codeElements = document.querySelectorAll('code[data-full-content]');
   
   codeElements.forEach(codeElement => {
     const fullContent = codeElement.getAttribute('data-full-content');
+    const truncatedContent = codeElement.getAttribute('data-truncated-content') || '';
+    
     if (!fullContent) return;
     
-    // Update textContent for Prism.js highlighting when JS is enabled
-    codeElement.addEventListener('focus', () => {
-      // Update textContent for Prism.js highlighting
-      if (codeElement.textContent !== fullContent) {
+    // Handle contenteditable code blocks (ZX code) - use focus/blur
+    if (codeElement.hasAttribute('contenteditable')) {
+      codeElement.addEventListener('focus', () => {
         codeElement.textContent = fullContent;
-        codeElement.classList.add('js-enhanced'); // Signal that JS has updated content
+        codeElement.setAttribute('data-expanded', 'true');
         if (typeof Prism !== 'undefined') {
           Prism.highlightElement(codeElement);
         }
-      }
-    });
-    
-    codeElement.addEventListener('blur', () => {
-      const truncatedContent = codeElement.getAttribute('data-truncated-content') || '';
-      if (truncatedContent && codeElement.textContent !== truncatedContent) {
+      });
+      
+      codeElement.addEventListener('blur', () => {
         codeElement.textContent = truncatedContent;
-        codeElement.classList.remove('js-enhanced'); // Remove signal when back to truncated
+        codeElement.removeAttribute('data-expanded');
         if (typeof Prism !== 'undefined') {
           Prism.highlightElement(codeElement);
         }
-      }
-    });
-    
-    // Also handle hover for non-editable code blocks
-    if (!codeElement.hasAttribute('contenteditable')) {
+      });
+    } else {
+      // Handle non-contenteditable code blocks (Zig code) - use hover
       codeElement.addEventListener('mouseenter', () => {
-        if (codeElement.textContent !== fullContent) {
-          codeElement.textContent = fullContent;
-          codeElement.classList.add('js-enhanced');
-          if (typeof Prism !== 'undefined') {
-            Prism.highlightElement(codeElement);
-          }
+        codeElement.textContent = fullContent;
+        codeElement.setAttribute('data-expanded', 'true');
+        if (typeof Prism !== 'undefined') {
+          Prism.highlightElement(codeElement);
         }
       });
       
       codeElement.addEventListener('mouseleave', () => {
-        const truncatedContent = codeElement.getAttribute('data-truncated-content') || '';
-        if (truncatedContent && codeElement.textContent !== truncatedContent) {
-          codeElement.textContent = truncatedContent;
-          codeElement.classList.remove('js-enhanced');
-          if (typeof Prism !== 'undefined') {
-            Prism.highlightElement(codeElement);
-          }
+        codeElement.textContent = truncatedContent;
+        codeElement.removeAttribute('data-expanded');
+        if (typeof Prism !== 'undefined') {
+          Prism.highlightElement(codeElement);
         }
       });
     }
