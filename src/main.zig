@@ -239,6 +239,12 @@ fn transpileDirectory(
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
     defer dir.close();
 
+    // Check if dir_path itself is or contains "pages"
+    const sep = std.fs.path.sep_str;
+    const dir_is_pages = std.mem.endsWith(u8, dir_path, sep ++ "pages") or
+        std.mem.eql(u8, getBasename(dir_path), "pages") or
+        std.mem.endsWith(u8, dir_path, "pages");
+
     var walker = try dir.walk(allocator);
     defer walker.deinit();
 
@@ -248,34 +254,56 @@ fn transpileDirectory(
         const is_zx = std.mem.endsWith(u8, entry.path, ".zx");
         const is_zig = std.mem.endsWith(u8, entry.path, ".zig");
 
-        // Skip files that don't match our criteria
-        if (!is_zx and !(include_zig and is_zig)) continue;
+        // Check if this entry is within a "pages" directory
+        // entry.path is relative to dir_path, so check if it contains "pages" in its path
+        // or if dir_path itself is a pages directory
+        const is_in_pages_dir = dir_is_pages or
+            std.mem.startsWith(u8, entry.path, "pages" ++ sep) or
+            std.mem.indexOf(u8, entry.path, sep ++ "pages" ++ sep) != null;
 
         // Build input path
         const input_path = try std.fs.path.join(allocator, &.{ dir_path, entry.path });
         defer allocator.free(input_path);
 
-        // For .zig files with --zig flag, check if they contain zx syntax
-        if (is_zig and include_zig) {
+        // Check if this file should be transpiled
+        var should_transpile = false;
+        var should_copy = false;
+
+        if (is_zx) {
+            should_transpile = true;
+        } else if (is_zig and include_zig) {
             const has_zx = hasZXSyntax(allocator, input_path) catch false;
-            if (!has_zx) {
-                // Skip .zig files that don't contain zx syntax
-                continue;
+            if (has_zx) {
+                should_transpile = true;
+            } else if (is_in_pages_dir) {
+                // In pages directory, copy .zig files that don't have zx syntax
+                should_copy = true;
             }
+        } else if (is_in_pages_dir) {
+            // In pages directory, copy all other files
+            should_copy = true;
         }
+
+        // Skip files that don't match our criteria
+        if (!should_transpile and !should_copy) continue;
 
         // Build output path
         const relative_path = entry.path;
         var output_rel_path: []const u8 = undefined;
 
-        if (is_zx) {
-            // Remove .zx and add .zig
-            output_rel_path = try std.mem.concat(allocator, u8, &.{
-                relative_path[0 .. relative_path.len - (".zx").len], // Remove .zx
-                ".zig",
-            });
+        if (should_transpile) {
+            if (is_zx) {
+                // Remove .zx and add .zig
+                output_rel_path = try std.mem.concat(allocator, u8, &.{
+                    relative_path[0 .. relative_path.len - (".zx").len], // Remove .zx
+                    ".zig",
+                });
+            } else {
+                // For .zig files, keep the same name
+                output_rel_path = try allocator.dupe(u8, relative_path);
+            }
         } else {
-            // For .zig files, keep the same name
+            // For copying, keep the same name
             output_rel_path = try allocator.dupe(u8, relative_path);
         }
         defer allocator.free(output_rel_path);
@@ -283,10 +311,27 @@ fn transpileDirectory(
         const output_path = try std.fs.path.join(allocator, &.{ output_dir, output_rel_path });
         defer allocator.free(output_path);
 
-        transpileFile(allocator, input_path, output_path) catch |err| {
-            std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
-            continue;
-        };
+        if (should_transpile) {
+            transpileFile(allocator, input_path, output_path) catch |err| {
+                std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
+                continue;
+            };
+        } else {
+            // Copy file as-is
+            // Create parent directory if needed
+            if (std.fs.path.dirname(output_path)) |parent| {
+                std.fs.cwd().makePath(parent) catch |err| switch (err) {
+                    error.PathAlreadyExists => {},
+                    else => {
+                        std.debug.print("Error creating directory {s}: {}\n", .{ parent, err });
+                        continue;
+                    },
+                };
+            }
+
+            try std.fs.cwd().copyFile(input_path, std.fs.cwd(), output_path, .{});
+            std.debug.print("Copied: {s} -> {s}\n", .{ input_path, output_path });
+        }
     }
 
     // Copy asset directories after transpiling all files

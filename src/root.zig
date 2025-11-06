@@ -4,7 +4,7 @@ const std = @import("std");
 pub const Ast = @import("zx/Ast.zig");
 pub const Allocator = std.mem.Allocator;
 
-const ElementTag = enum { iframe, slot, svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
+const ElementTag = enum { polyline, iframe, slot, svg, path, img, html, base, head, link, meta, script, style, title, address, article, body, h1, h6, footer, header, h2, h3, h4, h5, hgroup, nav, section, dd, dl, dt, div, figcaption, figure, hr, li, ol, ul, menu, main, p, pre, a, abbr, b, bdi, bdo, br, cite, code, data, time, dfn, em, i, kbd, mark, q, blockquote, rp, ruby, rt, rtc, rb, s, del, ins, samp, small, span, strong, sub, sup, u, @"var", wbr, area, map, audio, source, track, video, embed, object, param, canvas, noscript, caption, table, col, colgroup, tbody, tr, thead, tfoot, td, th, button, datalist, option, fieldset, label, form, input, keygen, legend, meter, optgroup, select, output, progress, textarea, details, dialog, menuitem, summary, content, element, shadow, template, acronym, applet, basefont, font, big, blink, center, command, dir, frame, frameset, isindex, listing, marquee, noembed, plaintext, spacer, strike, tt, xmp };
 const SELF_CLOSING_ONLY: []const ElementTag = &.{ .br, .hr, .img, .input, .link, .source, .track, .wbr };
 const NO_CHILDREN_ONLY: []const ElementTag = &.{ .meta, .link, .input };
 
@@ -173,10 +173,15 @@ pub const Component = union(enum) {
                     for (attributes) |attribute| {
                         try writer.print(" {s}", .{attribute.name});
                         if (attribute.value) |value| {
-                            // HTML escape attribute values to prevent XSS
-                            // Escape quotes, ampersands, and other HTML special characters
                             try writer.writeAll("=\"");
-                            try escapeAttributeValueToWriter(writer, value);
+                            if (attribute.format) |_| {
+                                // Format field is present - value is already formatted, skip HTML escaping
+                                try writer.writeAll(value);
+                            } else {
+                                // HTML escape attribute values to prevent XSS
+                                // Escape quotes, ampersands, and other HTML special characters
+                                try escapeAttributeValueToWriter(writer, value);
+                            }
                             try writer.writeAll("\"");
                         }
                     }
@@ -214,6 +219,7 @@ const Element = struct {
     const Attribute = struct {
         name: []const u8,
         value: ?[]const u8 = null,
+        format: ?[]const u8 = null, // Format specifier for value (e.g., "{s}", "{d}")
     };
 
     tag: ElementTag,

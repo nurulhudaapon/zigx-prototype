@@ -1,5 +1,4 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
-
     // If example
     var aw_if: std.io.Writer.Allocating = .init(allocator);
     const zx_example_if = @embedFile("../../../pages/doc/example/if.zx");
@@ -52,6 +51,10 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const txt_expr = "{expression}";
     const fmt_expr = "{[expression:format]}";
 
+    var aw_icon_svg_base64: std.io.Writer.Allocating = .init(allocator);
+    std.base64.standard.Encoder.encodeWriter(&aw_icon_svg_base64.writer, @embedFile("../../public/zx-icon.svg")) catch unreachable;
+    const icon_href = std.fmt.allocPrint(allocator, "data:image/svg+xml;base64,{s}", .{aw_icon_svg_base64.written()}) catch unreachable;
+
     return (
 <html>
 <head>
@@ -60,6 +63,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     <title>ZX Documentation - JSX-like Syntax for Zig</title>
     <link rel="stylesheet" href="./assets/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
+    <link rel="icon" href={icon_href} type="image/svg+xml">
     <style>
         {[@embedFile("../../assets/doc.css"):s]}
     </style>
@@ -70,12 +74,20 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     <div class="container">
         <nav class="sidebar">
             <div class="nav-header">
-                <h1>ZX</h1>
+                <div class="nav-header-top">
+                    <h1>ZX</h1>
+                </div>
                 <p class="nav-subtitle">HTML within Zig</p>
             </div>
             <ul class="nav-menu">
                 <li><a href="#introduction">Introduction</a></li>
-                <li><a href="#getting-started">Getting Started</a></li>
+                <li class="nav-item-with-submenu">
+                    <a href="#getting-started" class="nav-parent">Getting Started <span class="submenu-arrow">▼</span></a>
+                    <ul class="nav-submenu">
+                        <li><a href="#getting-started">Quick Start</a></li>
+                        <li><a href="#editor-setup">Editor Setup</a></li>
+                    </ul>
+                </li>
                 <li><a href="#control-flow">Control Flow</a></li>
                 <li><a href="#expressions">Expressions</a></li>
                 <li><a href="#examples">Examples</a></li>
@@ -84,10 +96,19 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 
         <main class="content">
             <section id="introduction" class="section">
-                <h2>Introduction</h2>
+                <div class="section-header">
+                    <h2>Introduction</h2>
+                    <div class="source-code-badge">
+                        <a href="https://github.com/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer" class="source-code-badge-link">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                            </svg>
+                            <span>View Source Code</span>
+                        </a>
+                    </div>
+                </div>
                 <p>ZX is a <strong>prototype</strong> Zig library for building web applications with JSX-like syntax. Write declarative UI
                     components using familiar JSX patterns, transpiled to efficient Zig code.</p>
-                <p><strong>ZX is available on GitHub:</strong> <a href="https://github.com/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer" style="font-size: 1.1em; font-weight: 600;">https://github.com/nurulhudaapon/zx</a></p>
                 <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
                     fast, type-safe web applications. ZX uses <a href="https://github.com/karlseguin/http.zig" target="_blank" rel="noopener noreferrer">http.zig</a> to create high-performance HTTP servers, making it significantly faster than frameworks like Next.js. See benchmarks at <a href="https://zigweb.nuhu.dev" target="_blank" rel="noopener noreferrer">zigweb.nuhu.dev</a>.</p>
                 <p>Currently, ZX supports Server-Side Rendering (SSR) and Static Site Generation (SSG). Client-Side Rendering (CSR) may be implemented in the future by compiling Zig to WebAssembly and creating a bridge with JavaScript, once the prototype has proven the concept to be useful.</p>
@@ -104,6 +125,11 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 </p>
                 <p>
                     A full, step-by-step getting started guide is currently a work in progress and will be available here soon.
+                </p>
+                
+                <h3 id="editor-setup">Editor Setup</h3>
+                <p>
+                    Enhance your development experience with the official ZX extension for VSCode and Cursor. The extension provides syntax highlighting, code completion, and other helpful features for working with <code>.zx</code> files. Install it from <a href="https://open-vsx.org/extension/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer">Open VSX</a>.
                 </p>
             </section>
 
@@ -169,156 +195,6 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     );
 }
 
-// Helper function to find minimum indentation in non-empty lines
-fn findMinIndent(lines: []const []const u8, first_non_empty: usize, last_non_empty: usize) usize {
-    var min_indent: usize = std.math.maxInt(usize);
-    for (lines[first_non_empty..last_non_empty+1]) |line| {
-        if (std.mem.trim(u8, line, " \t").len > 0) {
-            var indent: usize = 0;
-            for (line) |char| {
-                if (char == ' ' or char == '\t') {
-                    indent += 1;
-                } else {
-                    break;
-                }
-            }
-            if (indent < min_indent) {
-                min_indent = indent;
-            }
-        }
-    }
-    return if (min_indent == std.math.maxInt(usize)) 0 else min_indent;
-}
-
-// Helper function to remove common leading indentation
-fn removeCommonIndentation(allocator: zx.Allocator, content: []const u8) []const u8 {
-    var lines = std.array_list.Managed([]const u8).init(allocator);
-    defer lines.deinit();
-    
-    var it = std.mem.splitScalar(u8, content, '\n');
-    while (it.next()) |line| {
-        lines.append(line) catch unreachable;
-    }
-    
-    if (lines.items.len == 0) {
-        return allocator.dupe(u8, "") catch unreachable;
-    }
-    
-    // Find first and last non-empty lines
-    var first_non_empty: ?usize = null;
-    var last_non_empty: ?usize = null;
-    for (lines.items, 0..) |line, i| {
-        if (std.mem.trim(u8, line, " \t").len > 0) {
-            if (first_non_empty == null) {
-                first_non_empty = i;
-            }
-            last_non_empty = i;
-        }
-    }
-    
-    if (first_non_empty == null) {
-        return allocator.dupe(u8, "") catch unreachable;
-    }
-    
-    const first = first_non_empty.?;
-    const last = last_non_empty.?;
-    
-    // Find minimum indentation
-    const min_indent = findMinIndent(lines.items, first, last);
-    
-    // Build result with indentation removed
-    var result = std.array_list.Managed(u8).init(allocator);
-    defer result.deinit();
-    
-    for (lines.items[first..last+1], 0..) |line, i| {
-        if (i > 0) {
-            result.append('\n') catch unreachable;
-        }
-        if (std.mem.trim(u8, line, " \t").len > 0) {
-            const start = @min(min_indent, line.len);
-            result.appendSlice(line[start..]) catch unreachable;
-        } else {
-            result.appendSlice(line) catch unreachable;
-        }
-    }
-    
-    return allocator.dupe(u8, result.items) catch unreachable;
-}
-
-// Extract content inside return (...) for ZX code
-fn extractZxReturnContent(allocator: zx.Allocator, content: []const u8) []const u8 {
-    const return_pattern = "return (";
-    if (std.mem.indexOf(u8, content, return_pattern)) |start_idx| {
-        var depth: usize = 1;
-        var i = start_idx + return_pattern.len;
-        while (i < content.len and depth > 0) {
-            if (content[i] == '(') {
-                depth += 1;
-            } else if (content[i] == ')') {
-                depth -= 1;
-                if (depth == 0) {
-                    return allocator.dupe(u8, content[start_idx + return_pattern.len..i]) catch unreachable;
-                }
-            }
-            i += 1;
-        }
-    }
-    return allocator.dupe(u8, content) catch unreachable;
-}
-
-// Extract content after return statement for Zig code (until semicolon)
-fn extractZigReturnContent(allocator: zx.Allocator, content: []const u8) []const u8 {
-    const return_pattern = "return ";
-    if (std.mem.indexOf(u8, content, return_pattern)) |start_idx| {
-        var depth: usize = 0;
-        var in_string = false;
-        var string_char: ?u8 = null;
-        var i = start_idx + return_pattern.len;
-        
-        while (i < content.len) {
-            const char = content[i];
-            
-            // Handle string literals
-            if (char == '"' or char == '\'') {
-                // Check if previous character is not a backslash (or if backslash is escaped)
-                var is_escaped = false;
-                if (i > start_idx + return_pattern.len) {
-                    var backslash_count: usize = 0;
-                    var j = i - 1;
-                    while (j >= start_idx + return_pattern.len and content[j] == '\\') {
-                        backslash_count += 1;
-                        j -= 1;
-                    }
-                    is_escaped = (backslash_count % 2) == 1;
-                }
-                
-                if (!is_escaped) {
-                    if (!in_string) {
-                        in_string = true;
-                        string_char = char;
-                    } else if (char == string_char) {
-                        in_string = false;
-                        string_char = null;
-                    }
-                }
-            }
-            
-            // Only process brackets/braces/parentheses outside of strings
-            if (!in_string) {
-                if (char == '(' or char == '{' or char == '[') {
-                    depth += 1;
-                } else if (char == ')' or char == '}' or char == ']') {
-                    depth -= 1;
-                } else if (char == ';' and depth == 0) {
-                    return allocator.dupe(u8, content[start_idx + return_pattern.len..i]) catch unreachable;
-                }
-            }
-            
-            i += 1;
-        }
-    }
-    return allocator.dupe(u8, content) catch unreachable;
-}
 
 const ExampleBlockProps = struct {
     id: []const u8,
@@ -329,13 +205,13 @@ const ExampleBlockProps = struct {
 
 fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component {
     // Extract and truncate ZX code
-    const zx_return_content = extractZxReturnContent(allocator, props.zx_code);
-    const truncated_zx_code = removeCommonIndentation(allocator, zx_return_content);
+    const zx_return_content = util.extractZxReturnContent(allocator, props.zx_code);
+    const truncated_zx_code = util.removeCommonIndentation(allocator, zx_return_content);
     const escaped_full_zx = props.zx_code;
     
     // Extract and truncate Zig code
-    const zig_return_content = extractZigReturnContent(allocator, props.zig_code);
-    const truncated_zig_code = removeCommonIndentation(allocator, zig_return_content);
+    const zig_return_content = util.extractZigReturnContent(allocator, props.zig_code);
+    const truncated_zig_code = util.removeCommonIndentation(allocator, zig_return_content);
     const escaped_full_zig = props.zig_code;
     
     const preview_id = std.fmt.allocPrint(allocator, "tab-{s}-preview", .{props.id}) catch unreachable;
@@ -386,3 +262,4 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
 
 const zx = @import("zx");
 const std = @import("std");
+const util = @import("util.zig");

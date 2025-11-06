@@ -123,6 +123,7 @@ const ZXElement = struct {
     const AttributeValue = union(enum) {
         static: []const u8, // "string value"
         dynamic: []const u8, // .{expression}
+        format: struct { expr: []const u8, format: []const u8 }, // {[expr:fmt]}
     };
 
     const SwitchCase = struct {
@@ -491,7 +492,7 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
         // Skip whitespace and =
         while (i < content.len and (std.ascii.isWhitespace(content[i]) or content[i] == '=')) i += 1;
 
-        // Parse attribute value - either quoted string or dynamic expression
+        // Parse attribute value - either quoted string, dynamic expression, or format expression
         if (i < content.len and content[i] == '"') {
             // Static string value: "value"
             i += 1; // skip opening quote
@@ -502,7 +503,7 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
 
             try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .static = attr_value } });
         } else if (i + 1 < content.len and content[i] == '{') {
-            // Dynamic expression: .{expression}
+            // Check for format expression: {[expr:fmt]} or dynamic expression: {expr}
             i += 1; // skip {
             const expr_start = i;
             var brace_depth: i32 = 1;
@@ -511,10 +512,45 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
                 if (content[i] == '}') brace_depth -= 1;
                 if (brace_depth > 0) i += 1;
             }
-            const expr = content[expr_start..i];
+            var expr = content[expr_start..i];
             i += 1; // skip closing }
 
-            try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .dynamic = expr } });
+            // Trim whitespace first
+            while (expr.len > 0 and std.ascii.isWhitespace(expr[0])) expr = expr[1..];
+            while (expr.len > 0 and std.ascii.isWhitespace(expr[expr.len - 1])) expr = expr[0 .. expr.len - 1];
+
+            // Check for format expression: {[expr:fmt]} or {[expr]}
+            if (expr.len >= 2 and expr[0] == '[' and expr[expr.len - 1] == ']') {
+                // Remove the brackets
+                var inner = expr[1 .. expr.len - 1];
+
+                // Trim whitespace from inner content
+                while (inner.len > 0 and std.ascii.isWhitespace(inner[0])) inner = inner[1..];
+                while (inner.len > 0 and std.ascii.isWhitespace(inner[inner.len - 1])) inner = inner[0 .. inner.len - 1];
+
+                // Check for format specifier after colon
+                if (std.mem.indexOfScalar(u8, inner, ':')) |colon_pos| {
+                    // Split at colon: expr:format
+                    const expr_part = inner[0..colon_pos];
+                    var format_part = inner[colon_pos + 1 ..];
+
+                    // Trim whitespace from both parts
+                    var trimmed_expr = expr_part;
+                    while (trimmed_expr.len > 0 and std.ascii.isWhitespace(trimmed_expr[0])) trimmed_expr = trimmed_expr[1..];
+                    while (trimmed_expr.len > 0 and std.ascii.isWhitespace(trimmed_expr[trimmed_expr.len - 1])) trimmed_expr = trimmed_expr[0 .. trimmed_expr.len - 1];
+
+                    while (format_part.len > 0 and std.ascii.isWhitespace(format_part[0])) format_part = format_part[1..];
+                    while (format_part.len > 0 and std.ascii.isWhitespace(format_part[format_part.len - 1])) format_part = format_part[0 .. format_part.len - 1];
+
+                    try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .format = .{ .expr = trimmed_expr, .format = format_part } } });
+                } else {
+                    // No format specifier, default to "d" for decimal
+                    try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .format = .{ .expr = inner, .format = "d" } } });
+                }
+            } else {
+                // Regular dynamic expression: {expr}
+                try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .dynamic = expr } });
+            }
         }
     }
 
@@ -1145,6 +1181,31 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     .dynamic => |expr| {
                         try output.addToken(.identifier, expr);
                     },
+                    .format => |fmt| {
+                        // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
+                        try output.addToken(.identifier, "std");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "fmt");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "allocPrint");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.comma, ",");
+
+                        // Format string: "{format}"
+                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                        defer allocator.free(format_str);
+                        try output.addToken(.string_literal, format_str);
+                        try output.addToken(.comma, ",");
+
+                        // Expression wrapped in tuple: .{expr}
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.identifier, fmt.expr);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.r_paren, ")");
+                    },
                 }
                 if (i < elem.attributes.items.len - 1) {
                     try output.addToken(.comma, ",");
@@ -1221,6 +1282,22 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                 .dynamic => |expr| {
                     // Dynamic expression - output as-is
                     try output.addToken(.identifier, expr);
+                },
+                .format => |fmt| {
+                    // Format expression: pass expression directly and set format field
+                    // .value = expr (expression as-is)
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+
+                    // .format = "{format}"
+                    try addIndentTokens(output, indent + 3);
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "format");
+                    try output.addToken(.equal, "=");
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
                 },
             }
 
@@ -1619,6 +1696,22 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         .dynamic => |expr| {
                                             try output.addToken(.identifier, expr);
                                         },
+                                        .format => |fmt| {
+                                            // Format expression: pass expression directly and set format field
+                                            // .value = expr (expression as-is)
+                                            try output.addToken(.identifier, fmt.expr);
+                                            try output.addToken(.comma, ",");
+                                            try output.addToken(.invalid, "\n");
+
+                                            // .format = "{format}"
+                                            try addIndentTokens(output, indent + 4);
+                                            try output.addToken(.period, ".");
+                                            try output.addToken(.identifier, "format");
+                                            try output.addToken(.equal, "=");
+                                            const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                                            defer allocator.free(format_str);
+                                            try output.addToken(.string_literal, format_str);
+                                        },
                                     }
                                     if (i < child_elem.attributes.items.len - 1) {
                                         try output.addToken(.comma, ",");
@@ -1695,6 +1788,31 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                     .dynamic => |expr| {
                         try output.addToken(.identifier, expr);
                     },
+                    .format => |fmt| {
+                        // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
+                        try output.addToken(.identifier, "std");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "fmt");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "allocPrint");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.comma, ",");
+
+                        // Format string: "{format}"
+                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                        defer allocator.free(format_str);
+                        try output.addToken(.string_literal, format_str);
+                        try output.addToken(.comma, ",");
+
+                        // Expression wrapped in tuple: .{expr}
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.identifier, fmt.expr);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.r_paren, ")");
+                    },
                 }
                 if (i < elem.attributes.items.len - 1) {
                     try output.addToken(.comma, ",");
@@ -1756,6 +1874,22 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                 },
                 .dynamic => |expr| {
                     try output.addToken(.identifier, expr);
+                },
+                .format => |fmt| {
+                    // Format expression: pass expression directly and set format field
+                    // .value = expr (expression as-is)
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+
+                    // .format = "{format}"
+                    try addIndentTokens(output, indent + 3);
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "format");
+                    try output.addToken(.equal, "=");
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
                 },
             }
 
@@ -2000,6 +2134,22 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                 .dynamic => |expr| {
                     // Dynamic expression - output as-is
                     try output.addToken(.identifier, expr);
+                },
+                .format => |fmt| {
+                    // Format expression: pass expression directly and set format field
+                    // .value = expr (expression as-is)
+                    try output.addToken(.identifier, fmt.expr);
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+
+                    // .format = "{format}"
+                    try addIndentTokens(output, indent + 3);
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "format");
+                    try output.addToken(.equal, "=");
+                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                    defer allocator.free(format_str);
+                    try output.addToken(.string_literal, format_str);
                 },
             }
             try output.addToken(.r_brace, "}");
