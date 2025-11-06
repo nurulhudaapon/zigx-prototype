@@ -636,6 +636,12 @@ code[data-full-content]:not([contenteditable]):hover::before {
     font-weight: inherit;
     letter-spacing: inherit;
     text-transform: none;
+    transition: opacity 0.2s ease-out 0s;
+}
+
+code[data-full-content]:not([contenteditable]):not(:hover)::before {
+    opacity: 0;
+    transition: opacity 0.2s ease-out 0.3s;
 }
 
 /* Hide CSS fallback when JS has updated content */

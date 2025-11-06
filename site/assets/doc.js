@@ -63,7 +63,15 @@ function setupCodeHighlighting() {
       });
     } else {
       // Handle non-contenteditable code blocks (Zig code) - use hover
+      let hoverTimeout = null;
+      
       codeElement.addEventListener('mouseenter', () => {
+        // Clear any pending timeout
+        if (hoverTimeout) {
+          clearTimeout(hoverTimeout);
+          hoverTimeout = null;
+        }
+        
         codeElement.textContent = fullContent;
         codeElement.setAttribute('data-expanded', 'true');
         if (typeof Prism !== 'undefined') {
@@ -72,11 +80,15 @@ function setupCodeHighlighting() {
       });
       
       codeElement.addEventListener('mouseleave', () => {
-        codeElement.textContent = truncatedContent;
-        codeElement.removeAttribute('data-expanded');
-        if (typeof Prism !== 'undefined') {
-          Prism.highlightElement(codeElement);
-        }
+        // Delay collapsing by 500ms (CSS handles the visual transition)
+        hoverTimeout = setTimeout(() => {
+          codeElement.textContent = truncatedContent;
+          codeElement.removeAttribute('data-expanded');
+          if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(codeElement);
+          }
+          hoverTimeout = null;
+        }, 500);
       });
     }
   });
