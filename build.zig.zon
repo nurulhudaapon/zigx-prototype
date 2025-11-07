@@ -1,8 +1,8 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.30",
+    .version = "0.0.1-dev.31",
     .fingerprint = 0xcad77a8d2a3389f2,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .httpz = .{
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#9c918865554c82648cd5eeff52b373d291625edc",
