@@ -2,7 +2,7 @@
     .name = .zx_site,
     .version = "0.0.0",
     .fingerprint = 0xc041515566a276f7,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .httpz = .{
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#9c918865554c82648cd5eeff52b373d291625edc",
@@ -10,7 +10,7 @@
         },
         .zx = .{
             .url = "../",
-            .hash = "zx-0.0.1-dev.23-8okzKlZXAgCczvT0Fb0y5HglAXl7PjbTf7KalHyuMuVb",
+            .hash = "zx-0.0.1-dev.26-8okzKk9-AgC8D2QsXdjGsAl2T5_N-OIBhKM_GDKK4vXq",
         },
     },
     .paths = .{

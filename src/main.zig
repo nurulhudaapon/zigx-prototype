@@ -44,6 +44,51 @@ fn getBasename(path: []const u8) []const u8 {
     return path;
 }
 
+/// Check if output_dir is a subdirectory of dir_path and return the relative path if so
+/// Returns null if output_dir is not a subdirectory of dir_path
+fn getOutputDirRelativePath(allocator: std.mem.Allocator, dir_path: []const u8, output_dir: []const u8) !?[]const u8 {
+    const sep = std.fs.path.sep_str;
+
+    // Normalize paths by removing trailing separators
+    var normalized_dir = dir_path;
+    if (std.mem.endsWith(u8, dir_path, sep)) {
+        normalized_dir = dir_path[0 .. dir_path.len - sep.len];
+    }
+
+    var normalized_output = output_dir;
+    if (std.mem.endsWith(u8, output_dir, sep)) {
+        normalized_output = output_dir[0 .. output_dir.len - sep.len];
+    }
+
+    // Check if output_dir starts with dir_path
+    if (!std.mem.startsWith(u8, normalized_output, normalized_dir)) {
+        return null;
+    }
+
+    // If they're equal, output_dir is not a subdirectory
+    if (std.mem.eql(u8, normalized_dir, normalized_output)) {
+        return null;
+    }
+
+    // Check if the next character after dir_path is a separator
+    const remaining = normalized_output[normalized_dir.len..];
+    if (remaining.len == 0) {
+        return null;
+    }
+
+    if (!std.mem.startsWith(u8, remaining, sep)) {
+        return null;
+    }
+
+    // Return the relative path (without leading separator)
+    const relative_path = remaining[sep.len..];
+    if (relative_path.len == 0) {
+        return null;
+    }
+
+    return try allocator.dupe(u8, relative_path);
+}
+
 /// Check if a .zig file contains zx syntax (JSX-like patterns)
 fn hasZXSyntax(allocator: std.mem.Allocator, file_path: []const u8) !bool {
     const source = std.fs.cwd().readFileAlloc(
@@ -142,6 +187,228 @@ fn copyDirectory(
 }
 
 /// Copy asset directories (assets and public) if they exist in the input path
+/// Represents a route in the application
+const Route = struct {
+    path: []const u8,
+    page_import: ?[]const u8,
+    layout_import: ?[]const u8,
+    children: std.array_list.Managed(Route),
+
+    fn deinit(self: *Route, allocator: std.mem.Allocator) void {
+        allocator.free(self.path);
+        if (self.page_import) |import| allocator.free(import);
+        if (self.layout_import) |import| allocator.free(import);
+        for (self.children.items) |*child| {
+            child.deinit(allocator);
+        }
+        self.children.deinit();
+    }
+};
+
+/// Generate meta.zig file from the pages directory structure
+fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8) !void {
+    const pages_dir = try std.fs.path.join(allocator, &.{ output_dir, "pages" });
+    defer allocator.free(pages_dir);
+
+    // Check if pages directory exists
+    std.fs.cwd().access(pages_dir, .{}) catch |err| {
+        std.debug.print("No pages directory found at {s}, skipping meta.zig generation\n", .{pages_dir});
+        return err;
+    };
+
+    std.debug.print("Generating meta.zig from pages directory: {s}\n", .{pages_dir});
+
+    var routes = try scanPagesDirectory(allocator, pages_dir, "pages");
+    defer {
+        for (routes.items) |*route| {
+            route.deinit(allocator);
+        }
+        routes.deinit();
+    }
+
+    // Generate meta.zig content
+    var content = std.array_list.Managed(u8).init(allocator);
+    defer content.deinit();
+    const writer = content.writer();
+
+    // Write routes array
+    try writer.writeAll("pub const routes = [_]zx.App.Meta.Route{\n");
+    for (routes.items) |route| {
+        try writeRoute(writer, route, 1);
+    }
+    try writer.writeAll("};\n\n");
+
+    // Write meta struct
+    try writer.writeAll("pub const meta = zx.App.Meta{\n");
+    try writer.writeAll("    .routes = &routes,\n");
+    try writer.writeAll("};\n\n");
+    try writer.writeAll("const zx = @import(\"zx\");\n");
+
+    // Write the meta.zig file
+    const meta_path = try std.fs.path.join(allocator, &.{ output_dir, "meta.zig" });
+    defer allocator.free(meta_path);
+
+    // Parse and render the meta.zig to get auto fmt
+    const content_z = try allocator.dupeZ(u8, content.items);
+    defer allocator.free(content_z);
+    var ast = try std.zig.Ast.parse(allocator, content_z, .zig);
+    defer ast.deinit(allocator);
+
+    if (ast.errors.len > 0) {
+        return error.ParseError;
+    }
+
+    const rendered_zig_source = try ast.renderAlloc(allocator);
+    defer allocator.free(rendered_zig_source);
+
+    try std.fs.cwd().writeFile(.{
+        .sub_path = meta_path,
+        .data = rendered_zig_source,
+    });
+
+    std.debug.print("Generated meta.zig at: {s}\n", .{meta_path});
+}
+
+/// Recursively write a route to the writer
+fn writeRoute(writer: anytype, route: Route, indent_level: usize) !void {
+    const indent = "    ";
+
+    try writer.print("{s}.{{\n", .{indent});
+    try writer.print("{s}    .path = \"{s}\",\n", .{ indent, route.path });
+
+    if (route.page_import) |page| {
+        try writer.print("{s}    .page = @import(\"{s}\").Page,\n", .{ indent, page });
+    }
+
+    if (route.layout_import) |layout| {
+        try writer.print("{s}    .layout = @import(\"{s}\").Layout,\n", .{ indent, layout });
+    }
+
+    if (route.children.items.len > 0) {
+        try writer.print("{s}    .routes = &.{{\n", .{indent});
+        for (route.children.items) |child| {
+            try writeRoute(writer, child, indent_level + 2);
+        }
+        try writer.print("{s}    }},\n", .{indent});
+    }
+
+    try writer.print("{s}}},\n", .{indent});
+}
+
+/// Scan pages directory and build route structure
+fn scanPagesDirectory(
+    allocator: std.mem.Allocator,
+    pages_dir: []const u8,
+    import_prefix: []const u8,
+) !std.array_list.Managed(Route) {
+    var routes = std.array_list.Managed(Route).init(allocator);
+    errdefer {
+        for (routes.items) |*route| {
+            route.deinit(allocator);
+        }
+        routes.deinit();
+    }
+
+    // Check for root page and layout
+    const root_page_path = try std.fs.path.join(allocator, &.{ pages_dir, "page.zig" });
+    defer allocator.free(root_page_path);
+
+    const root_layout_path = try std.fs.path.join(allocator, &.{ pages_dir, "layout.zig" });
+    defer allocator.free(root_layout_path);
+
+    const has_root_page = blk: {
+        std.fs.cwd().access(root_page_path, .{}) catch break :blk false;
+        break :blk true;
+    };
+
+    const has_root_layout = blk: {
+        std.fs.cwd().access(root_layout_path, .{}) catch break :blk false;
+        break :blk true;
+    };
+
+    // Only create root route if we have a page or layout
+    if (has_root_page or has_root_layout) {
+        var root_route = Route{
+            .path = try allocator.dupe(u8, "/"),
+            .page_import = if (has_root_page) try std.mem.concat(allocator, u8, &.{ import_prefix, "/page.zig" }) else null,
+            .layout_import = if (has_root_layout) try std.mem.concat(allocator, u8, &.{ import_prefix, "/layout.zig" }) else null,
+            .children = std.array_list.Managed(Route).init(allocator),
+        };
+        errdefer root_route.deinit(allocator);
+
+        // Scan for child routes (subdirectories)
+        var dir = try std.fs.cwd().openDir(pages_dir, .{ .iterate = true });
+        defer dir.close();
+
+        var iter = dir.iterate();
+        while (try iter.next()) |entry| {
+            if (entry.kind != .directory) continue;
+
+            // Skip .zx directories
+            if (std.mem.eql(u8, entry.name, ".zx")) continue;
+
+            const child_path = try std.fs.path.join(allocator, &.{ pages_dir, entry.name });
+            defer allocator.free(child_path);
+
+            const child_import_prefix = try std.mem.concat(allocator, u8, &.{ import_prefix, "/", entry.name });
+            defer allocator.free(child_import_prefix);
+
+            if (try scanRoute(allocator, child_path, child_import_prefix, entry.name)) |child_route| {
+                try root_route.children.append(child_route);
+            }
+        }
+
+        try routes.append(root_route);
+    }
+
+    return routes;
+}
+
+/// Scan a single route directory (e.g., /about)
+fn scanRoute(
+    allocator: std.mem.Allocator,
+    route_dir: []const u8,
+    import_prefix: []const u8,
+    route_name: []const u8,
+) !?Route {
+    const page_path = try std.fs.path.join(allocator, &.{ route_dir, "page.zig" });
+    defer allocator.free(page_path);
+
+    const layout_path = try std.fs.path.join(allocator, &.{ route_dir, "layout.zig" });
+    defer allocator.free(layout_path);
+
+    const has_page = blk: {
+        std.fs.cwd().access(page_path, .{}) catch break :blk false;
+        break :blk true;
+    };
+
+    const has_layout = blk: {
+        std.fs.cwd().access(layout_path, .{}) catch break :blk false;
+        break :blk true;
+    };
+
+    // Only create route if we have a page
+    if (!has_page) return null;
+
+    const route_path = try std.mem.concat(allocator, u8, &.{ "/", route_name });
+    errdefer allocator.free(route_path);
+
+    const page_import = try std.mem.concat(allocator, u8, &.{ import_prefix, "/page.zig" });
+    errdefer allocator.free(page_import);
+
+    const layout_import = if (has_layout) try std.mem.concat(allocator, u8, &.{ import_prefix, "/layout.zig" }) else null;
+    errdefer if (layout_import) |import| allocator.free(import);
+
+    const route = Route{
+        .path = route_path,
+        .page_import = page_import,
+        .layout_import = layout_import,
+        .children = std.array_list.Managed(Route).init(allocator),
+    };
+
+    return route;
+}
+
 fn copyAssetDirectories(
     allocator: std.mem.Allocator,
     input_path: []const u8,
@@ -239,6 +506,10 @@ fn transpileDirectory(
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
     defer dir.close();
 
+    // Check if output_dir is a subdirectory of dir_path
+    const output_dir_relative = try getOutputDirRelativePath(allocator, dir_path, output_dir);
+    defer if (output_dir_relative) |rel| allocator.free(rel);
+
     // Check if dir_path itself is or contains "pages"
     const sep = std.fs.path.sep_str;
     const dir_is_pages = std.mem.endsWith(u8, dir_path, sep ++ "pages") or
@@ -250,6 +521,20 @@ fn transpileDirectory(
 
     while (try walker.next()) |entry| {
         if (entry.kind != .file) continue;
+
+        // Skip files in output directory if output_dir is a subdirectory of dir_path
+        if (output_dir_relative) |rel| {
+            // Check if entry.path starts with rel followed by separator, or is exactly rel
+            if (std.mem.startsWith(u8, entry.path, rel)) {
+                // Check if it's exactly rel or followed by separator
+                if (entry.path.len == rel.len) {
+                    continue;
+                }
+                if (std.mem.startsWith(u8, entry.path[rel.len..], sep)) {
+                    continue;
+                }
+            }
+        }
 
         const is_zx = std.mem.endsWith(u8, entry.path, ".zx");
         const is_zig = std.mem.endsWith(u8, entry.path, ".zig");
@@ -358,7 +643,11 @@ fn transpileCommand(
     if (stat.kind == .directory) {
         std.debug.print("Transpiling directory: {s}\n", .{path});
         try transpileDirectory(allocator, path, output_dir, include_zig);
-        std.debug.print("Done!\n", .{});
+
+        // Generate meta.zig after transpiling directory
+        generateMetaFile(allocator, output_dir) catch |err| {
+            std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
+        };
     } else if (stat.kind == .file) {
         const is_zx = std.mem.endsWith(u8, path, ".zx");
         const is_zig = std.mem.endsWith(u8, path, ".zig");
@@ -403,6 +692,11 @@ fn transpileCommand(
         // Copy asset directories after transpiling the file
         copyAssetDirectories(allocator, path, output_dir) catch |err| {
             std.debug.print("Warning: Failed to copy asset directories: {}\n", .{err});
+        };
+
+        // Generate meta.zig if pages directory exists
+        generateMetaFile(allocator, output_dir) catch |err| {
+            std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
         };
 
         std.debug.print("Done!\n", .{});
