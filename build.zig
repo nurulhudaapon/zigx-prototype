@@ -109,7 +109,7 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     var it = exe.root_module.import_table.iterator();
     while (it.next()) |entry|
         imports.append(.{ .name = entry.key_ptr.*, .module = entry.value_ptr.* }) catch @panic("OOM");
-    exe.root_module.addAnonymousImport("zx_route", .{
+    exe.root_module.addAnonymousImport("zx_meta", .{
         .root_source_file = output_dir.path(b, "meta.zig"),
         .imports = imports.items,
     });
