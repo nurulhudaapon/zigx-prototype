@@ -65,37 +65,55 @@ pub fn build(b: *std.Build) void {
 }
 
 pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
-    const zx_dep = b.dependency("zx", .{
-        // .target = options.root_module.target,
-        // .optimize = options.root_module.optimize,
-    });
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const zx_dep = b.dependency("zx", .{ .target = target, .optimize = optimize });
 
     // --- 1. Get the zx executable artifact ---
     const zx_exe = zx_dep.artifact("zx");
 
     // --- 2. Define the transpilation run command ---
-    // This command generates the missing files in 'site/.zx'
     const transpile_cmd = b.addRunArtifact(zx_exe);
-    transpile_cmd.addArgs(&[_][:0]const u8{
-        "transpile",
-        "site",
-        "--output",
-        "site/.zx",
-    });
-    // Ensure the build fails if transpilation fails
-    // transpile_cmd.expect_exit_code = 0;
+    transpile_cmd.addArg("transpile");
+
+    const site_path = b.pathJoin(&.{"site"});
+    transpile_cmd.addArg(site_path);
+
+    transpile_cmd.addArg("--output");
+    const output_dir = transpile_cmd.addOutputDirectoryArg("site");
+
+    transpile_cmd.expectExitCode(0);
+
+    // Add all files to make sure cache is invalidated upon changes to the site
+    const input_dir = b.path("site");
+    const src_dir_path = input_dir.getPath3(b, &transpile_cmd.step);
+    var src_dir = src_dir_path.root_dir.handle.openDir(src_dir_path.subPathOrDot(), .{ .iterate = true }) catch @panic("OOM");
+    var itd = src_dir.walk(transpile_cmd.step.owner.allocator) catch @panic("OOM");
+    defer itd.deinit();
+    while (itd.next() catch @panic("OOM")) |entry| {
+        switch (entry.kind) {
+            .directory => {},
+            .file => {
+                const entry_path = src_dir_path.join(transpile_cmd.step.owner.allocator, entry.path) catch @panic("OOM");
+                transpile_cmd.addFileInput(b.path(entry_path.sub_path));
+            },
+            else => continue,
+        }
+    }
 
     // --- 3. Define the main executable artifact ---
     const exe = b.addExecutable(options);
 
-    // NEW FIX: Add the project root path (where 'site' is located) as an
-    // include path to help the compiler resolve paths to generated files
-    // once the transpilation step has completed.
-    exe.addIncludePath(b.path("."));
     exe.root_module.addImport("zx", zx_dep.module("zx"));
+    var imports = std.array_list.Managed(std.Build.Module.Import).init(b.allocator);
+    var it = exe.root_module.import_table.iterator();
+    while (it.next()) |entry|
+        imports.append(.{ .name = entry.key_ptr.*, .module = entry.value_ptr.* }) catch @panic("OOM");
+    exe.root_module.addAnonymousImport("zx_route", .{
+        .root_source_file = output_dir.path(b, "meta.zig"),
+        .imports = imports.items,
+    });
 
-    // CRITICAL FIX: Force the compilation of the main executable to wait
-    // until the transpilation command has completed and generated all files.
     exe.step.dependOn(&transpile_cmd.step);
 
     b.installArtifact(exe);

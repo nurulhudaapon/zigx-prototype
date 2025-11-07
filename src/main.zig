@@ -206,17 +206,21 @@ const Route = struct {
 };
 
 /// Generate meta.zig file from the pages directory structure
-fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8) !void {
+fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8, verbose: bool) !void {
     const pages_dir = try std.fs.path.join(allocator, &.{ output_dir, "pages" });
     defer allocator.free(pages_dir);
 
     // Check if pages directory exists
     std.fs.cwd().access(pages_dir, .{}) catch |err| {
-        std.debug.print("No pages directory found at {s}, skipping meta.zig generation\n", .{pages_dir});
+        if (verbose) {
+            std.debug.print("No pages directory found at {s}, skipping meta.zig generation\n", .{pages_dir});
+        }
         return err;
     };
 
-    std.debug.print("Generating meta.zig from pages directory: {s}\n", .{pages_dir});
+    if (verbose) {
+        std.debug.print("Generating meta.zig from pages directory: {s}\n", .{pages_dir});
+    }
 
     var routes = try scanPagesDirectory(allocator, pages_dir, "pages");
     defer {
@@ -266,7 +270,9 @@ fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8) !void 
         .data = rendered_zig_source,
     });
 
-    std.debug.print("Generated meta.zig at: {s}\n", .{meta_path});
+    if (verbose) {
+        std.debug.print("Generated meta.zig at: {s}\n", .{meta_path});
+    }
 }
 
 /// Recursively write a route to the writer
@@ -409,62 +415,47 @@ fn scanRoute(
     return route;
 }
 
-fn copyAssetDirectories(
+fn copySpecifiedDirectories(
     allocator: std.mem.Allocator,
     input_path: []const u8,
     output_dir: []const u8,
+    copy_dirs: []const []const u8,
+    verbose: bool,
 ) !void {
-    // Determine the base directory to check for assets
+    // Determine the base directory to check for directories
     const base_dir = if (std.fs.path.dirname(input_path)) |dir| dir else input_path;
 
-    // Check for 'assets' directory
-    const assets_src = try std.fs.path.join(allocator, &.{ base_dir, "assets" });
-    defer allocator.free(assets_src);
+    // Copy each specified directory if it exists
+    for (copy_dirs) |dir_name| {
+        const src_path = try std.fs.path.join(allocator, &.{ base_dir, dir_name });
+        defer allocator.free(src_path);
 
-    const assets_dest = try std.fs.path.join(allocator, &.{ output_dir, "assets" });
-    defer allocator.free(assets_dest);
+        const dest_path = try std.fs.path.join(allocator, &.{ output_dir, dir_name });
+        defer allocator.free(dest_path);
 
-    if (std.fs.cwd().openDir(assets_src, .{})) |dir_result| {
-        var dir = dir_result;
-        defer dir.close();
-        // Directory exists, copy it
-        std.debug.print("Copying assets directory: {s} -> {s}\n", .{ assets_src, assets_dest });
-        copyDirectory(allocator, assets_src, assets_dest) catch |copy_err| {
-            std.debug.print("Warning: Failed to copy assets directory: {}\n", .{copy_err});
-        };
-    } else |err| switch (err) {
-        error.FileNotFound => {},
-        error.NotDir => {},
-        else => {
-            std.debug.print("Warning: Failed to check assets directory: {}\n", .{err});
-        },
-    }
-
-    // Check for 'public' directory
-    const public_src = try std.fs.path.join(allocator, &.{ base_dir, "public" });
-    defer allocator.free(public_src);
-
-    const public_dest = try std.fs.path.join(allocator, &.{ output_dir, "public" });
-    defer allocator.free(public_dest);
-
-    if (std.fs.cwd().openDir(public_src, .{})) |dir_result| {
-        var dir = dir_result;
-        defer dir.close();
-        // Directory exists, copy it
-        std.debug.print("Copying public directory: {s} -> {s}\n", .{ public_src, public_dest });
-        copyDirectory(allocator, public_src, public_dest) catch |copy_err| {
-            std.debug.print("Warning: Failed to copy public directory: {}\n", .{copy_err});
-        };
-    } else |err| switch (err) {
-        error.FileNotFound => {},
-        error.NotDir => {},
-        else => {
-            std.debug.print("Warning: Failed to check public directory: {}\n", .{err});
-        },
+        if (std.fs.cwd().openDir(src_path, .{})) |dir_result| {
+            var dir = dir_result;
+            defer dir.close();
+            // Directory exists, copy it
+            if (verbose) {
+                std.debug.print("Copying '{s}' directory: {s} -> {s}\n", .{ dir_name, src_path, dest_path });
+            }
+            copyDirectory(allocator, src_path, dest_path) catch |copy_err| {
+                std.debug.print("Warning: Failed to copy '{s}' directory: {}\n", .{ dir_name, copy_err });
+            };
+        } else |err| switch (err) {
+            error.FileNotFound => {
+                // Silently skip if directory doesn't exist
+            },
+            error.NotDir => {},
+            else => {
+                std.debug.print("Warning: Failed to check '{s}' directory: {}\n", .{ dir_name, err });
+            },
+        }
     }
 }
 
-fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8) !void {
+fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8, verbose: bool) !void {
     // Read the source file
     const source = try std.fs.cwd().readFileAlloc(
         allocator,
@@ -494,7 +485,9 @@ fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_p
         .data = result.zig_source,
     });
 
-    std.debug.print("Transpiled: {s} -> {s}\n", .{ source_path, output_path });
+    if (verbose) {
+        std.debug.print("Transpiled: {s} -> {s}\n", .{ source_path, output_path });
+    }
 }
 
 fn transpileDirectory(
@@ -502,6 +495,8 @@ fn transpileDirectory(
     dir_path: []const u8,
     output_dir: []const u8,
     include_zig: bool,
+    copy_dirs: []const []const u8,
+    verbose: bool,
 ) !void {
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
     defer dir.close();
@@ -597,7 +592,7 @@ fn transpileDirectory(
         defer allocator.free(output_path);
 
         if (should_transpile) {
-            transpileFile(allocator, input_path, output_path) catch |err| {
+            transpileFile(allocator, input_path, output_path, verbose) catch |err| {
                 std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
                 continue;
             };
@@ -615,13 +610,15 @@ fn transpileDirectory(
             }
 
             try std.fs.cwd().copyFile(input_path, std.fs.cwd(), output_path, .{});
-            std.debug.print("Copied: {s} -> {s}\n", .{ input_path, output_path });
+            if (verbose) {
+                std.debug.print("Copied: {s} -> {s}\n", .{ input_path, output_path });
+            }
         }
     }
 
-    // Copy asset directories after transpiling all files
-    copyAssetDirectories(allocator, dir_path, output_dir) catch |err| {
-        std.debug.print("Warning: Failed to copy asset directories: {}\n", .{err});
+    // Copy specified directories after transpiling all files
+    copySpecifiedDirectories(allocator, dir_path, output_dir, copy_dirs, verbose) catch |err| {
+        std.debug.print("Warning: Failed to copy specified directories: {}\n", .{err});
     };
 }
 
@@ -630,6 +627,8 @@ fn transpileCommand(
     path: []const u8,
     output_dir: []const u8,
     include_zig: bool,
+    copy_dirs: []const []const u8,
+    verbose: bool,
 ) !void {
     // Check if path is a file or directory
     const stat = std.fs.cwd().statFile(path) catch |err| switch (err) {
@@ -641,11 +640,13 @@ fn transpileCommand(
     };
 
     if (stat.kind == .directory) {
-        std.debug.print("Transpiling directory: {s}\n", .{path});
-        try transpileDirectory(allocator, path, output_dir, include_zig);
+        if (verbose) {
+            std.debug.print("Transpiling directory: {s}\n", .{path});
+        }
+        try transpileDirectory(allocator, path, output_dir, include_zig, copy_dirs, verbose);
 
         // Generate meta.zig after transpiling directory
-        generateMetaFile(allocator, output_dir) catch |err| {
+        generateMetaFile(allocator, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
         };
     } else if (stat.kind == .file) {
@@ -687,19 +688,21 @@ fn transpileCommand(
         const output_path = try std.fs.path.join(allocator, &.{ output_dir, output_rel_path });
         defer allocator.free(output_path);
 
-        try transpileFile(allocator, path, output_path);
+        try transpileFile(allocator, path, output_path, verbose);
 
-        // Copy asset directories after transpiling the file
-        copyAssetDirectories(allocator, path, output_dir) catch |err| {
-            std.debug.print("Warning: Failed to copy asset directories: {}\n", .{err});
+        // Copy specified directories after transpiling the file
+        copySpecifiedDirectories(allocator, path, output_dir, copy_dirs, verbose) catch |err| {
+            std.debug.print("Warning: Failed to copy specified directories: {}\n", .{err});
         };
 
         // Generate meta.zig if pages directory exists
-        generateMetaFile(allocator, output_dir) catch |err| {
+        generateMetaFile(allocator, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
         };
 
-        std.debug.print("Done!\n", .{});
+        if (verbose) {
+            std.debug.print("Done!\n", .{});
+        }
     } else {
         std.debug.print("Error: Path must be a file or directory\n", .{});
         return error.InvalidPath;
@@ -748,15 +751,21 @@ pub fn main() !void {
             std.debug.print("Usage: {s} transpile <path> [options]\n", .{args[0]});
             std.debug.print("  <path> can be a .zx file or a directory\n", .{});
             std.debug.print("  Options:\n", .{});
-            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zx/site)\n", .{});
-            std.debug.print("    --zig                     Also transpile .zig files containing zx syntax\n", .{});
+            std.debug.print("    --output <dir>, -o <dir>     Output directory (default: .zx/site)\n", .{});
+            std.debug.print("    --zig                        Also transpile .zig files containing zx syntax\n", .{});
+            std.debug.print("    --copy-dir <dir>             Directory to copy (can be specified multiple times,\n", .{});
+            std.debug.print("                                 default: 'assets' and 'public' if they exist)\n", .{});
+            std.debug.print("    --verbose, -v                Show detailed transpilation output\n", .{});
             return error.MissingArgument;
         }
 
         // Parse arguments
         var output_dir: []const u8 = ".zx/site";
         var include_zig: bool = false;
+        var verbose: bool = false;
         var path: ?[]const u8 = null;
+        var copy_dirs_list = std.array_list.Managed([]const u8).init(allocator);
+        defer copy_dirs_list.deinit();
         var i: usize = 2;
 
         while (i < args.len) {
@@ -767,8 +776,18 @@ pub fn main() !void {
                 }
                 output_dir = args[i + 1];
                 i += 2;
+            } else if (std.mem.eql(u8, args[i], "--copy-dir")) {
+                if (i + 1 >= args.len) {
+                    std.debug.print("Error: --copy-dir requires a directory argument\n", .{});
+                    return error.MissingArgument;
+                }
+                try copy_dirs_list.append(args[i + 1]);
+                i += 2;
             } else if (std.mem.eql(u8, args[i], "--zig")) {
                 include_zig = true;
+                i += 1;
+            } else if (std.mem.eql(u8, args[i], "--verbose") or std.mem.eql(u8, args[i], "-v")) {
+                verbose = true;
                 i += 1;
             } else {
                 if (path != null) {
@@ -784,12 +803,21 @@ pub fn main() !void {
             std.debug.print("Usage: {s} transpile <path> [options]\n", .{args[0]});
             std.debug.print("  <path> can be a .zx file or a directory\n", .{});
             std.debug.print("  Options:\n", .{});
-            std.debug.print("    --output <dir>, -o <dir>  Output directory (default: .zx/site)\n", .{});
-            std.debug.print("    --zig                     Also transpile .zig files containing zx syntax\n", .{});
+            std.debug.print("    --output <dir>, -o <dir>     Output directory (default: .zx/site)\n", .{});
+            std.debug.print("    --zig                        Also transpile .zig files containing zx syntax\n", .{});
+            std.debug.print("    --copy-dir <dir>             Directory to copy (can be specified multiple times,\n", .{});
+            std.debug.print("                                 default: 'assets' and 'public' if they exist)\n", .{});
+            std.debug.print("    --verbose, -v                Show detailed transpilation output\n", .{});
             return error.MissingArgument;
         }
 
-        try transpileCommand(allocator, path.?, output_dir, include_zig);
+        // Use default copy directories if none specified
+        const copy_dirs = if (copy_dirs_list.items.len > 0)
+            copy_dirs_list.items
+        else
+            &[_][]const u8{ "assets", "public" };
+
+        try transpileCommand(allocator, path.?, output_dir, include_zig, copy_dirs, verbose);
     } else {
         // Run default behavior
         try runDefaultBehavior(allocator);
