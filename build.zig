@@ -65,8 +65,8 @@ pub fn build(b: *std.Build) void {
 }
 
 pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    const target = options.root_module.resolved_target;
+    const optimize = options.root_module.optimize;
     const zx_dep = b.dependency("zx", .{ .target = target, .optimize = optimize });
 
     // --- 1. Get the zx executable artifact ---
