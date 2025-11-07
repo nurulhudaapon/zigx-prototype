@@ -12,6 +12,9 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
             <h2>Switch Statement</h2>
             <SwitchExample />
             <hr />
+            <h2>Form</h2>
+            <FormExample />
+            <hr />
         </div>
     );
 }
@@ -20,7 +23,9 @@ const zx = @import("zx");
 const ForExample = @import("for.zig").Page;
 const IfExample = @import("if.zig").Page;
 const SwitchExample = @import("switch.zig").Page;
+const FormExample = @import("form.zig").FormExample;
 
 const ForExampleProps = struct {};
 const IfExampleProps = struct {};
 const SwitchExampleProps = struct {};
+const FormExampleProps = struct {};

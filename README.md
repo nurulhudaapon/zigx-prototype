@@ -2,7 +2,7 @@
 
 A Zig library for building web applications with JSX-like syntax. Write declarative UI components using familiar JSX patterns, transpiled to efficient Zig code.
 
-ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build fast, type-safe web applications. ZX uses [http.zig](https://github.com/karlseguin/http.zig) to create high-performance HTTP servers, making it significantly faster than frameworks like Next.js.
+ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
 
 **📚 [Full Documentation →](https://zx.nuhu.dev)**
 
@@ -25,9 +25,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 
             <section>
                 {for (users) |user| {
-                    (<p>{user.name} - {[user.age:d]} - 
-                    
-                    {switch (user.user_type) {
+                    (<p>{user.name} - {[user.age:d]} - {switch (user.user_type) {
                         .admin => ("Admin"),
                         .member => ("Member"),
                     }}
@@ -55,25 +53,64 @@ const users = [_]User{
 };
 
 ```
-## Features
+## Feature Checklist
 
-- **JSX-like syntax** - Write UI components using familiar JSX patterns
-- **Type-safe** - Full Zig type checking and safety
-- **High performance** - Powered by Zig and http.zig for maximum speed
-- **Server-Side Rendering (SSR)** - Generate HTML on the server
-- **Static Site Generation (SSG)** - Pre-render pages at build time
+Core
+- [x] JSX-like syntax
+- [x] Server-Side Rendering (SSR)
+- [ ] Static Site Generation (SSG) _(in progress)_
+- [x] High performance  
+  _Currently 120X faster than Next.js at SSR_
+- [x] Asset Copying
+- [x] Asset Serving
+- [ ] Image Optimization
+- [ ] Server Actions
+- [ ] Route Handlers / Path Segments
+- [x] Type Safety
+- [x] File-system Routing
+- [ ] Middleware support
+- [ ] API Endpoints
+- [ ] CSS-in-ZX / Styling Solution
+- [ ] Incremental Static Regeneration (ISR)
+- [ ] Client-Side Rendering (CSR) via WebAssembly
+- [ ] Importing React Components
+
+Tooling
+- [ ] CLI
+- [ ] Dev Server (HMR or Rebuild on Change)
+
+### Editor Support
+
+* [VSCode Extension](https://open-vsx.org/extension/nurulhudaapon/zx)
+    - [x] Syntax Highlighting
+    - [x] LSP Support
+    - [ ] Auto Format
+
+* [Cursor Extension](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx)
+    - [x] Syntax Highlighting
+    - [x] LSP Support
+    - [ ] Auto Format
+
+* Neovim
+    - [ ] Syntax Highlighting
+    - [ ] LSP Support
+    - [ ] Auto Format
 
 ## Similar Projects
 
+* [ZTS](https://github.com/zigster64/zts)
+* [zmpl](https://github.com/jetzig-framework/zmpl)
+* [mustache-zig](https://github.com/batiati/mustache-zig)
+* [etch](https://github.com/haze/etch)
 * [Zap](https://github.com/zigzap/zap)
 * [http.zig](https://github.com/karlseguin/http.zig) (_ZX_'s backend)
 * [tokamak](https://github.com/cztomsik/tokamak)
 * [zig-router](https://github.com/Cloudef/zig-router)
 * [zig-webui](https://github.com/webui-dev/zig-webui/)
-* [ZTS](https://github.com/zigster64/zts)
 * [Zine](https://github.com/kristoff-it/zine)
 * [Zinc](https://github.com/zon-dev/zinc/)
 * [zUI](https://github.com/thienpow/zui)
+* [ziggy](https://github.com/kristoff-it/ziggy) — SSG
 
 ## Documentation
 
