@@ -172,7 +172,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 <ul>
                     <li>
                         <strong>This Documentation Site: </strong>
-                        <a href="https://zx.nuhu.dev" target="_blank" rel="noopener noreferrer">Live</a> |
+                        <a href="https://ziex.dev" target="_blank" rel="noopener noreferrer">Live</a> |
                         <a href="https://github.com/nurulhudaapon/zx/tree/main/site" target="_blank" rel="noopener noreferrer">Source</a>
                     </li>
                     <li>

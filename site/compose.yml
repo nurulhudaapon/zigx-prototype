@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: "zx.nuhu.dev"
+    container_name: "ziex.dev"
     restart: unless-stopped
     networks:
       - npm
