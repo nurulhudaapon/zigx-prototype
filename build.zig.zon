@@ -1,12 +1,16 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.35",
+    .version = "0.0.1-dev.36",
     .fingerprint = 0xcad77a8d2a3389f2,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .httpz = .{
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#9c918865554c82648cd5eeff52b373d291625edc",
             .hash = "httpz-0.0.0-PNVzrBXyBgBR5yTLW6dUTWtXSahqFsLdEwFI3tVy5J72",
+        },
+        .lsp_kit = .{
+            .url = "git+https://github.com/nurulhudaapon/lspz.git?ref=0.15.x#421ae644f53bd788e3699b5fc22b3e07b161e2b6",
+            .hash = "lsp_kit-0.1.0-bi_PL5wxCgB1_jRIZtcodh-x-_nteVzuOrul2ken-ZLE",
         },
     },
     .paths = .{
