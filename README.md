@@ -81,12 +81,7 @@ Tooling
 
 ### Editor Support
 
-* [VSCode Extension](https://open-vsx.org/extension/nurulhudaapon/zx)
-    - [x] Syntax Highlighting
-    - [x] LSP Support
-    - [ ] Auto Format
-
-* [Cursor Extension](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx)
+* [VSCode](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx)/[Cursor](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx) Extension
     - [x] Syntax Highlighting
     - [x] LSP Support
     - [ ] Auto Format
