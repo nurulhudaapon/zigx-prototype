@@ -1,5 +1,7 @@
-pub fn Page(allocator: zx.Allocator) zx.Component {
-    const time = std.time.timestamp();
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.allocator;
+    
+        const time = std.time.timestamp();
 
     return (
         <div>

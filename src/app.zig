@@ -5,8 +5,8 @@ pub const App = struct {
     pub const Meta = struct {
         pub const Route = struct {
             path: []const u8,
-            page: *const fn (allocator: Allocator) Component,
-            layout: ?*const fn (allocator: Allocator, component: Component) Component = null,
+            page: *const fn (ctx: zx.PageContext) Component,
+            layout: ?*const fn (ctx: zx.LayoutContext, component: Component) Component = null,
             routes: ?[]const Route = null,
         };
         routes: []const Route,
@@ -22,17 +22,19 @@ pub const App = struct {
         pub fn handle(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
             const allocator = req.arena;
             const path = req.url.path;
-            const writer = &res.buffer.writer;
 
             const request_path = normalizePath(allocator, path) catch {
                 res.body = "Internal Server Error";
                 return;
             };
 
-            const empty_layouts: []const *const fn (allocator: Allocator, component: Component) Component = &.{};
+            const pagectx = zx.PageContext.init(req, res, allocator);
+            const layoutctx = zx.LayoutContext.init(req, res, allocator);
+
+            const empty_layouts: []const *const fn (ctx: zx.LayoutContext, component: Component) Component = &.{};
 
             for (self.meta.routes) |route| {
-                const rendered = matchRoute(request_path, route, empty_layouts, allocator, writer) catch {
+                const rendered = matchRoute(request_path, route, empty_layouts, pagectx, layoutctx) catch {
                     res.body = "Internal Server Error";
                     return;
                 };
@@ -87,26 +89,27 @@ pub const App = struct {
     fn matchRoute(
         request_path: []const u8,
         route: App.Meta.Route,
-        parent_layouts: []const *const fn (allocator: Allocator, component: Component) Component,
-        allocator: std.mem.Allocator,
-        writer: *std.Io.Writer,
+        parent_layouts: []const *const fn (ctx: zx.LayoutContext, component: Component) Component,
+        pagectx: zx.PageContext,
+        layoutctx: zx.LayoutContext,
     ) !bool {
-        const normalized_route_path = normalizePath(allocator, route.path) catch return false;
+        const normalized_route_path = normalizePath(pagectx.allocator, route.path) catch return false;
 
         // Check if this route matches the request path
         if (std.mem.eql(u8, request_path, normalized_route_path)) {
-            var page = route.page(allocator);
+            var page = route.page(pagectx);
 
             // Apply all parent layouts first (in order from root to here)
             for (parent_layouts) |layout| {
-                page = layout(allocator, page);
+                page = layout(layoutctx, page);
             }
 
             // Apply this route's own layout last
             if (route.layout) |layout| {
-                page = layout(allocator, page);
+                page = layout(layoutctx, page);
             }
 
+            const writer = &layoutctx.response.buffer.writer;
             _ = writer.write("<!DOCTYPE html>\n") catch |err| {
                 std.debug.print("Error writing HTML: {}\n", .{err});
                 return true;
@@ -122,7 +125,7 @@ pub const App = struct {
         if (route.routes) |sub_routes| {
             // Build the layout chain for sub-routes
             // We need to accumulate parent_layouts + current route's layout (if it exists)
-            var layouts_buffer: [10]*const fn (allocator: Allocator, component: Component) Component = undefined;
+            var layouts_buffer: [10]*const fn (ctx: zx.LayoutContext, component: Component) Component = undefined;
             var layouts_count: usize = 0;
 
             // Copy all parent layouts
@@ -140,7 +143,7 @@ pub const App = struct {
             const layouts_to_pass = layouts_buffer[0..layouts_count];
 
             for (sub_routes) |sub_route| {
-                const matched = try matchRoute(request_path, sub_route, layouts_to_pass, allocator, writer);
+                const matched = try matchRoute(request_path, sub_route, layouts_to_pass, pagectx, layoutctx);
                 if (matched) {
                     return true;
                 }

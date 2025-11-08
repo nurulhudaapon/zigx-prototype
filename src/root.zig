@@ -230,6 +230,7 @@ const Element = struct {
 const ZxOptions = struct {
     children: ?[]const Component = null,
     attributes: ?[]const Element.Attribute = null,
+    @"@allocator": ?std.mem.Allocator = null,
 };
 
 pub fn zx(tag: ElementTag, options: ZxOptions) Component {
@@ -251,7 +252,7 @@ pub fn lazy(allocator: Allocator, comptime func: anytype, props: anytype) Compon
 const ZxContext = struct {
     allocator: std.mem.Allocator,
 
-    fn escapeHtml(self: ZxContext, text: []const u8) []const u8 {
+    fn escapeHtml(self: *ZxContext, text: []const u8) []const u8 {
         // First pass: calculate the escaped length
         var escaped_len: usize = 0;
         for (text) |char| {
@@ -306,7 +307,9 @@ const ZxContext = struct {
         return escaped;
     }
 
-    pub fn zx(self: ZxContext, tag: ElementTag, options: ZxOptions) Component {
+    pub fn zx(self: *ZxContext, tag: ElementTag, options: ZxOptions) Component {
+        if (options.@"@allocator") |allocator| self.allocator = allocator;
+
         // Allocate and copy children if provided
         const children_copy = if (options.children) |children| blk: {
             const copy = self.allocator.alloc(Component, children.len) catch @panic("OOM");
@@ -328,17 +331,21 @@ const ZxContext = struct {
         } };
     }
 
-    pub fn txt(self: ZxContext, text: []const u8) Component {
+    pub fn txt(self: *ZxContext, text: []const u8) Component {
+        // if (self.allocator == null) @compileError("Parent component must define an allocator via builtin @allocator attribute");
+
         const escaped = self.escapeHtml(text);
         return .{ .text = escaped };
     }
 
-    pub fn fmt(self: ZxContext, comptime format: []const u8, args: anytype) Component {
+    pub fn fmt(self: *ZxContext, comptime format: []const u8, args: anytype) Component {
+        // if (self.allocator == null) @compileError("Parent component must define an allocator via builtin @allocator attribute");
+
         const text = std.fmt.allocPrint(self.allocator, format, args) catch @panic("OOM");
         return .{ .text = text };
     }
 
-    pub fn lazy(self: ZxContext, comptime func: anytype, props: anytype) Component {
+    pub fn lazy(self: *ZxContext, comptime func: anytype, props: anytype) Component {
         return .{ .component_fn = Component.ComponentFn.init(func, self.allocator, props) };
     }
 };
@@ -348,4 +355,8 @@ pub fn init(allocator: std.mem.Allocator) ZxContext {
     return .{ .allocator = allocator };
 }
 
+const routing = @import("routing.zig");
+
 pub const App = @import("app.zig").App;
+pub const PageContext = routing.PageContext;
+pub const LayoutContext = routing.LayoutContext;

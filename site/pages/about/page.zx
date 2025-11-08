@@ -1,4 +1,6 @@
-pub fn Page(allocator: zx.Allocator) zx.Component {
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.allocator;
+    
     const is_loading = true;
     const test_chars = "abc";
     const names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };

@@ -10,7 +10,7 @@
         },
         .zx = .{
             .url = "../",
-            .hash = "zx-0.0.1-dev.35-8okzKuW4AgCebWoh5OK6imHIkihXPQYsGdT_woPG7Pt5",
+            .hash = "zx-0.0.1-dev.50-8okzKp3FAgC_cRghU9kjvObGzw_uE0O7r-K5wZyrmkET",
         },
     },
     .paths = .{

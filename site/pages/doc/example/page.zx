@@ -1,5 +1,6 @@
-pub fn Page(allocator: zx.Allocator) zx.Component {
-
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.allocator;
+    
     return (
         <div>
             <h1>Examples</h1> 

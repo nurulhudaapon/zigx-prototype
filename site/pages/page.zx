@@ -1,4 +1,5 @@
-pub fn Page(allocator: zx.Allocator) zx.Component {
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.allocator;
     const myButtonClass = "custom-btn";
     
     return (
@@ -77,9 +78,9 @@ const AsyncScoreProps = struct {
 };
 
 fn AsyncScore(allocator: zx.Allocator, props: AsyncScoreProps) zx.Component {
-    const rand = std.crypto.random;
-    const ns = rand.intRangeAtMost(u64, 5, std.time.ns_per_s);
-    std.Thread.sleep(ns);
+    // const rand = std.crypto.random;
+    // const ns = rand.intRangeAtMost(u64, 5, std.time.ns_per_s);
+    // std.Thread.sleep(ns);
 
     return (
             <span>

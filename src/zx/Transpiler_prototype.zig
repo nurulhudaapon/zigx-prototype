@@ -256,7 +256,7 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
                         defer output.deinit();
 
                         // Add allocator context initialization
-                        try output.addToken(.keyword_const, "const");
+                        try output.addToken(.keyword_const, "var");
                         try output.addToken(.identifier, "_zx");
                         try output.addToken(.equal, "=");
                         try output.addToken(.identifier, "zx");
@@ -351,7 +351,7 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
                                 defer output.deinit();
 
                                 // Add allocator context initialization
-                                try output.addToken(.keyword_const, "const");
+                                try output.addToken(.keyword_const, "var");
                                 try output.addToken(.identifier, "_zx");
                                 try output.addToken(.equal, "=");
                                 try output.addToken(.identifier, "zx");
