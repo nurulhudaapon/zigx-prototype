@@ -107,19 +107,19 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                         </a>
                     </div>
                 </div>
-                <p>ZX is a <strong>prototype</strong> Zig library for building web applications with JSX-like syntax. Write declarative UI
+                <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
                     components using familiar JSX patterns, transpiled to efficient Zig code.</p>
                 <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
-                    fast, type-safe web applications. ZX uses <a href="https://github.com/karlseguin/http.zig" target="_blank" rel="noopener noreferrer">http.zig</a> to create high-performance HTTP servers, making it significantly faster than frameworks like Next.js. See benchmarks at <a href="https://zigweb.nuhu.dev" target="_blank" rel="noopener noreferrer">zigweb.nuhu.dev</a>.</p>
-                <p>Currently, ZX supports Server-Side Rendering (SSR) and Static Site Generation (SSG). Client-Side Rendering (CSR) may be implemented in the future by compiling Zig to WebAssembly and creating a bridge with JavaScript, once the prototype has proven the concept to be useful.</p>
+                    fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
+                    <em>Currently 120X faster than Next.js at SSR</em>.</p>
             </section>
 
             <section id="getting-started" class="section">
                 <h2>Getting Started</h2>
                 <p>
                     To get started quickly, you can pull the 
-                    <a href="https://github.com/nurulhudaapon/zigx.nuhu.dev" target="_blank" rel="noopener noreferrer">
-                        zigx.nuhu.dev
+                    <a href="https://github.com/nurulhudaapon/zx-example-portfolio" target="_blank" rel="noopener noreferrer">
+                        zx-example-portfolio
                     </a>
                     repository as a template and try it out yourself.
                 </p>
@@ -178,7 +178,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                     <li>
                         <strong>A Portfolio Site with Blog: </strong>
                         <a href="https://zigx.nuhu.dev" target="_blank" rel="noopener noreferrer">Live</a> |
-                        <a href="https://github.com/nurulhudaapon/zigx.nuhu.dev" target="_blank" rel="noopener noreferrer">Source</a>
+                        <a href="https://github.com/nurulhudaapon/zx-example-portfolio" target="_blank" rel="noopener noreferrer">Source</a>
                     </li>
                 </ul>
             </section>
