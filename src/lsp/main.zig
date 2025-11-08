@@ -3,6 +3,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const lsp = @import("lsp");
+const zls = @import("zls");
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
 var log_transport: ?lsp.AnyTransport = null;
