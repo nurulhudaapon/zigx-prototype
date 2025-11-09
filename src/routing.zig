@@ -17,7 +17,7 @@ const BaseContext = struct {
     /// This allocator is cleared automatically when the request is processed, so you don't need
     /// to manually free memory allocated with this allocator. Use this for temporary allocations
     /// that are only needed during request processing.
-    arena: std.heap.ArenaAllocator,
+    arena: std.mem.Allocator,
     /// Optional parent context, used for nested layouts or hierarchical context passing
     parent_ctx: ?*BaseContext = null,
 

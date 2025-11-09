@@ -57,7 +57,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const icon_href = std.fmt.allocPrint(allocator, "data:image/svg+xml;base64,{s}", .{aw_icon_svg_base64.written()}) catch unreachable;
 
     return (
-<html>
+<html @allocator={allocator}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -225,7 +225,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
     const zx_code_id = std.fmt.allocPrint(allocator, "zx-code-{s}", .{props.id}) catch unreachable;
     
     return (
-        <div class="code-example">
+        <div class="code-example" @allocator={allocator}>
             <div class="example-code">
                 <h4>ZX</h4>
             <pre><code id={zx_code_id} class="language-jsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>

@@ -3,7 +3,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const is_logged_in = false;
 
     return (
-        <main>
+        <main @allocator={allocator}>
             <section>
                 {if (is_admin) (<p>Admin</p>) else (<p>User</p>)}
             </section>

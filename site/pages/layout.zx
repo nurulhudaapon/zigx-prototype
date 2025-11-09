@@ -1,8 +1,7 @@
 pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
-  const allocator = ctx.arena;
   
   return (
-    <html lang="en-US">
+    <html lang="en-US" @allocator={ctx.arena}>
       <head>
         <title>Zx</title>
       </head>

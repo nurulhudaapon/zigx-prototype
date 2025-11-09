@@ -230,10 +230,11 @@ const Element = struct {
 const ZxOptions = struct {
     children: ?[]const Component = null,
     attributes: ?[]const Element.Attribute = null,
-    @"@allocator": ?std.mem.Allocator = null,
+    allocator: ?std.mem.Allocator = null,
 };
 
 pub fn zx(tag: ElementTag, options: ZxOptions) Component {
+    std.debug.print("zx: Tag: {s}, allocator: {any}\n", .{ @tagName(tag), options.allocator });
     return .{ .element = .{
         .tag = tag,
         .children = options.children,
@@ -250,9 +251,14 @@ pub fn lazy(allocator: Allocator, comptime func: anytype, props: anytype) Compon
 
 /// Context for creating components with allocator support
 const ZxContext = struct {
-    allocator: std.mem.Allocator,
+    allocator: ?std.mem.Allocator = null,
+
+    fn getAllocator(self: *ZxContext) std.mem.Allocator {
+        return self.allocator orelse @panic("Allocator not set. Please provide @allocator attribute to the parent element.");
+    }
 
     fn escapeHtml(self: *ZxContext, text: []const u8) []const u8 {
+        const allocator = self.getAllocator();
         // First pass: calculate the escaped length
         var escaped_len: usize = 0;
         for (text) |char| {
@@ -268,13 +274,13 @@ const ZxContext = struct {
 
         // If no escaping needed, return original text
         if (escaped_len == text.len) {
-            const copy = self.allocator.alloc(u8, text.len) catch @panic("OOM");
+            const copy = allocator.alloc(u8, text.len) catch @panic("OOM");
             @memcpy(copy, text);
             return copy;
         }
 
         // Second pass: allocate and escape
-        const escaped = self.allocator.alloc(u8, escaped_len) catch @panic("OOM");
+        const escaped = allocator.alloc(u8, escaped_len) catch @panic("OOM");
         var i: usize = 0;
         for (text) |char| {
             switch (char) {
@@ -308,18 +314,23 @@ const ZxContext = struct {
     }
 
     pub fn zx(self: *ZxContext, tag: ElementTag, options: ZxOptions) Component {
-        if (options.@"@allocator") |allocator| self.allocator = allocator;
+        // Set allocator from @allocator option if provided
+        if (options.allocator) |allocator| {
+            self.allocator = allocator;
+        }
+
+        const allocator = self.getAllocator();
 
         // Allocate and copy children if provided
         const children_copy = if (options.children) |children| blk: {
-            const copy = self.allocator.alloc(Component, children.len) catch @panic("OOM");
+            const copy = allocator.alloc(Component, children.len) catch @panic("OOM");
             @memcpy(copy, children);
             break :blk copy;
         } else null;
 
         // Allocate and copy attributes if provided
         const attributes_copy = if (options.attributes) |attributes| blk: {
-            const copy = self.allocator.alloc(Element.Attribute, attributes.len) catch @panic("OOM");
+            const copy = allocator.alloc(Element.Attribute, attributes.len) catch @panic("OOM");
             @memcpy(copy, attributes);
             break :blk copy;
         } else null;
@@ -332,26 +343,30 @@ const ZxContext = struct {
     }
 
     pub fn txt(self: *ZxContext, text: []const u8) Component {
-        // if (self.allocator == null) @compileError("Parent component must define an allocator via builtin @allocator attribute");
-
         const escaped = self.escapeHtml(text);
         return .{ .text = escaped };
     }
 
     pub fn fmt(self: *ZxContext, comptime format: []const u8, args: anytype) Component {
-        // if (self.allocator == null) @compileError("Parent component must define an allocator via builtin @allocator attribute");
-
-        const text = std.fmt.allocPrint(self.allocator, format, args) catch @panic("OOM");
+        const allocator = self.getAllocator();
+        const text = std.fmt.allocPrint(allocator, format, args) catch @panic("OOM");
         return .{ .text = text };
     }
 
     pub fn lazy(self: *ZxContext, comptime func: anytype, props: anytype) Component {
-        return .{ .component_fn = Component.ComponentFn.init(func, self.allocator, props) };
+        const allocator = self.getAllocator();
+        return .{ .component_fn = Component.ComponentFn.init(func, allocator, props) };
     }
 };
 
-/// Initialize a ZxContext with an allocator
-pub fn init(allocator: std.mem.Allocator) ZxContext {
+/// Initialize a ZxContext without an allocator
+/// The allocator must be provided via @allocator attribute on the parent element
+pub fn init() ZxContext {
+    return .{ .allocator = null };
+}
+
+/// Initialize a ZxContext with an allocator (for backward compatibility with direct API usage)
+pub fn initWithAllocator(allocator: std.mem.Allocator) ZxContext {
     return .{ .allocator = allocator };
 }
 

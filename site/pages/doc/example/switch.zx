@@ -2,7 +2,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const user_swtc = users[0];
 
     return (
-        <main>
+        <main @allocator={allocator}>
             <section>
                 {switch (user_swtc.user_type) {
                     .admin => ("Admin"),

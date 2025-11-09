@@ -49,6 +49,20 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(zxls_exe);
 
+    // --- ZX Site (Docs, Example, sample) ---
+    const site_exe = b.addExecutable(.{
+        .name = "zx_site",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("site/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zx", .module = mod },
+            },
+        }),
+    });
+    b.installArtifact(site_exe);
+
     // --- Steps: Run ---
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);
@@ -58,8 +72,10 @@ pub fn build(b: *std.Build) void {
 
     // --- Steps: Run Docs ---
     const run_docs_step = b.step("run-docs", "Run the docs");
-    const run_docs_cmd = b.addSystemCommand(&.{ "bash", "tools/run-site" });
+    const run_docs_cmd = b.addRunArtifact(site_exe);
     run_docs_step.dependOn(&run_docs_cmd.step);
+    run_docs_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_docs_cmd.addArgs(args);
 
     // --- Steps: Test ---
     const mod_tests = b.addTest(.{ .root_module = mod });

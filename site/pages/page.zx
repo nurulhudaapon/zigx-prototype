@@ -3,7 +3,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const myButtonClass = "custom-btn";
     
     return (
-        <html lang="en-US">
+        <html lang="en-US" @allocator={allocator}>
 
         <head>
             <title>ZX - Props Demo</title>
@@ -64,7 +64,7 @@ const ButtonProps = struct {
 
 fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
     return (
-        <button class={props.class}>{props.title}
+        <button @allocator={allocator} class={props.class}>{props.title}
             <span>
                 ZX
             </span>
@@ -83,7 +83,7 @@ fn AsyncScore(allocator: zx.Allocator, props: AsyncScoreProps) zx.Component {
     // std.Thread.sleep(ns);
 
     return (
-            <span>
+            <span @allocator={allocator}>
                 {props.label} #{[props.index:d]} - Complete
             </span>
     );

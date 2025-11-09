@@ -1,6 +1,6 @@
 pub fn FormExample(allocator: zx.Allocator) zx.Component {
     return (
-        <main>
+        <main @allocator={allocator}>
             <form method="get">
                 <input type="text" name="search" placeholder="Search users..." />
                 <button>Search</button>

@@ -7,7 +7,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const user_swtc = users[0];
 
     return (
-        <body>
+        <body @allocator={allocator}>
             <h1>About</h1>
 
             <section>

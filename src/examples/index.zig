@@ -1,7 +1,7 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
     const dynamic_title = "Dynamic Title!";
 
-    var _zx = zx.init(allocator);
+    var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .div,
         .{
@@ -44,7 +44,7 @@ const ButtonProps = struct {
 
 // Custom Button component with props
 fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
-    var _zx = zx.init(allocator);
+    var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .button,
         .{

@@ -3,7 +3,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const user_names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
 
     return (
-        <main>
+        <main @allocator={allocator}>
             <section>
                 {for (chars) |char| (<i>{[char:c]}</i>)}
             </section>

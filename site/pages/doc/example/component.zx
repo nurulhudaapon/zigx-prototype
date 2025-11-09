@@ -2,7 +2,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const greeting = zx.Component{ .text = "Hello!" };
 
     return (
-        <section>
+        <section @allocator={allocator}>
             {(greeting)}
         </section>
     );

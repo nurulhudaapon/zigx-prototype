@@ -2,7 +2,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const allocator = ctx.arena;
     
     return (
-        <div>
+        <div @allocator={allocator}>
             <h1>Examples</h1> 
             <h2>For Loop</h2>
             <ForExample />

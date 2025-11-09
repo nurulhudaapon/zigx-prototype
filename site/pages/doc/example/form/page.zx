@@ -3,7 +3,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const request_info = handler.handleRequest(ctx);
 
     return (
-        <div>
+        <div @allocator={allocator}>
             <FormExample />
 
             {if (request_info.is_reset) (<p>Reset successful</p>) else (<p> </p>)}

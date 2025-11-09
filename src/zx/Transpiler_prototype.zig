@@ -114,6 +114,7 @@ const ZXElement = struct {
     attributes: std.ArrayList(Attribute),
     children: std.ArrayList(Child),
     allocator: std.mem.Allocator,
+    builtin_allocator: ?[]const u8 = null, // Builtin @allocator attribute value (expression)
 
     const Attribute = struct {
         name: []const u8,
@@ -159,6 +160,11 @@ const ZXElement = struct {
     }
 
     fn deinit(self: *ZXElement) void {
+        // Free builtin_allocator if allocated
+        if (self.builtin_allocator) |allocator_expr| {
+            self.allocator.free(allocator_expr);
+        }
+
         for (self.children.items) |child| {
             if (child == .element) {
                 child.element.deinit();
@@ -256,15 +262,22 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
                         defer output.deinit();
 
                         // Add allocator context initialization
+                        // If root element has @allocator, pass it to init; otherwise use init() without allocator
                         try output.addToken(.keyword_const, "var");
                         try output.addToken(.identifier, "_zx");
                         try output.addToken(.equal, "=");
                         try output.addToken(.identifier, "zx");
                         try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "init");
-                        try output.addToken(.l_paren, "(");
-                        try output.addToken(.identifier, "allocator");
-                        try output.addToken(.r_paren, ")");
+                        if (jsx_elem.builtin_allocator) |allocator_expr| {
+                            try output.addToken(.identifier, "initWithAllocator");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, allocator_expr);
+                            try output.addToken(.r_paren, ")");
+                        } else {
+                            try output.addToken(.identifier, "init");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.r_paren, ")");
+                        }
                         try output.addToken(.semicolon, ";");
                         try output.addToken(.invalid, "\n");
 
@@ -351,15 +364,22 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
                                 defer output.deinit();
 
                                 // Add allocator context initialization
+                                // If root element has @allocator, pass it to init; otherwise use init() without allocator
                                 try output.addToken(.keyword_const, "var");
                                 try output.addToken(.identifier, "_zx");
                                 try output.addToken(.equal, "=");
                                 try output.addToken(.identifier, "zx");
                                 try output.addToken(.period, ".");
-                                try output.addToken(.identifier, "init");
-                                try output.addToken(.l_paren, "(");
-                                try output.addToken(.identifier, "allocator");
-                                try output.addToken(.r_paren, ")");
+                                if (jsx_elem.builtin_allocator) |allocator_expr| {
+                                    try output.addToken(.identifier, "initWithAllocator");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.identifier, allocator_expr);
+                                    try output.addToken(.r_paren, ")");
+                                } else {
+                                    try output.addToken(.identifier, "init");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.r_paren, ")");
+                                }
                                 try output.addToken(.semicolon, ";");
                                 try output.addToken(.invalid, "\n");
 
@@ -489,6 +509,10 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
         }
         const attr_name = content[attr_start..i];
 
+        // Check if this is a builtin attribute (@allocator)
+        const is_builtin = std.mem.startsWith(u8, attr_name, "@");
+        const builtin_name: ?[]const u8 = if (is_builtin) attr_name[1..] else null;
+
         // Skip whitespace and =
         while (i < content.len and (std.ascii.isWhitespace(content[i]) or content[i] == '=')) i += 1;
 
@@ -501,7 +525,20 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
             const attr_value = content[val_start..i];
             i += 1; // skip closing quote
 
-            try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .static = attr_value } });
+            // Handle builtin attributes
+            if (builtin_name) |name| {
+                if (std.mem.eql(u8, name, "allocator")) {
+                    // @allocator with static value - not supported, must be dynamic expression
+                    // For now, treat static string as identifier (variable name)
+                    const expr = try allocator.dupe(u8, attr_value);
+                    elem.builtin_allocator = expr;
+                } else {
+                    // Other builtin attributes - add to regular attributes for now
+                    try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .static = attr_value } });
+                }
+            } else {
+                try elem.attributes.append(allocator, .{ .name = attr_name, .value = .{ .static = attr_value } });
+            }
         } else if (i + 1 < content.len and content[i] == '{') {
             // Check for format expression: {[expr:fmt]} or dynamic expression: {expr}
             i += 1; // skip {
@@ -518,6 +555,16 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
             // Trim whitespace first
             while (expr.len > 0 and std.ascii.isWhitespace(expr[0])) expr = expr[1..];
             while (expr.len > 0 and std.ascii.isWhitespace(expr[expr.len - 1])) expr = expr[0 .. expr.len - 1];
+
+            // Handle builtin @allocator attribute
+            if (builtin_name) |name| {
+                if (std.mem.eql(u8, name, "allocator")) {
+                    // Store the expression for @allocator
+                    const expr_copy = try allocator.dupe(u8, expr);
+                    elem.builtin_allocator = expr_copy;
+                    continue; // Skip adding to regular attributes
+                }
+            }
 
             // Check for format expression: {[expr:fmt]} or {[expr]}
             if (expr.len >= 2 and expr[0] == '[' and expr[expr.len - 1] == ']') {
@@ -1243,6 +1290,16 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
     try output.addToken(.l_brace, "{");
     try output.addToken(.invalid, "\n");
 
+    // Options.allocator = allocator;
+    if (elem.builtin_allocator) |allocator_expr| {
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "allocator");
+        try output.addToken(.equal, "=");
+        try output.addToken(.identifier, allocator_expr);
+        try output.addToken(.comma, ",");
+        try output.addToken(.invalid, "\n");
+    }
+
     // Attributes
     if (elem.attributes.items.len > 0) {
         try addIndentTokens(output, indent + 2);
@@ -1840,6 +1897,17 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
     try output.addToken(.comma, ",");
     try output.addToken(.period, ".");
     try output.addToken(.l_brace, "{");
+    try output.addToken(.invalid, "\n");
+
+    // Options.allocator = allocator;
+    if (elem.builtin_allocator) |allocator_expr| {
+        try output.addToken(.period, ".");
+        try output.addToken(.identifier, "allocator");
+        try output.addToken(.equal, "=");
+        try output.addToken(.identifier, allocator_expr);
+        try output.addToken(.comma, ",");
+        try output.addToken(.invalid, "\n");
+    }
 
     // Attributes
     if (elem.attributes.items.len > 0) {
