@@ -1,0 +1,31 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.arena;
+    const request_info = handler.handleRequest(ctx);
+
+    return (
+        <div>
+            <FormExample />
+
+            {if (request_info.is_reset) (<p>Reset successful</p>) else (<p> </p>)}
+            {if (request_info.is_delete) (<p>User deleted</p>) else (<p> </p>)}
+            {if (request_info.is_add) (<p>User added</p>) else (<p> </p>)}
+
+            <p>User count: {[request_info.users.items.len:d]}</p>
+            <div>
+                {for (request_info.filtered_users.items) |user| (
+                    <form method="post">
+                        {[user.id:d]}: {user.name} - <button name="delete" value={std.fmt.allocPrint(allocator, "{d}", .{user.id}) catch @panic("OOM")}>Delete</button>
+                    </form>
+                )}
+            </div>
+            <form method="post"><button type="submit" name="reset" value="true">Reset</button></form>
+        </div>
+    );
+}
+
+const zx = @import("zx");
+const FormExample = @import("../form.zig").FormExample;
+const FormExampleProps = struct {
+};
+const std = @import("std");
+const handler = @import("handler.zig");

@@ -1,28 +1,14 @@
 pub fn FormExample(allocator: zx.Allocator) zx.Component {
     return (
         <main>
-            <h5>GET Form</h5>
-            <form>
-                <input type="text" name="name" placeholder="Name" />
-                <button>Submit</button>
+            <form method="get">
+                <input type="text" name="search" placeholder="Search users..." />
+                <button>Search</button>
             </form>
 
-            <h5>POST Form</h5>
             <form method="post">
-                <input type="text" name="name" placeholder="Name" />
-                <button>Submit</button>
-            </form>
-
-            <h5>PUT Form</h5>
-            <form method="put">
-                <input type="text" name="name" placeholder="Name" />
-                <button>Submit</button>
-            </form>
-
-            <h5>File Upload Form</h5>
-            <form method="post" enctype="multipart/form-data">
-                <input type="file" name="file" />
-                <button>Submit</button>
+                <input type="text" name="name" placeholder="Name" autofocus />
+                <button>Add User</button>
             </form>
         </main>
     );

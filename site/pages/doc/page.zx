@@ -1,5 +1,5 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
-    const allocator = ctx.allocator;
+    const allocator = ctx.arena;
     // If example
     var aw_if: std.io.Writer.Allocating = .init(allocator);
     const zx_example_if = @embedFile("../../../pages/doc/example/if.zx");

@@ -18,12 +18,13 @@ pub const App = struct {
 
     const Handler = struct {
         meta: *const App.Meta,
+        allocator: std.mem.Allocator,
 
         pub fn handle(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
-            const allocator = req.arena;
+            const allocator = self.allocator;
             const path = req.url.path;
 
-            const request_path = normalizePath(allocator, path) catch {
+            const request_path = normalizePath(req.arena, path) catch {
                 res.body = "Internal Server Error";
                 return;
             };
@@ -61,7 +62,7 @@ pub const App = struct {
 
         app.allocator = allocator;
         app.meta = config.meta;
-        app.handler = Handler{ .meta = config.meta };
+        app.handler = Handler{ .meta = config.meta, .allocator = allocator };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
 
         return app;
@@ -93,7 +94,7 @@ pub const App = struct {
         pagectx: zx.PageContext,
         layoutctx: zx.LayoutContext,
     ) !bool {
-        const normalized_route_path = normalizePath(pagectx.allocator, route.path) catch return false;
+        const normalized_route_path = normalizePath(pagectx.arena, route.path) catch return false;
 
         // Check if this route matches the request path
         if (std.mem.eql(u8, request_path, normalized_route_path)) {

@@ -1,5 +1,5 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
-    const allocator = ctx.allocator;
+    const allocator = ctx.arena;
     
     const is_loading = true;
     const test_chars = "abc";

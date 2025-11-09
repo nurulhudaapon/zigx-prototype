@@ -3,7 +3,13 @@ const std = @import("std");
 const zx = @import("zx");
 
 const config = zx.App.Config{
-    .server = .{ .port = 5588, .address = "0.0.0.0" },
+    .server = .{
+        .port = 5588,
+        .address = "0.0.0.0",
+        .request = .{
+            .max_form_count = 100,
+        },
+    },
     .meta = &Metadata.meta,
 };
 
