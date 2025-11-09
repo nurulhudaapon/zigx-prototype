@@ -39,7 +39,7 @@ pub fn handleRequest(ctx: zx.PageContext) RequestInfo {
     }
 
     const search_opt = qs.get("search");
-    const filtered_users = filterUsers(ctx.allocator, search_opt);
+    const filtered_users = filterUsers(ctx.arena, search_opt);
 
     return RequestInfo{
         .is_reset = is_reset,

@@ -1,16 +1,5 @@
 pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
-  const allocator = ctx.allocator;
-  // const params = ctx.request.query() catch unreachable;
-  // const name_str = params.get("name") orelse "hello";
-  // var query_it = params.iterator();
-
-  // var aw: std.io.Writer.Allocating = .init(allocator);  
-  // while (query_it.next()) |entry| {
-  //   const key = entry.key;
-  //   const value = entry.value;
-  //   _  = aw.writer.write(std.fmt.allocPrint(allocator, "{s}={s}\n", .{ key, value }) catch unreachable) catch unreachable;
-  //   std.debug.print("Key: {s}, Value: {s}\n", .{ key, value });
-  // }
+  const allocator = ctx.arena;
   
   return (
     <html lang="en-US">
