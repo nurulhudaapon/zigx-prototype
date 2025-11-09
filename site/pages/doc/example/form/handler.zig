@@ -41,6 +41,11 @@ pub fn handleRequest(ctx: zx.PageContext) RequestInfo {
     const search_opt = qs.get("search");
     const filtered_users = filterUsers(ctx.arena, search_opt);
 
+    if (is_delete or is_add or is_reset) {
+        ctx.response.header("Location", "/example/form");
+        ctx.response.setStatus(.found);
+    }
+
     return RequestInfo{
         .is_reset = is_reset,
         .is_delete = is_delete,

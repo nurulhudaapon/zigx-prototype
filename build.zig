@@ -61,7 +61,8 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(site_exe);
+    const site_step = b.step("site", "Build the site (docs, example, sample)");
+    site_step.dependOn(&b.addInstallArtifact(site_exe, .{}).step);
 
     // --- Steps: Run ---
     const run_step = b.step("run", "Run the app");
@@ -71,7 +72,7 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_cmd.addArgs(args);
 
     // --- Steps: Run Docs ---
-    const run_docs_step = b.step("run-docs", "Run the docs");
+    const run_docs_step = b.step("run-site", "Run the site (docs, example, sample)");
     const run_docs_cmd = b.addRunArtifact(site_exe);
     run_docs_step.dependOn(&run_docs_cmd.step);
     run_docs_cmd.step.dependOn(b.getInstallStep());

@@ -2,7 +2,5 @@
 zig build run -- transpile site --output site/.zx
 
 cd site
-zig fetch --save "git+https://github.com/nurulhudaapon/zx"
 docker compose up -d --build
-git restore build.zig.zon
 docker network connect npm ziex.dev

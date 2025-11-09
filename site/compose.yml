@@ -2,8 +2,8 @@ name: "zx"
 services:
   doc_site:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: site/Dockerfile
     container_name: "ziex.dev"
     restart: unless-stopped
     networks:

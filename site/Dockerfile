@@ -11,11 +11,11 @@ mv zig-$(uname -m)-linux-${ZIG_VER}/ /opt/zig
 WORKDIR /build
 COPY . .
 
-RUN /opt/zig/zig build -Doptimize=ReleaseFast -Dcpu=baseline
+RUN /opt/zig/zig build site -Doptimize=ReleaseFast -Dcpu=baseline
 
 # Run the app
 FROM alpine:3.22.2
-COPY --from=build /build/zig-out/bin/site /site
+COPY --from=build /build/zig-out/bin/zx_site /site
 
 ENTRYPOINT ["/site"]
 

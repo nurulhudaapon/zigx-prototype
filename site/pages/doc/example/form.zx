@@ -7,7 +7,7 @@ pub fn FormExample(allocator: zx.Allocator) zx.Component {
             </form>
 
             <form method="post">
-                <input type="text" name="name" placeholder="Name" autofocus />
+                <input type="text" name="name" placeholder="Name" autofocus="true" />
                 <button>Add User</button>
             </form>
         </main>

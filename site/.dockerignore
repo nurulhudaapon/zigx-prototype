@@ -1,2 +1,12 @@
 .zig-cache
 zig-out
+Dockerfile
+compose.yml
+.dockerignore
+.gitignore
+.git
+.github
+.vscode
+.zx
+.zxignore
+.zxignore.md
