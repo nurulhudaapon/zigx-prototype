@@ -1,12 +1,18 @@
 //! Implements a language server using the `lsp.basic_server` abstraction.
+//! This server forwards all requests and notifications to zls (Zig Language Server).
+
+// Increase comptime branch quota BEFORE importing libraries
+// This is needed because basic_server analyzes all handler methods at comptime
+comptime {
+    @setEvalBranchQuota(100_000);
+}
 
 const std = @import("std");
 const builtin = @import("builtin");
-const lsp = @import("lsp");
 const zls = @import("zls");
+const lsp = zls.lsp;
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-var log_transport: ?lsp.AnyTransport = null;
 
 pub fn main() !void {
     const gpa, const is_debug = switch (builtin.mode) {
@@ -22,276 +28,361 @@ pub fn main() !void {
     var stdio_transport: lsp.Transport.Stdio = .init(&read_buffer, .stdin(), .stdout());
     const transport: *lsp.Transport = &stdio_transport.transport;
 
+    const zls_server = zls.Server.create(.{
+        .allocator = gpa,
+        .transport = transport, // zls doesn't need transport, we just forward requests
+        .config = null,
+        // .config = &zls.Config{
+        //     .builtin_path = "/Users/nurulhudaapon/Library/Caches/zls/builtin.zig",
+        //     .zig_lib_path = "/Users/nurulhudaapon/.asdf/installs/zig/0.15.2/lib",
+        //     .zig_exe_path = "/Users/nurulhudaapon/.asdf/shims/zig",
+        //     .build_runner_path = "/Users/nurulhudaapon/Library/Caches/zls/build_runner/cf46548b062a7e79e448e80c05616097/build_runner.zig",
+        //     .global_cache_path = "/Users/nurulhudaapon/Library/Caches/zls",
+        // },
+    }) catch unreachable;
+
     // The handler is a user provided type that stores the state of the
     // language server and provides callbacks for the desired LSP messages.
-    var handler: Handler = .init(gpa);
+    var handler: Handler = .init(gpa, zls_server);
     defer handler.deinit();
 
-    try lsp.basic_server.run(
-        gpa,
-        transport,
-        &handler,
-        std.log.err,
-    );
-}
+    // try lsp.basic_server.run(
+    //     gpa,
+    //     transport,
+    //     &handler,
+    //     std.log.err,
+    // );
 
-// Most functions can be omitted if you are not interested them. A unhandled request will automatically return a 'null' response.
+    try zls_server.loop();
+}
 
 pub const Handler = struct {
     allocator: std.mem.Allocator,
-    files: std.StringHashMapUnmanaged([]u8),
-    /// The LSP protocol specifies position inside a text document using a line and character pair.
-    /// This field stores encoding is used for the character value (UTF-8, UTF-16, UTF-32).
-    ///
-    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocuments
+    zls: *zls.Server,
     offset_encoding: lsp.offsets.Encoding,
 
-    fn init(allocator: std.mem.Allocator) Handler {
+    fn init(allocator: std.mem.Allocator, zls_server: *zls.Server) Handler {
         return .{
             .allocator = allocator,
-            .files = .{},
-            // The default position encoding is UTF-16.
-            // The agreed upon encoding between server client is actually decided during `initialize`.
+            .zls = zls_server,
             .offset_encoding = .@"utf-16",
         };
     }
 
     fn deinit(handler: *Handler) void {
-        var file_it = handler.files.iterator();
-        while (file_it.next()) |entry| {
-            handler.allocator.free(entry.key_ptr.*);
-            handler.allocator.free(entry.value_ptr.*);
-        }
-
-        handler.files.deinit(handler.allocator);
-
+        zls.Server.destroy(handler.zls);
         handler.* = undefined;
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#initialize
     pub fn initialize(
         handler: *Handler,
-        _: std.mem.Allocator,
+        arena: std.mem.Allocator,
         request: lsp.types.InitializeParams,
     ) lsp.types.InitializeResult {
-        std.log.debug("Received 'initialize' message", .{});
+        const result = handler.zls.sendRequestSync(arena, "initialize", request) catch |err| {
+            std.log.err("zls initialize failed: {}", .{err});
+            return .{
+                .serverInfo = .{ .name = "zxls", .version = "0.1.0" },
+                .capabilities = .{},
+            };
+        };
 
-        if (request.clientInfo) |client_info| {
-            std.log.info("The client is '{s}' ({s})", .{ client_info.name, client_info.version orelse "unknown version" });
-        }
-
-        // Specifies which features are supported by the client/editor.
-        const client_capabilities: lsp.types.ClientCapabilities = request.capabilities;
-
-        // Pick the client's favorite character offset encoding.
-        if (client_capabilities.general) |general| {
-            for (general.positionEncodings orelse &.{}) |encoding| {
-                handler.offset_encoding = switch (encoding) {
-                    .@"utf-8" => .@"utf-8",
-                    .@"utf-16" => .@"utf-16",
-                    .@"utf-32" => .@"utf-32",
-                    .custom_value => continue,
-                };
-                break;
-            }
-        }
-
-        // Specifies which features are supported by the language server.
-        const server_capabilities: lsp.types.ServerCapabilities = .{
-            .positionEncoding = switch (handler.offset_encoding) {
+        // sendRequestSync returns the result directly (not optional) for initialize
+        if (result.capabilities.positionEncoding) |encoding| {
+            handler.offset_encoding = switch (encoding) {
                 .@"utf-8" => .@"utf-8",
                 .@"utf-16" => .@"utf-16",
                 .@"utf-32" => .@"utf-32",
-            },
-            .textDocumentSync = .{
-                .TextDocumentSyncOptions = .{
-                    .openClose = true,
-                    .change = .Full,
-                },
-            },
-            .hoverProvider = .{ .bool = true },
-            .completionProvider = .{ .triggerCharacters = &.{"."} },
-        };
-
-        // Tries to validate that our server capabilities are actually implemented.
-        if (@import("builtin").mode == .Debug) {
-            lsp.basic_server.validateServerCapabilities(Handler, server_capabilities);
+                .custom_value => .@"utf-16", // fallback to utf-16 for custom encodings
+            };
         }
-
-        return .{
-            .serverInfo = .{
-                .name = "My first LSP",
-                .version = "0.1.0",
-            },
-            .capabilities = server_capabilities,
-        };
+        return result;
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#initialized
     pub fn initialized(
-        _: *Handler,
-        _: std.mem.Allocator,
-        _: lsp.types.InitializedParams,
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.InitializedParams,
     ) void {
-        std.log.debug("Received 'initialized' notification", .{});
+        handler.zls.sendNotificationSync(arena, "initialized", params) catch {};
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#shutdown
     pub fn shutdown(
-        _: *Handler,
-        _: std.mem.Allocator,
+        handler: *Handler,
+        arena: std.mem.Allocator,
         _: void,
     ) ?void {
-        std.log.debug("Received 'shutdown' request", .{});
-        return null;
+        return handler.zls.sendRequestSync(arena, "shutdown", {}) catch null;
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#exit
-    /// The `lsp.basic_server.run` function will automatically return after this function completes.
     pub fn exit(
-        _: *Handler,
-        _: std.mem.Allocator,
+        handler: *Handler,
+        arena: std.mem.Allocator,
         _: void,
     ) void {
-        std.log.debug("Received 'exit' notification", .{});
+        handler.zls.sendNotificationSync(arena, "exit", {}) catch {};
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_didOpen
     pub fn @"textDocument/didOpen"(
-        self: *Handler,
-        _: std.mem.Allocator,
-        notification: lsp.types.DidOpenTextDocumentParams,
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidOpenTextDocumentParams,
     ) !void {
-        std.log.debug("Received 'textDocument/didOpen' notification", .{});
-
-        const new_text = try self.allocator.dupe(u8, notification.textDocument.text);
-        errdefer self.allocator.free(new_text);
-
-        const gop = try self.files.getOrPut(self.allocator, notification.textDocument.uri);
-
-        if (gop.found_existing) {
-            std.log.warn("Document opened twice: '{s}'", .{notification.textDocument.uri});
-            self.allocator.free(gop.value_ptr.*);
-        } else {
-            errdefer std.debug.assert(self.files.remove(notification.textDocument.uri));
-            gop.key_ptr.* = try self.allocator.dupe(u8, notification.textDocument.uri);
-        }
-
-        gop.value_ptr.* = new_text;
+        handler.zls.sendNotificationSync(arena, "textDocument/didOpen", params) catch {};
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_didChange
     pub fn @"textDocument/didChange"(
-        self: *Handler,
-        _: std.mem.Allocator,
-        notification: lsp.types.DidChangeTextDocumentParams,
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidChangeTextDocumentParams,
     ) !void {
-        std.log.debug("Received 'textDocument/didChange' notification", .{});
+        handler.zls.sendNotificationSync(arena, "textDocument/didChange", params) catch {};
+    }
 
-        const current_text = self.files.getPtr(notification.textDocument.uri) orelse {
-            std.log.warn("Modifying non existent Document: '{s}'", .{notification.textDocument.uri});
-            return;
-        };
-
-        var buffer: std.ArrayListUnmanaged(u8) = .empty;
-        errdefer buffer.deinit(self.allocator);
-
-        try buffer.appendSlice(self.allocator, current_text.*);
-
-        for (notification.contentChanges) |content_change| {
-            switch (content_change) {
-                .literal_1 => |change| {
-                    buffer.clearRetainingCapacity();
-                    try buffer.appendSlice(self.allocator, change.text);
-                },
-                .literal_0 => |change| {
-                    const loc = lsp.offsets.rangeToLoc(buffer.items, change.range, self.offset_encoding);
-                    try buffer.replaceRange(self.allocator, loc.start, loc.end - loc.start, change.text);
-                },
-            }
-        }
-
-        const new_text = try buffer.toOwnedSlice(self.allocator);
-        self.allocator.free(current_text.*);
-        current_text.* = new_text;
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_didSave
+    pub fn @"textDocument/didSave"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidSaveTextDocumentParams,
+    ) !void {
+        handler.zls.sendNotificationSync(arena, "textDocument/didSave", params) catch {};
     }
 
     /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_didClose
     pub fn @"textDocument/didClose"(
-        self: *Handler,
-        _: std.mem.Allocator,
-        notification: lsp.types.DidCloseTextDocumentParams,
-    ) !void {
-        std.log.debug("Received 'textDocument/didClose' notification", .{});
-
-        const entry = self.files.fetchRemove(notification.textDocument.uri) orelse {
-            std.log.warn("Closing non existent Document: '{s}'", .{notification.textDocument.uri});
-            return;
-        };
-        self.allocator.free(entry.key);
-        self.allocator.free(entry.value);
-    }
-
-    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_hover
-    ///
-    /// This function can be omitted if you are not interested in this request. A `null` response will be automatically send back.
-    pub fn @"textDocument/hover"(
         handler: *Handler,
-        _: std.mem.Allocator,
-        params: lsp.types.HoverParams,
-    ) ?lsp.types.Hover {
-        std.log.debug("Received 'textDocument/hover' request", .{});
-
-        const source = handler.files.get(params.textDocument.uri) orelse
-            return null; // We should actually read the document from the file system
-
-        const source_index = lsp.offsets.positionToIndex(source, params.position, handler.offset_encoding);
-        std.log.debug("Hover position: line={d}, character={d}, index={d}", .{ params.position.line, params.position.character, source_index });
-
-        return .{
-            .contents = .{
-                .MarkupContent = .{
-                    .kind = .plaintext,
-                    .value = "I don't know what you are hovering over but I'd like to point out that you have a nice editor theme",
-                },
-            },
-        };
+        arena: std.mem.Allocator,
+        params: lsp.types.DidCloseTextDocumentParams,
+    ) !void {
+        handler.zls.sendNotificationSync(arena, "textDocument/didClose", params) catch {};
     }
 
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_willSaveWaitUntil
+    pub fn @"textDocument/willSaveWaitUntil"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.WillSaveTextDocumentParams,
+    ) error{OutOfMemory}!?[]const lsp.types.TextEdit {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/willSaveWaitUntil", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_semanticTokens_full
+    pub fn @"textDocument/semanticTokens/full"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.SemanticTokensParams,
+    ) error{OutOfMemory}!?lsp.types.SemanticTokens {
+        return handler.zls.sendRequestSync(arena, "textDocument/semanticTokens/full", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_semanticTokens_range
+    pub fn @"textDocument/semanticTokens/range"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.SemanticTokensRangeParams,
+    ) error{OutOfMemory}!?lsp.types.SemanticTokens {
+        return handler.zls.sendRequestSync(arena, "textDocument/semanticTokens/range", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_inlayHint
+    pub fn @"textDocument/inlayHint"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.InlayHintParams,
+    ) error{OutOfMemory}!?[]const lsp.types.InlayHint {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/inlayHint", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_completion
     pub fn @"textDocument/completion"(
-        _: *Handler,
+        handler: *Handler,
         arena: std.mem.Allocator,
         params: lsp.types.CompletionParams,
     ) error{OutOfMemory}!lsp.ResultType("textDocument/completion") {
-        std.log.debug("Received 'textDocument/completion' notification", .{});
+        return handler.zls.sendRequestSync(arena, "textDocument/completion", params) catch null;
+    }
 
-        if (params.context) |context| {
-            std.log.info("completion triggered by {?s} {t}", .{
-                context.triggerCharacter,
-                context.triggerKind,
-            });
-        }
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_signatureHelp
+    pub fn @"textDocument/signatureHelp"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.SignatureHelpParams,
+    ) error{OutOfMemory}!?lsp.types.SignatureHelp {
+        return handler.zls.sendRequestSync(arena, "textDocument/signatureHelp", params) catch null;
+    }
 
-        const completions = try arena.dupe(lsp.types.CompletionItem, &.{
-            .{
-                .label = "get",
-                .detail = "get the value",
-            },
-            .{
-                .label = "set",
-                .detail = "set the value",
-            },
-        });
-        return .{ .array_of_CompletionItem = completions };
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_definition
+    pub fn @"textDocument/definition"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DefinitionParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/definition") {
+        return handler.zls.sendRequestSync(arena, "textDocument/definition", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_typeDefinition
+    pub fn @"textDocument/typeDefinition"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.TypeDefinitionParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/typeDefinition") {
+        return handler.zls.sendRequestSync(arena, "textDocument/typeDefinition", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_implementation
+    pub fn @"textDocument/implementation"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.ImplementationParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/implementation") {
+        return handler.zls.sendRequestSync(arena, "textDocument/implementation", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_declaration
+    pub fn @"textDocument/declaration"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DeclarationParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/declaration") {
+        return handler.zls.sendRequestSync(arena, "textDocument/declaration", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_hover
+    pub fn @"textDocument/hover"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.HoverParams,
+    ) ?lsp.types.Hover {
+        return handler.zls.sendRequestSync(arena, "textDocument/hover", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_documentSymbol
+    pub fn @"textDocument/documentSymbol"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DocumentSymbolParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/documentSymbol") {
+        return handler.zls.sendRequestSync(arena, "textDocument/documentSymbol", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_formatting
+    pub fn @"textDocument/formatting"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DocumentFormattingParams,
+    ) error{OutOfMemory}!?[]const lsp.types.TextEdit {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/formatting", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_rename
+    pub fn @"textDocument/rename"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.RenameParams,
+    ) error{OutOfMemory}!?lsp.types.WorkspaceEdit {
+        return handler.zls.sendRequestSync(arena, "textDocument/rename", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_prepareRename
+    pub fn @"textDocument/prepareRename"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.PrepareRenameParams,
+    ) ?lsp.types.PrepareRenameResult {
+        return handler.zls.sendRequestSync(arena, "textDocument/prepareRename", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_references
+    pub fn @"textDocument/references"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.ReferenceParams,
+    ) error{OutOfMemory}!?[]const lsp.types.Location {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/references", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_documentHighlight
+    pub fn @"textDocument/documentHighlight"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DocumentHighlightParams,
+    ) error{OutOfMemory}!?[]const lsp.types.DocumentHighlight {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/documentHighlight", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_codeAction
+    pub fn @"textDocument/codeAction"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.CodeActionParams,
+    ) error{OutOfMemory}!lsp.ResultType("textDocument/codeAction") {
+        return handler.zls.sendRequestSync(arena, "textDocument/codeAction", params) catch null;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_foldingRange
+    pub fn @"textDocument/foldingRange"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.FoldingRangeParams,
+    ) error{OutOfMemory}!?[]const lsp.types.FoldingRange {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/foldingRange", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_selectionRange
+    pub fn @"textDocument/selectionRange"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.SelectionRangeParams,
+    ) error{OutOfMemory}!?[]const lsp.types.SelectionRange {
+        const result = handler.zls.sendRequestSync(arena, "textDocument/selectionRange", params) catch null;
+        return result;
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_didChangeWatchedFiles
+    pub fn @"workspace/didChangeWatchedFiles"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidChangeWatchedFilesParams,
+    ) !void {
+        handler.zls.sendNotificationSync(arena, "workspace/didChangeWatchedFiles", params) catch {};
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_didChangeWorkspaceFolders
+    pub fn @"workspace/didChangeWorkspaceFolders"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidChangeWorkspaceFoldersParams,
+    ) !void {
+        handler.zls.sendNotificationSync(arena, "workspace/didChangeWorkspaceFolders", params) catch {};
+    }
+
+    /// https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_didChangeConfiguration
+    pub fn @"workspace/didChangeConfiguration"(
+        handler: *Handler,
+        arena: std.mem.Allocator,
+        params: lsp.types.DidChangeConfigurationParams,
+    ) !void {
+        handler.zls.sendNotificationSync(arena, "workspace/didChangeConfiguration", params) catch {};
     }
 
     /// We received a response message from the client/editor.
     pub fn onResponse(
         _: *Handler,
         _: std.mem.Allocator,
-        response: lsp.JsonRPCMessage.Response,
+        _: lsp.JsonRPCMessage.Response,
     ) void {
-        // We didn't make any requests to the client/editor.
-        std.log.warn("received unexpected response from client with id '{?}'!", .{response.id});
+        // zls handles responses internally
     }
 };
