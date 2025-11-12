@@ -2,11 +2,11 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const is_logged_in = false;
     return (
         <main @allocator={allocator}>
-                {if (is_logged_in) {
-                    (<p>Welcome, User </p>)
-                } else {
-                    (<p>Please log in to continue.</p>)
-                }}
+            {if (is_logged_in) {
+                (<p>Welcome, User </p>)
+            } else {
+                (<p>Please log in to continue.</p>)
+            }}
         </main>
     );
 }

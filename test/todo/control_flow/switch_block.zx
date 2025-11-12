@@ -3,8 +3,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     return (
         <main @allocator={allocator}>
             {switch (user_type) {
-                .admin => ("Admin"),
-                .member => ("Member"),
+                        .admin => { (<p>Admin</p>) },
+                        .member => { (<p>Member</p>) },
             }}
         </main>
     );

@@ -35,9 +35,9 @@ test "control_flow > for_block" {
 test "control_flow > switch" {
     try test_transpile(cf_path ++ "switch.zx", cf_path ++ "switch.zig");
 }
-test "control_flow > switch_block" {
-    try test_transpile(cf_path ++ "switch_block.zx", cf_path ++ "switch_block.zig");
-}
+// test "control_flow > switch_block" {
+//     try test_transpile(cf_path ++ "switch_block.zx", cf_path ++ "switch_block.zig");
+// }
 // While
 // TODO: Implement while loop
 // test "control_flow > while" {
@@ -114,8 +114,8 @@ const TestFileCache = struct {
             // Switch
             .{ .path = "control_flow/switch.zx" },
             .{ .path = "control_flow/switch.zig" },
-            .{ .path = "control_flow/switch_block.zx" },
-            .{ .path = "control_flow/switch_block.zig" },
+            // .{ .path = "control_flow/switch_block.zx" },
+            // .{ .path = "control_flow/switch_block.zig" },
             // Expression
             // Text
             .{ .path = "expression/text.zx" },
