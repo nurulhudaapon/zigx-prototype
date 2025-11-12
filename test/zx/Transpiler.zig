@@ -16,52 +16,61 @@ test "tests:afterAll" {
 }
 
 // Control Flow
-const cf_path = "control_flow/";
 // If
 test "control_flow > if" {
-    try test_transpile(cf_path ++ "if.zx", cf_path ++ "if.zig");
+    try test_transpile("control_flow/if");
 }
 test "control_flow > if_block" {
-    try test_transpile(cf_path ++ "if_block.zx", cf_path ++ "if_block.zig");
+    try test_transpile("control_flow/if_block");
 }
 // For
 test "control_flow > for" {
-    try test_transpile(cf_path ++ "for.zx", cf_path ++ "for.zig");
+    try test_transpile("control_flow/for");
 }
 test "control_flow > for_block" {
-    try test_transpile(cf_path ++ "for_block.zx", cf_path ++ "for_block.zig");
+    try test_transpile("control_flow/for_block");
 }
 // Switch
 test "control_flow > switch" {
-    try test_transpile(cf_path ++ "switch.zx", cf_path ++ "switch.zig");
+    try test_transpile("control_flow/switch");
 }
 // test "control_flow > switch_block" {
-//     try test_transpile(cf_path ++ "switch_block.zx", cf_path ++ "switch_block.zig");
+//     try test_transpile("control_flow/switch_block");
 // }
 // While
 // TODO: Implement while loop
 // test "control_flow > while" {
-//     try test_transpile(cf_path ++ "while.zx", cf_path ++ "while.zig");
+//     try test_transpile("control_flow/while");
 // }
 
 // test "control_flow > while_block" {
-//     try test_transpile(cf_path ++ "while_block.zx", cf_path ++ "while_block.zig");
+//     try test_transpile("control_flow/while_block");
 // }
 
-const exp_path = "expression/";
 test "expression > text" {
-    try test_transpile(exp_path ++ "text.zx", exp_path ++ "text.zig");
+    try test_transpile("expression/text");
 }
 test "expression > format" {
-    try test_transpile(exp_path ++ "format.zx", exp_path ++ "format.zig");
+    try test_transpile("expression/format");
 }
 test "expression > component" {
-    try test_transpile(exp_path ++ "component.zx", exp_path ++ "component.zig");
+    try test_transpile("expression/component");
 }
 
-fn test_transpile(comptime source_path: []const u8, comptime expected_source_path: []const u8) !void {
+test "component > basic" {
+    try test_transpile("component/basic");
+}
+test "component > multiple" {
+    try test_transpile("component/multiple");
+}
+
+fn test_transpile(comptime file_path: []const u8) !void {
     const allocator = std.testing.allocator;
     const cache = test_file_cache orelse return error.CacheNotInitialized;
+
+    // Construct paths for .zx and .zig files
+    const source_path = file_path ++ ".zx";
+    const expected_source_path = file_path ++ ".zig";
 
     // Get pre-loaded source file
     const source = cache.get(source_path) orelse return error.FileNotFound;
@@ -94,51 +103,39 @@ const TestFileCache = struct {
         };
 
         const base_path = "test/data/";
-        const test_files = [_]struct { path: []const u8 }{
+        const test_files = [_][]const u8{
             // Control Flow
-            // If
-            .{ .path = "control_flow/if.zx" },
-            .{ .path = "control_flow/if.zig" },
-            .{ .path = "control_flow/if_block.zx" },
-            .{ .path = "control_flow/if_block.zig" },
-            // While
-            // .{ .path = "control_flow/while.zx" },
-            // .{ .path = "control_flow/while.zig" },
-            // .{ .path = "control_flow/while_block.zx" },
-            // .{ .path = "control_flow/while_block.zig" },
-            // For
-            .{ .path = "control_flow/for.zx" },
-            .{ .path = "control_flow/for.zig" },
-            .{ .path = "control_flow/for_block.zx" },
-            .{ .path = "control_flow/for_block.zig" },
-            // Switch
-            .{ .path = "control_flow/switch.zx" },
-            .{ .path = "control_flow/switch.zig" },
-            // .{ .path = "control_flow/switch_block.zx" },
-            // .{ .path = "control_flow/switch_block.zig" },
+            "control_flow/if",
+            "control_flow/if_block",
+            "control_flow/for",
+            "control_flow/for_block",
+            "control_flow/switch",
+            // "control_flow/switch_block",
+            // "control_flow/while",
+            // "control_flow/while_block",
             // Expression
-            // Text
-            .{ .path = "expression/text.zx" },
-            .{ .path = "expression/text.zig" },
-            // Format
-            .{ .path = "expression/format.zx" },
-            .{ .path = "expression/format.zig" },
+            "expression/text",
+            "expression/format",
+            "expression/component",
             // Component
-            .{ .path = "expression/component.zx" },
-            .{ .path = "expression/component.zig" },
+            "component/basic",
+            "component/multiple",
         };
 
-        for (test_files) |file| {
-            const full_path = try std.fmt.allocPrint(allocator, "{s}{s}", .{ base_path, file.path });
-            defer allocator.free(full_path);
+        // Load both .zx and .zig files for each test file
+        for (test_files) |file_path| {
+            for ([_]struct { ext: []const u8 }{ .{ .ext = ".zx" }, .{ .ext = ".zig" } }) |ext_info| {
+                const full_path = try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ base_path, file_path, ext_info.ext });
+                defer allocator.free(full_path);
 
-            const content = try std.fs.cwd().readFileAlloc(
-                allocator,
-                full_path,
-                std.math.maxInt(usize),
-            );
-            const key = try allocator.dupe(u8, file.path);
-            try cache.files.put(key, content);
+                const content = try std.fs.cwd().readFileAlloc(
+                    allocator,
+                    full_path,
+                    std.math.maxInt(usize),
+                );
+                const cache_key = try std.fmt.allocPrint(allocator, "{s}{s}", .{ file_path, ext_info.ext });
+                try cache.files.put(cache_key, content);
+            }
         }
 
         return cache;

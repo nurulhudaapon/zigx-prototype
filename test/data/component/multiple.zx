@@ -1,0 +1,31 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    return (
+        <main @allocator={ctx.arena}>
+            <Button title="Submit" />
+            <Button title="Cancel" />
+            <AsyncScore index={1} label="Score" />
+            <AsyncScore index={2} label="Points" />
+            <AsyncScore index={3} label="Rating" />
+        </main>
+    );
+}
+
+const ButtonProps = struct { title: []const u8 };
+fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
+    return (
+        <button @allocator={allocator}>
+            {props.title}
+        </button>
+    );
+}
+
+const AsyncScoreProps = struct { index: u64, label: []const u8 };
+fn AsyncScore(allocator: zx.Allocator, props: AsyncScoreProps) zx.Component {
+    return (
+        <span @allocator={allocator}>
+            {props.label} #{[props.index:d]}
+        </span>
+    );
+}
+
+const zx = @import("zx");
