@@ -84,7 +84,7 @@ Tooling
 * [VSCode](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx)/[Cursor](https://marketplace.visualstudio.com/items?itemName=nurulhudaapon.zx) Extension
     - [x] Syntax Highlighting
     - [x] LSP Support
-    - [ ] Auto Format
+    - [x] Auto Format
 
 * Neovim
     - [ ] Syntax Highlighting
