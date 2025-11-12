@@ -1,0 +1,16 @@
+// This example shows a layout component
+pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
+    return (
+        <html lang="en" @allocator={ctx.arena}>
+            <head>
+                <title>My App</title>
+            </head>
+            <body>
+                {(children)}
+            </body>
+        </html>
+    );
+}
+
+const zx = @import("zx");
+

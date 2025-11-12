@@ -5,11 +5,11 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
         .{
             .allocator = ctx.arena,
             .children = &.{
-                _zx.lazy(Button, ButtonProps{ .title = "Submit" }),
-                _zx.lazy(Button, ButtonProps{ .title = "Cancel" }),
-                _zx.lazy(AsyncScore, AsyncScoreProps{ .index = 1, .label = "Score" }),
-                _zx.lazy(AsyncScore, AsyncScoreProps{ .index = 2, .label = "Points" }),
-                _zx.lazy(AsyncScore, AsyncScoreProps{ .index = 3, .label = "Rating" }),
+                _zx.lazy(Button, .{ .title = "Submit" }),
+                _zx.lazy(Button, .{ .title = "Cancel" }),
+                _zx.lazy(AsyncScore, .{ .index = 1, .label = "Score" }),
+                _zx.lazy(AsyncScore, .{ .index = 2, .label = "Points" }),
+                _zx.lazy(AsyncScore, .{ .index = 3, .label = "Rating" }),
             },
         },
     );

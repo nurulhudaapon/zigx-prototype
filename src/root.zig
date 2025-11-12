@@ -31,44 +31,95 @@ fn escapeAttributeValueToWriter(writer: *std.Io.Writer, value: []const u8) !void
     }
 }
 
+/// Coerce props to the target struct type, handling defaults
+fn coerceProps(comptime TargetType: type, props: anytype) TargetType {
+    const TargetInfo = @typeInfo(TargetType);
+    if (TargetInfo != .@"struct") {
+        @compileError("Target type must be a struct");
+    }
+
+    const fields = TargetInfo.@"struct".fields;
+    var result: TargetType = undefined;
+
+    inline for (fields) |field| {
+        if (@hasField(@TypeOf(props), field.name)) {
+            @field(result, field.name) = @field(props, field.name);
+        } else if (field.defaultValue()) |default_value| {
+            @field(result, field.name) = default_value;
+        } else {
+            @compileError(std.fmt.comptimePrint("Missing required field: {s}", .{field.name}));
+        }
+    }
+
+    return result;
+}
+
 pub const Component = union(enum) {
     text: []const u8,
     element: Element,
     component_fn: ComponentFn,
 
     pub const ComponentFn = struct {
-        propsPtr: *const anyopaque,
-        callFn: *const fn (propsPtr: *const anyopaque, allocator: Allocator) Component,
+        propsPtr: ?*const anyopaque,
+        callFn: *const fn (propsPtr: ?*const anyopaque, allocator: Allocator) Component,
         allocator: Allocator,
-        deinitFn: ?*const fn (propsPtr: *const anyopaque, allocator: Allocator) void,
+        deinitFn: ?*const fn (propsPtr: ?*const anyopaque, allocator: Allocator) void,
 
         pub fn init(comptime func: anytype, allocator: Allocator, props: anytype) ComponentFn {
             const FuncInfo = @typeInfo(@TypeOf(func));
-            const PropsType = @TypeOf(props);
+            const param_count = FuncInfo.@"fn".params.len;
+            const fn_name = @typeName(@TypeOf(func));
+
+            // Validation of parameters
+            if (param_count != 1 and param_count != 2)
+                @compileError(std.fmt.comptimePrint("{s} must have 1 or 2 parameters found {d} parameters", .{ fn_name, param_count }));
+
+            // Validation of props type
+            const FirstPropType = FuncInfo.@"fn".params[0].type.?;
+
+            if (FirstPropType != std.mem.Allocator)
+                @compileError("Component" ++ fn_name ++ " must have allocator as the first parameter");
+
+            // If two parameters are passed, the props type must be a struct
+            if (param_count == 2) {
+                const SecondPropType = FuncInfo.@"fn".params[1].type.?;
+
+                if (@typeInfo(SecondPropType) != .@"struct")
+                    @compileError("Component" ++ fn_name ++ "must have a struct as the second parameter, found " ++ @typeName(SecondPropType));
+            }
 
             // Allocate props on heap to persist
-            const props_copy = allocator.create(PropsType) catch @panic("OOM");
-            props_copy.* = props;
+            const props_copy = if (param_count == 2) blk: {
+                const SecondPropType = FuncInfo.@"fn".params[1].type.?;
+                const coerced = coerceProps(SecondPropType, props);
+                const p = allocator.create(SecondPropType) catch @panic("OOM");
+                p.* = coerced;
+                break :blk p;
+            } else null;
 
             const Wrapper = struct {
-                fn call(propsPtr: *const anyopaque, alloc: Allocator) Component {
-                    const p: *const PropsType = @ptrCast(@alignCast(propsPtr));
-
+                fn call(propsPtr: ?*const anyopaque, alloc: Allocator) Component {
                     // Check function signature and call appropriately
-                    if (FuncInfo.@"fn".params.len == 0) {
-                        return func();
-                    } else if (FuncInfo.@"fn".params.len == 1) {
+                    if (param_count == 1) {
                         return func(alloc);
-                    } else if (FuncInfo.@"fn".params.len == 2) {
-                        return func(alloc, p.*);
-                    } else {
-                        @compileError("Component function must have 0, 1 (allocator), or 2 (allocator, props) parameters");
                     }
+                    if (param_count == 2) {
+                        const SecondPropType = FuncInfo.@"fn".params[1].type.?;
+                        const p = propsPtr orelse @panic("propsPtr is null for function with props");
+                        const typed_p: *const SecondPropType = @ptrCast(@alignCast(p));
+                        return func(alloc, typed_p.*);
+                    }
+                    unreachable;
                 }
 
-                fn deinit(propsPtr: *const anyopaque, alloc: Allocator) void {
-                    const p: *const PropsType = @ptrCast(@alignCast(propsPtr));
-                    alloc.destroy(p);
+                fn deinit(propsPtr: ?*const anyopaque, alloc: Allocator) void {
+                    if (param_count == 2) {
+                        const SecondPropType = FuncInfo.@"fn".params[1].type.?;
+                        const p = propsPtr orelse @panic("propsPtr is null for function with props");
+                        const typed_p: *const SecondPropType = @ptrCast(@alignCast(p));
+                        alloc.destroy(typed_p);
+                    }
+                    // If param_count == 1, propsPtr is null, so nothing to destroy
                 }
             };
 
@@ -355,7 +406,17 @@ const ZxContext = struct {
 
     pub fn lazy(self: *ZxContext, comptime func: anytype, props: anytype) Component {
         const allocator = self.getAllocator();
-        return .{ .component_fn = Component.ComponentFn.init(func, allocator, props) };
+        const FuncInfo = @typeInfo(@TypeOf(func));
+        const param_count = FuncInfo.@"fn".params.len;
+
+        // If function has props parameter, coerce props to the expected type
+        if (param_count == 2) {
+            const PropsType = FuncInfo.@"fn".params[1].type.?;
+            const coerced_props = coerceProps(PropsType, props);
+            return .{ .component_fn = Component.ComponentFn.init(func, allocator, coerced_props) };
+        } else {
+            return .{ .component_fn = Component.ComponentFn.init(func, allocator, props) };
+        }
     }
 };
 

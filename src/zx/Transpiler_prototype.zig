@@ -1218,13 +1218,9 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
         try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
-        // Generate props type name (ComponentName + "Props")
-        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{elem.tag});
-        defer allocator.free(props_type_name);
-
         // Build props struct from attributes with explicit type
         if (elem.attributes.items.len > 0) {
-            try output.addToken(.identifier, props_type_name);
+            try output.addToken(.period, ".");
             try output.addToken(.l_brace, "{");
             for (elem.attributes.items, 0..) |attr, i| {
                 try output.addToken(.period, ".");
@@ -1272,7 +1268,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.r_brace, "}");
         } else {
             // Empty props struct with explicit type
-            try output.addToken(.identifier, props_type_name);
+            try output.addToken(.period, ".");
             try output.addToken(.l_brace, "{");
             try output.addToken(.r_brace, "}");
         }
@@ -1743,13 +1739,9 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.identifier, child_elem.tag);
                             try output.addToken(.comma, ",");
 
-                            // Generate props type name (ComponentName + "Props")
-                            const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{child_elem.tag});
-                            defer allocator.free(props_type_name);
-
                             // Build props struct from attributes with explicit type
                             if (child_elem.attributes.items.len > 0) {
-                                try output.addToken(.identifier, props_type_name);
+                                try output.addToken(.period, ".");
                                 try output.addToken(.l_brace, "{");
                                 for (child_elem.attributes.items, 0..) |attr, i| {
                                     try output.addToken(.period, ".");
@@ -1788,7 +1780,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                 try output.addToken(.r_brace, "}");
                             } else {
                                 // Empty props struct with explicit type
-                                try output.addToken(.identifier, props_type_name);
+                                try output.addToken(.period, ".");
                                 try output.addToken(.l_brace, "{");
                                 try output.addToken(.r_brace, "}");
                             }
@@ -1863,13 +1855,9 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
         try output.addToken(.identifier, elem.tag);
         try output.addToken(.comma, ",");
 
-        // Generate props type name (ComponentName + "Props")
-        const props_type_name = try std.fmt.allocPrint(allocator, "{s}Props", .{elem.tag});
-        defer allocator.free(props_type_name);
-
         // Build props struct from attributes with explicit type
         if (elem.attributes.items.len > 0) {
-            try output.addToken(.identifier, props_type_name);
+            try output.addToken(.period, ".");
             try output.addToken(.l_brace, "{");
             for (elem.attributes.items, 0..) |attr, i| {
                 try output.addToken(.period, ".");
@@ -1917,7 +1905,7 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
             try output.addToken(.r_brace, "}");
         } else {
             // Empty props struct with explicit type
-            try output.addToken(.identifier, props_type_name);
+            try output.addToken(.period, ".");
             try output.addToken(.l_brace, "{");
             try output.addToken(.r_brace, "}");
         }

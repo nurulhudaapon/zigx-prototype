@@ -1,0 +1,27 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.arena;
+    
+    return (
+        <main @allocator={allocator}>
+            <Button title="Submit" class="primary-btn" />
+            <Button title="Cancel" />
+            <Button />
+        </main>
+    );
+}
+
+const ButtonProps = struct {
+    title: []const u8 = "Click Me",
+    class: []const u8 = "btn"
+};
+
+fn Button(allocator: zx.Allocator, props: ButtonProps) zx.Component {
+    return (
+        <button @allocator={allocator} class={props.class}>
+            {props.title}
+        </button>
+    );
+}
+
+const zx = @import("zx");
+

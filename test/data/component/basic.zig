@@ -5,7 +5,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
         .{
             .allocator = ctx.arena,
             .children = &.{
-                _zx.lazy(Button, ButtonProps{ .title = "Custom Button" }),
+                _zx.lazy(Button, .{ .title = "Custom Button" }),
             },
         },
     );

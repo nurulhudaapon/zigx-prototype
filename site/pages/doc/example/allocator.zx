@@ -1,0 +1,25 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    return (
+        <html @allocator={ctx.arena}>
+            <head>
+                <title>My Page</title>
+            </head>
+            <body>
+                <MyComponent />
+            </body>
+        </html>
+    );
+}
+
+fn MyComponent(allocator: zx.Allocator) zx.Component {
+    const someText = "This text will be allocated and escaped";
+    
+    return (
+        <div @allocator={allocator}>
+            {someText}
+        </div>
+    );
+}
+
+const zx = @import("zx");
+

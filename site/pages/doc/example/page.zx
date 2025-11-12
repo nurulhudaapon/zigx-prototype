@@ -25,8 +25,3 @@ const ForExample = @import("for.zig").Page;
 const IfExample = @import("if.zig").Page;
 const SwitchExample = @import("switch.zig").Page;
 const FormExample = @import("form.zig").FormExample;
-
-const ForExampleProps = struct {};
-const IfExampleProps = struct {};
-const SwitchExampleProps = struct {};
-const FormExampleProps = struct {};
