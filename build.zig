@@ -94,8 +94,11 @@ pub fn build(b: *std.Build) void {
             .{ .name = "zx", .module = mod },
         },
     });
-    const transpiler_tests = b.addTest(.{ .root_module = testing_mod });
-    const run_transpiler_tests = b.addRunArtifact(transpiler_tests);
+    const testing_mod_tests = b.addTest(.{
+        .root_module = testing_mod,
+        .test_runner = .{ .path = b.path("test/runner.zig"), .mode = .simple },
+    });
+    const run_transpiler_tests = b.addRunArtifact(testing_mod_tests);
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);

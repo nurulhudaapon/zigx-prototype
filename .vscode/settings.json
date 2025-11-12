@@ -1,0 +1,7 @@
+{
+    "zig.testArgs": [
+        "build",
+        "test",
+        "TEST_FILTER=${filter}"
+    ]
+}

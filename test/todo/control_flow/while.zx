@@ -1,10 +1,9 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
-    const chars = "ABC";
+    var i: usize = 0;
+
     return (
         <main @allocator={allocator}>
-            {for (chars) |char| {
-                (<i>{[char:c]}</i>)
-            }}
+            {while (i < 3) : (i +=1) (<p>{n}</p>)}
         </main>
     );
 }

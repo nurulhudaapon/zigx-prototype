@@ -1,0 +1,12 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const user_names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
+    return (
+        <main @allocator={allocator}>
+            <section>
+                {for (user_names) |name| (<p>{name}</p>)}
+            </section>
+        </main>
+    );
+}
+
+const zx = @import("zx");
