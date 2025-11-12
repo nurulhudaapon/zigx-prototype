@@ -23,11 +23,7 @@ const zx = @import("zx");
 
 const UserType = enum { admin, member };
 
-const User = struct {
-    name: []const u8,
-    age: u32,
-    user_type: UserType,
-};
+const User = struct { name: []const u8, age: u32, user_type: UserType };
 
 const users = [_]User{
     .{ .name = "John", .age = 20, .user_type = .admin },

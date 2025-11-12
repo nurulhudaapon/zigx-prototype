@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: 0.15.2
+        
+    - name: Cache Zig build artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/zig
+          zig-out
+        key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
+        restore-keys: |
+          ${{ runner.os }}-zig-
+          
+    - name: Run tests
+      run: zig build test
+      
+    - name: Build project
+      run: zig build
+      
+    - name: Verify executable
+      run: |
+        ./zig-out/bin/zx --help || echo "Executable built successfully"

@@ -1,4 +1,4 @@
 #!/bin/bash
 
 zig build run -- transpile site --output site/.zx
-zig build run-docs
+zig build run-site

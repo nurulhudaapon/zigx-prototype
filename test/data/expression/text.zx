@@ -1,0 +1,17 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const user_name = "Alice & Bob";
+    const html_content = "<script>alert('XSS')</script>";
+    const unsafe_html = "<span>Test</span>";
+
+    return (
+        <main @allocator={allocator}>
+            <section>
+                <p>User: {user_name}</p>
+                <p>Safe HTML: {html_content}</p>
+                <p>Unsafe HTML: {[unsafe_html:s]}</p>
+            </section>
+        </main>
+    );
+}
+
+const zx = @import("zx");

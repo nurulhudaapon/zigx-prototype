@@ -85,9 +85,22 @@ pub fn build(b: *std.Build) void {
     const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
+    // Create transpiler test module and test executable
+    const testing_mod = b.createModule(.{
+        .root_source_file = b.path("test/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "zx", .module = mod },
+        },
+    });
+    const transpiler_tests = b.addTest(.{ .root_module = testing_mod });
+    const run_transpiler_tests = b.addRunArtifact(transpiler_tests);
+
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+    test_step.dependOn(&run_transpiler_tests.step);
 }
 
 pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {

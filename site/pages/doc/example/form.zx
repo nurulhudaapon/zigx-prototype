@@ -5,7 +5,7 @@ pub fn FormExample(allocator: zx.Allocator) zx.Component {
                 <input type="text" name="search" placeholder="Search users..." />
                 <button>Search</button>
             </form>
-
+        
             <form method="post">
                 <input type="text" name="name" placeholder="Name" autofocus="true" />
                 <button>Add User</button>
@@ -20,7 +20,7 @@ const FormEvent = struct {
     payload: struct {
         name: []const u8,
         email: []const u8,
-    }
+    },
 };
 
 fn onSubmit(event: FormEvent) void {

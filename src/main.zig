@@ -732,7 +732,7 @@ fn runDefaultBehavior(allocator: std.mem.Allocator) !void {
 
     try page.render(&aw.writer);
     std.debug.print("{s}\n", .{aw.written()});
-    try writeFileIfChanged("src/zx/examples/html/index.html", aw.written());
+    // try writeFileIfChanged("src/zx/examples/html/index.html", aw.written());
     aw.clearRetainingCapacity();
 }
 
@@ -821,29 +821,6 @@ pub fn main() !void {
     } else {
         // Run default behavior
         try runDefaultBehavior(allocator);
-    }
-}
-
-test "test parse" {
-    const allocator = std.testing.allocator;
-    const source = @embedFile("zx/examples/index.zx");
-    const source_z = try allocator.dupeZ(u8, source);
-    defer allocator.free(source_z);
-
-    var result = try zx.Ast.parse(allocator, source_z);
-    defer result.deinit(allocator);
-
-    if (result.zig_ast.errors.len > 0) {
-        std.debug.print("\n=== PARSE ERRORS ===\n", .{});
-        for (result.zig_ast.errors) |err| {
-            const loc = result.zig_ast.tokenLocation(0, err.token);
-            std.debug.print("Error at line {d}, col {d}: {s}\n", .{ loc.line, loc.column, @tagName(err.tag) });
-        }
-    } else {
-        std.debug.print("\n=== AST PARSED SUCCESSFULLY ===\n", .{});
-        const rendered = try result.zig_ast.renderAlloc(allocator);
-        defer allocator.free(rendered);
-        std.debug.print("{s}\n", .{rendered});
     }
 }
 

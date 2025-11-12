@@ -146,6 +146,7 @@ const ZXElement = struct {
         for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZXElement }, // For {for (iterable) |item| (<JSX>)}
         switch_expr: struct { expr: []const u8, cases: std.ArrayList(SwitchCase) }, // For {switch (expr) { case => value, ... }}
         element: *ZXElement,
+        raw_svg_content: []const u8, // For SVG tags - raw unescaped content
     };
 
     fn init(allocator: std.mem.Allocator, tag: []const u8) !*ZXElement {
@@ -186,6 +187,9 @@ const ZXElement = struct {
                     }
                 }
                 switch_expr.cases.deinit(self.allocator);
+            } else if (child == .raw_svg_content) {
+                // Free the allocated raw SVG content
+                self.allocator.free(child.raw_svg_content);
             }
         }
         self.children.deinit(self.allocator);
@@ -646,7 +650,14 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
     }
 
     const inner_content = content[inner_start..inner_end];
-    try parseJsxChildren(allocator, elem, inner_content);
+
+    // Special handling for SVG tags: store raw content as unescaped text
+    if (std.mem.eql(u8, tag_name, "svg")) {
+        const raw_content = try allocator.dupe(u8, inner_content);
+        try elem.children.append(allocator, .{ .raw_svg_content = raw_content });
+    } else {
+        try parseJsxChildren(allocator, elem, inner_content);
+    }
 
     return elem;
 }
@@ -1792,6 +1803,34 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.invalid, "\n");
                         }
                     },
+                    .raw_svg_content => |raw_content| {
+                        // For SVG tags: use _zx.fmt("{s}", .{raw_content}) to output unescaped content
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "fmt");
+                        try output.addToken(.l_paren, "(");
+
+                        // Format string: "{s}"
+                        try output.addToken(.string_literal, "\"{s}\"");
+                        try output.addToken(.comma, ",");
+
+                        // Expression wrapped in tuple: .{raw_content}
+                        try output.addToken(.period, ".");
+                        try output.addToken(.l_brace, "{");
+
+                        // Create a variable name for the raw content
+                        // We need to escape the string for use in a string literal
+                        const escaped_content = try escapeTextForStringLiteral(allocator, raw_content);
+                        defer allocator.free(escaped_content);
+                        const content_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_content});
+                        defer allocator.free(content_buf);
+                        try output.addToken(.string_literal, content_buf);
+
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
                 }
             }
 
@@ -2128,6 +2167,32 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                     try renderNestedElementAsCall(allocator, output, nested_elem, indent);
                     try output.addToken(.comma, ",");
                 },
+                .raw_svg_content => |raw_content| {
+                    // For SVG tags: use _zx.fmt("{s}", .{raw_content}) to output unescaped content
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "fmt");
+                    try output.addToken(.l_paren, "(");
+
+                    // Format string: "{s}"
+                    try output.addToken(.string_literal, "\"{s}\"");
+                    try output.addToken(.comma, ",");
+
+                    // Expression wrapped in tuple: .{raw_content}
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+
+                    // Escape the string for use in a string literal
+                    const escaped_content = try escapeTextForStringLiteral(allocator, raw_content);
+                    defer allocator.free(escaped_content);
+                    const content_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_content});
+                    defer allocator.free(content_buf);
+                    try output.addToken(.string_literal, content_buf);
+
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.comma, ",");
+                },
             }
         }
 
@@ -2311,6 +2376,45 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                     try output.addToken(.equal, "=");
                     // Recursively render the nested element
                     try renderElementAsStruct(allocator, output, nested_elem, indent + 1);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.comma, ",");
+                },
+                .raw_svg_content => |raw_content| {
+                    // For SVG tags: use _zx.fmt("{s}", .{raw_content}) to output unescaped content
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "text");
+                    try output.addToken(.equal, "=");
+
+                    // Generate: std.fmt.allocPrint(allocator, "{s}", .{raw_content})
+                    try output.addToken(.identifier, "std");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "fmt");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "allocPrint");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, "allocator");
+                    try output.addToken(.comma, ",");
+
+                    // Format string: "{s}"
+                    try output.addToken(.string_literal, "\"{s}\"");
+                    try output.addToken(.comma, ",");
+
+                    // Expression wrapped in tuple: .{raw_content}
+                    try output.addToken(.period, ".");
+                    try output.addToken(.l_brace, "{");
+
+                    // Escape the string for use in a string literal
+                    const escaped_content = try escapeTextForStringLiteral(allocator, raw_content);
+                    defer allocator.free(escaped_content);
+                    const content_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{escaped_content});
+                    defer allocator.free(content_buf);
+                    try output.addToken(.string_literal, content_buf);
+
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.r_paren, ")");
+
                     try output.addToken(.r_brace, "}");
                     try output.addToken(.comma, ",");
                 },
