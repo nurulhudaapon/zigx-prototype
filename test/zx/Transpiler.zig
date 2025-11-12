@@ -52,6 +52,12 @@ const exp_path = "expression/";
 test "expression > text" {
     try test_transpile(exp_path ++ "text.zx", exp_path ++ "text.zig");
 }
+test "expression > format" {
+    try test_transpile(exp_path ++ "format.zx", exp_path ++ "format.zig");
+}
+test "expression > component" {
+    try test_transpile(exp_path ++ "component.zx", exp_path ++ "component.zig");
+}
 
 fn test_transpile(comptime source_path: []const u8, comptime expected_source_path: []const u8) !void {
     const allocator = std.testing.allocator;
@@ -114,6 +120,12 @@ const TestFileCache = struct {
             // Text
             .{ .path = "expression/text.zx" },
             .{ .path = "expression/text.zig" },
+            // Format
+            .{ .path = "expression/format.zx" },
+            .{ .path = "expression/format.zig" },
+            // Component
+            .{ .path = "expression/component.zx" },
+            .{ .path = "expression/component.zig" },
         };
 
         for (test_files) |file| {
