@@ -103,6 +103,26 @@ test "component_multiple" {
     try test_transpile("component/multiple");
 }
 
+test "performance" {
+    const MAX_TIME_MS = 100.0;
+    const MAX_TIME_PER_FILE_MS = 10.0;
+
+    var total_time_ns: f64 = 0.0;
+    inline for (TestFileCache.test_files) |comptime_path| {
+        const start_time = std.time.nanoTimestamp();
+        try test_transpile(comptime_path);
+        const end_time = std.time.nanoTimestamp();
+        const duration = @as(f64, @floatFromInt(end_time - start_time));
+        total_time_ns += duration;
+        const duration_ms = duration / std.time.ns_per_ms;
+        try std.testing.expect(duration_ms < MAX_TIME_PER_FILE_MS);
+    }
+
+    const total_time_ms = total_time_ns / std.time.ns_per_ms;
+
+    try std.testing.expect(total_time_ms < MAX_TIME_MS);
+}
+
 fn test_transpile(comptime file_path: []const u8) !void {
     const allocator = std.testing.allocator;
     const cache = test_file_cache orelse return error.CacheNotInitialized;
@@ -134,7 +154,34 @@ var gpa_state: ?std.heap.GeneralPurposeAllocator(.{}) = null;
 const TestFileCache = struct {
     files: std.StringHashMap([]const u8),
     allocator: std.mem.Allocator,
-
+    pub const test_files = [_][]const u8{
+        // Control Flow
+        "control_flow/if",
+        "control_flow/if_block",
+        "control_flow/for",
+        "control_flow/for_block",
+        "control_flow/switch",
+        // "control_flow/switch_block",
+        // Nested Control Flow (2-level nesting)
+        // "control_flow/if_if",
+        // "control_flow/if_for",
+        // "control_flow/if_switch",
+        // "control_flow/for_if",
+        // "control_flow/for_for",
+        "control_flow/for_switch",
+        // "control_flow/switch_if",
+        // "control_flow/switch_for",
+        // "control_flow/switch_switch",
+        // "control_flow/while",
+        // "control_flow/while_block",
+        // Expression
+        "expression/text",
+        "expression/format",
+        "expression/component",
+        // Component
+        "component/basic",
+        "component/multiple",
+    };
     fn init(allocator: std.mem.Allocator) !TestFileCache {
         var cache = TestFileCache{
             .files = std.StringHashMap([]const u8).init(allocator),
@@ -142,34 +189,6 @@ const TestFileCache = struct {
         };
 
         const base_path = "test/data/";
-        const test_files = [_][]const u8{
-            // Control Flow
-            "control_flow/if",
-            "control_flow/if_block",
-            "control_flow/for",
-            "control_flow/for_block",
-            "control_flow/switch",
-            // "control_flow/switch_block",
-            // Nested Control Flow (2-level nesting)
-            // "control_flow/if_if",
-            // "control_flow/if_for",
-            // "control_flow/if_switch",
-            // "control_flow/for_if",
-            // "control_flow/for_for",
-            "control_flow/for_switch",
-            // "control_flow/switch_if",
-            // "control_flow/switch_for",
-            // "control_flow/switch_switch",
-            // "control_flow/while",
-            // "control_flow/while_block",
-            // Expression
-            "expression/text",
-            "expression/format",
-            "expression/component",
-            // Component
-            "component/basic",
-            "component/multiple",
-        };
 
         // Load both .zx and .zig files for each test file
         for (test_files) |file_path| {
