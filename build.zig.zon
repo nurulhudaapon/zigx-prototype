@@ -1,6 +1,6 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.79",
+    .version = "0.0.1-dev.80",
     .fingerprint = 0xcad77a8d2a3389f2,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
@@ -16,9 +16,9 @@
             .url = "git+https://github.com/zigtools/zls.git?ref=0.15.0#ce6c8f02c78e622421cfc2405c67c5222819ec03",
             .hash = "zls-0.15.0-rmm5fkjqIwDZpmDHyKwxa9K2gcI3FPaGVFPwjYWFBM5B",
         },
-        .clap = .{
-            .url = "git+https://github.com/nurulhudaapon/cliz#b7e3348ed60f99ba32c75aa707ff7c87adc31b36",
-            .hash = "clap-0.11.0-oBajB-TnAQC7yPLnZRT5WzHZ_4Ly4dX2OILskli74b9H",
+        .zli = .{
+            .url = "https://github.com/xcaeser/zli/archive/v4.3.0.tar.gz",
+            .hash = "zli-4.3.0-LeUjpmbfAACPnRj2nzbzaLMNfTkq-LEWSC9EfOcnFxjl",
         },
     },
     .paths = .{

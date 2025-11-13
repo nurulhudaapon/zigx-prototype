@@ -18,7 +18,7 @@ pub fn build(b: *std.Build) void {
     mod.addOptions("zx_info", options);
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---
-    const clap_dep = b.dependency("clap", .{ .target = target, .optimize = optimize });
+    const zli_dep = b.dependency("zli", .{ .target = target, .optimize = optimize });
     const exe = b.addExecutable(.{
         .name = "zx",
         .root_module = b.createModule(.{
@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "zx", .module = mod },
                 .{ .name = "httpz", .module = httpz_dep.module("httpz") },
-                .{ .name = "clap", .module = clap_dep.module("clap") },
+                .{ .name = "zli", .module = zli_dep.module("zli") },
             },
         }),
     });

@@ -1,47 +1,28 @@
-const SubCommand = enum {
-    init,
-    transpile,
-    @"export",
-    dev,
-};
+pub fn build(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.Allocator) !*zli.Command {
+    const root = try zli.Command.init(writer, reader, allocator, .{
+        .name = "zx",
+        .description = "ZX is a framework for building web applications with Zig.",
+        // .version = .{ .major = 0, .minor = 0, .patch = 1, .pre = null, .build = null },
+    }, showHelp);
 
-pub fn main() !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer _ = gpa.deinit();
+    try root.addCommands(&.{
+        try version.register(writer, reader, allocator),
+        try init.register(writer, reader, allocator),
+        try serve.register(writer, reader, allocator),
+        try transpile.register(writer, reader, allocator),
+    });
 
-    // First we specify what parameters our program can take.
-    // We can use `parseParamsComptime` to parse a string into an array of `Param(Help)`.
-    const params = comptime clap.parseParamsComptime(
-        \\-h, --help             Display this help and exit.
-        \\-n, --number <usize>   An option parameter, which takes a value.
-        \\-s, --string <str>...  An option parameter which can be specified multiple times.
-        \\<str>...
-        \\
-    );
-
-    // Initialize our diagnostics, which can be used for reporting useful errors.
-    // This is optional. You can also pass `.{}` to `clap.parse` if you don't
-    // care about the extra information `Diagnostic` provides.
-    var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
-        .diagnostic = &diag,
-        .allocator = gpa.allocator(),
-    }) catch |err| {
-        // Report useful error and exit.
-        try diag.reportToFile(.stderr(), err);
-        return err;
-    };
-    defer res.deinit();
-
-    if (res.args.help != 0)
-        return clap.helpToFile(.stderr(), clap.Help, &params, .{ .markdown_lite = true });
-    if (res.args.number) |n|
-        std.debug.print("--number = {}\n", .{n});
-    for (res.args.string) |s|
-        std.debug.print("--string = {s}\n", .{s});
-    for (res.positionals[0]) |pos|
-        std.debug.print("{s}\n", .{pos});
+    return root;
 }
 
-const clap = @import("clap");
+fn showHelp(ctx: zli.CommandContext) !void {
+    try ctx.command.printHelp();
+}
+
+const serve = @import("serve.zig");
+const init = @import("init.zig");
+const version = @import("version.zig");
+const transpile = @import("transpile.zig");
+
 const std = @import("std");
+const zli = @import("zli");
