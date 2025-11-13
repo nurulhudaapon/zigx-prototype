@@ -17,89 +17,89 @@ test "tests:afterAll" {
 
 // Control Flow
 // If
-test "control_flow > if" {
+test "if" {
     try test_transpile("control_flow/if");
 }
-test "control_flow > if_block" {
+test "if_block" {
     try test_transpile("control_flow/if_block");
 }
 // For
-test "control_flow > for" {
+test "for" {
     try test_transpile("control_flow/for");
 }
-test "control_flow > for_block" {
+test "for_block" {
     try test_transpile("control_flow/for_block");
 }
 // Switch
-test "control_flow > switch" {
+test "switch" {
     try test_transpile("control_flow/switch");
 }
-test "control_flow > switch_block" {
-    return error.SkipZigTest;
+test "switch_block" {
+    return error.Todo;
     // try test_transpile("control_flow/switch_block");
 }
 // Nested Control Flow (2-level nesting)
-test "control_flow > if_if" {
-    return error.SkipZigTest;
+test "if_if" {
+    return error.Todo;
     // try test_transpile("control_flow/if_if");
 }
-test "control_flow > if_for" {
-    return error.SkipZigTest;
+test "if_for" {
+    return error.Todo;
     // try test_transpile("control_flow/if_for");
 }
-test "control_flow > if_switch" {
-    return error.SkipZigTest;
+test "if_switch" {
+    return error.Todo;
     // try test_transpile("control_flow/if_switch");
 }
-test "control_flow > for_if" {
-    return error.SkipZigTest;
+test "for_if" {
+    return error.Todo;
     // try test_transpile("control_flow/for_if");
 }
-test "control_flow > for_for" {
-    return error.SkipZigTest;
+test "for_for" {
+    return error.Todo;
     // try test_transpile("control_flow/for_for");
 }
-test "control_flow > for_switch" {
+test "for_switch" {
     try test_transpile("control_flow/for_switch");
 }
-test "control_flow > switch_if" {
-    return error.SkipZigTest;
+test "switch_if" {
+    return error.Todo;
     // try test_transpile("control_flow/switch_if");
 }
-test "control_flow > switch_for" {
-    return error.SkipZigTest;
+test "switch_for" {
+    return error.Todo;
     // try test_transpile("control_flow/switch_for");
 }
-test "control_flow > switch_switch" {
-    return error.SkipZigTest;
+test "switch_switch" {
+    return error.Todo;
     // try test_transpile("control_flow/switch_switch");
 }
 // While
 // TODO: Implement while loop
-test "control_flow > while" {
-    return error.SkipZigTest;
+test "while" {
+    return error.Todo;
     // try test_transpile("control_flow/while");
 }
 
-test "control_flow > while_block" {
-    return error.SkipZigTest;
+test "while_block" {
+    return error.Todo;
     // try test_transpile("control_flow/while_block");
 }
 
-test "expression > text" {
+test "expression_text" {
     try test_transpile("expression/text");
 }
-test "expression > format" {
+test "expression_format" {
     try test_transpile("expression/format");
 }
-test "expression > component" {
+test "expression_component" {
     try test_transpile("expression/component");
 }
 
-test "component > basic" {
+test "component_basic" {
     try test_transpile("component/basic");
 }
-test "component > multiple" {
+test "component_multiple" {
     try test_transpile("component/multiple");
 }
 

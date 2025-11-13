@@ -33,6 +33,7 @@ pub fn main() !void {
     var pass: usize = 0;
     var fail: usize = 0;
     var skip: usize = 0;
+    var todo: usize = 0;
     var leak: usize = 0;
     var header_printed: bool = false;
     var total_ns: u64 = 0;
@@ -99,6 +100,10 @@ pub fn main() !void {
                 skip += 1;
                 status = .skip;
             },
+            error.Todo => {
+                todo += 1;
+                status = .todo;
+            },
             else => {
                 status = .fail;
                 fail += 1;
@@ -123,6 +128,7 @@ pub fn main() !void {
                 .pass => "✓",
                 .fail => "✗",
                 .skip => "⚠",
+                .todo => "○",
                 else => " ",
             };
             Printer.status(status, "{s}", .{checkmark});
@@ -142,7 +148,7 @@ pub fn main() !void {
         }
     }
 
-    const total_tests = pass + fail + skip;
+    const total_tests = pass + fail + skip + todo;
     const total_ms = @as(f64, @floatFromInt(total_ns)) / 1_000_000.0;
     const avg_ms = if (total_tests > 0) total_ms / @as(f64, @floatFromInt(total_tests)) else 0.0;
 
@@ -155,6 +161,9 @@ pub fn main() !void {
     }
     if (skip > 0) {
         Printer.status(.skip, "{d:<3} skipped\n", .{skip});
+    }
+    if (todo > 0) {
+        Printer.status(.todo, "{d:<3} todo\n", .{todo});
     }
     if (leak > 0) {
         Printer.status(.fail, "{d:<3} leaked\n", .{leak});
@@ -178,6 +187,7 @@ const Printer = struct {
             .pass => std.debug.print("\x1b[32m", .{}),
             .fail => std.debug.print("\x1b[31m", .{}),
             .skip => std.debug.print("\x1b[33m", .{}),
+            .todo => std.debug.print("\x1b[36m", .{}),
             else => {},
         }
         std.debug.print(format ++ "\x1b[0m", args);
@@ -188,6 +198,7 @@ const Status = enum {
     pass,
     fail,
     skip,
+    todo,
     text,
 };
 
