@@ -65,7 +65,7 @@ const TemplateFile = struct {
     content: []const u8,
 };
 
-const template_dir = "init/templates";
+const template_dir = "init/template";
 
 const templates = [_]TemplateFile{
     .{ .path = ".vscode/extensions.json", .content = @embedFile(template_dir ++ "/.vscode/extensions.json") },
