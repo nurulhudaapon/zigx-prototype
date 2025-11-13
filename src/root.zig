@@ -304,7 +304,7 @@ pub fn lazy(allocator: Allocator, comptime func: anytype, props: anytype) Compon
 const ZxContext = struct {
     allocator: ?std.mem.Allocator = null,
 
-    fn getAllocator(self: *ZxContext) std.mem.Allocator {
+    pub fn getAllocator(self: *ZxContext) std.mem.Allocator {
         return self.allocator orelse @panic("Allocator not set. Please provide @allocator attribute to the parent element.");
     }
 

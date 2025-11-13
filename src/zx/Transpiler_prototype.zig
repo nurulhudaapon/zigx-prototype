@@ -1395,7 +1395,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.l_brace, "{");
             try output.addToken(.invalid, "\n");
 
-            // const __zx_children = allocator.alloc(zx.Component, iterable.len) catch unreachable;
+            // const __zx_children = _zx.getAllocator().alloc(zx.Component, iterable.len) catch unreachable;
             try addIndentTokens(output, indent + 3);
             try output.addToken(.keyword_const, "const");
             try output.addToken(.invalid, " ");
@@ -1403,7 +1403,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.invalid, " ");
             try output.addToken(.equal, "=");
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "allocator");
+            try output.addToken(.identifier, "_zx");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "getAllocator");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.r_paren, ")");
             try output.addToken(.period, ".");
             try output.addToken(.identifier, "alloc");
             try output.addToken(.l_paren, "(");
@@ -1587,7 +1591,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.l_brace, "{");
                         try output.addToken(.invalid, "\n");
 
-                        // const __zx_children = allocator.alloc(zx.Component, iterable.len) catch unreachable;
+                        // const __zx_children = _zx.getAllocator().alloc(zx.Component, iterable.len) catch unreachable;
                         try addIndentTokens(output, indent + 4);
                         try output.addToken(.keyword_const, "const");
                         try output.addToken(.invalid, " ");
@@ -1595,7 +1599,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.invalid, " ");
                         try output.addToken(.equal, "=");
                         try output.addToken(.invalid, " ");
-                        try output.addToken(.identifier, "allocator");
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "getAllocator");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.r_paren, ")");
                         try output.addToken(.period, ".");
                         try output.addToken(.identifier, "alloc");
                         try output.addToken(.l_paren, "(");
