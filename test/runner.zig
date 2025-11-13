@@ -63,10 +63,14 @@ pub fn main() !void {
             }
         }
 
+        var scope_name: []const u8 = "";
         const friendly_name = blk: {
             const name = t.name;
+
             var it = std.mem.splitScalar(u8, name, '.');
-            while (it.next()) |value| {
+            var i: usize = 0;
+            while (it.next()) |value| : (i += 1) {
+                if (i == 1) scope_name = value;
                 if (std.mem.eql(u8, value, "test")) {
                     const rest = it.rest();
                     break :blk if (rest.len > 0) rest else name;
@@ -122,7 +126,7 @@ pub fn main() !void {
                 else => " ",
             };
             Printer.status(status, "{s}", .{checkmark});
-            Printer.fmt(" {s:<20} ", .{friendly_name});
+            Printer.fmt(" {s} \x1b[90m>\x1b[0m {s} ", .{ scope_name, friendly_name });
             Printer.fmt("\x1b[90m[{d:.2}ms]\x1b[0m\n", .{ms});
         } else {
             Printer.status(status, ".", .{});
@@ -143,17 +147,17 @@ pub fn main() !void {
     const avg_ms = if (total_tests > 0) total_ms / @as(f64, @floatFromInt(total_tests)) else 0.0;
 
     Printer.fmt("\n", .{});
-    Printer.status(.pass, "{d} pass\n", .{pass});
+    Printer.status(.pass, "{d:<3} pass\n", .{pass});
     if (fail > 0) {
-        Printer.status(.fail, "{d} fail\n", .{fail});
+        Printer.status(.fail, "{d:<3} fail\n", .{fail});
     } else {
-        Printer.fmt("{d} fail\n", .{fail});
+        Printer.fmt("{d:<3} fail\n", .{fail});
     }
     if (skip > 0) {
-        Printer.status(.skip, "{d} test{s} skipped\n", .{ skip, if (skip != 1) "s" else "" });
+        Printer.status(.skip, "{d:<3} skipped\n", .{skip});
     }
     if (leak > 0) {
-        Printer.status(.fail, "{d} test{s} leaked\n", .{ leak, if (leak != 1) "s" else "" });
+        Printer.status(.fail, "{d:<3} leaked\n", .{leak});
     }
     if (total_tests > 0) {
         Printer.fmt("\x1b[90m{d} test{s} | {d:.2}ms total | {d:.2}ms avg\x1b[0m\n", .{ total_tests, if (total_tests != 1) "s" else "", total_ms, avg_ms });

@@ -6,25 +6,18 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
         .{
             .allocator = allocator,
             .children = &.{
-                _zx.zx(
-                    .section,
+                if ((is_logged_in)) _zx.zx(
+                    .p,
                     .{
                         .children = &.{
-                            if ((is_logged_in)) _zx.zx(
-                                .p,
-                                .{
-                                    .children = &.{
-                                        _zx.txt("Welcome, User!"),
-                                    },
-                                },
-                            ) else _zx.zx(
-                                .p,
-                                .{
-                                    .children = &.{
-                                        _zx.txt("Please log in to continue."),
-                                    },
-                                },
-                            ),
+                            _zx.txt("Welcome, User!"),
+                        },
+                    },
+                ) else _zx.zx(
+                    .p,
+                    .{
+                        .children = &.{
+                            _zx.txt("Please log in to continue."),
                         },
                     },
                 ),

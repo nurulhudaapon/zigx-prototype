@@ -34,18 +34,57 @@ test "control_flow > for_block" {
 test "control_flow > switch" {
     try test_transpile("control_flow/switch");
 }
-// test "control_flow > switch_block" {
-//     try test_transpile("control_flow/switch_block");
-// }
+test "control_flow > switch_block" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/switch_block");
+}
+// Nested Control Flow (2-level nesting)
+test "control_flow > if_if" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/if_if");
+}
+test "control_flow > if_for" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/if_for");
+}
+test "control_flow > if_switch" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/if_switch");
+}
+test "control_flow > for_if" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/for_if");
+}
+test "control_flow > for_for" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/for_for");
+}
+test "control_flow > for_switch" {
+    try test_transpile("control_flow/for_switch");
+}
+test "control_flow > switch_if" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/switch_if");
+}
+test "control_flow > switch_for" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/switch_for");
+}
+test "control_flow > switch_switch" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/switch_switch");
+}
 // While
 // TODO: Implement while loop
-// test "control_flow > while" {
-//     try test_transpile("control_flow/while");
-// }
+test "control_flow > while" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/while");
+}
 
-// test "control_flow > while_block" {
-//     try test_transpile("control_flow/while_block");
-// }
+test "control_flow > while_block" {
+    return error.SkipZigTest;
+    // try test_transpile("control_flow/while_block");
+}
 
 test "expression > text" {
     try test_transpile("expression/text");
@@ -111,6 +150,16 @@ const TestFileCache = struct {
             "control_flow/for_block",
             "control_flow/switch",
             // "control_flow/switch_block",
+            // Nested Control Flow (2-level nesting)
+            // "control_flow/if_if",
+            // "control_flow/if_for",
+            // "control_flow/if_switch",
+            // "control_flow/for_if",
+            // "control_flow/for_for",
+            "control_flow/for_switch",
+            // "control_flow/switch_if",
+            // "control_flow/switch_for",
+            // "control_flow/switch_switch",
             // "control_flow/while",
             // "control_flow/while_block",
             // Expression
@@ -128,11 +177,14 @@ const TestFileCache = struct {
                 const full_path = try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ base_path, file_path, ext_info.ext });
                 defer allocator.free(full_path);
 
-                const content = try std.fs.cwd().readFileAlloc(
+                const content = std.fs.cwd().readFileAlloc(
                     allocator,
                     full_path,
                     std.math.maxInt(usize),
-                );
+                ) catch |err| switch (err) {
+                    error.FileNotFound => continue,
+                    else => return err,
+                };
                 const cache_key = try std.fmt.allocPrint(allocator, "{s}{s}", .{ file_path, ext_info.ext });
                 try cache.files.put(cache_key, content);
             }
