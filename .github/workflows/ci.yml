@@ -31,7 +31,7 @@ jobs:
           ${{ runner.os }}-zig-
           
     - name: Run tests
-      run: zig build test --summary all
+      run: zig build test
       
     - name: Build project
       run: zig build
