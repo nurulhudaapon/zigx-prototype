@@ -5,8 +5,8 @@ const Reader = std.Io.Reader;
 const zli = @import("zli");
 const zx = @import("zx");
 
-const output_flag = zli.Flag{
-    .name = "output",
+const outdir_flag = zli.Flag{
+    .name = "outdir",
     .shortcut = "o",
     .description = "Output directory",
     .type = .String,
@@ -19,7 +19,7 @@ pub fn register(writer: *Writer, reader: *Reader, allocator: std.mem.Allocator) 
         .description = "Transpile a .zx file or directory to zig source code.",
     }, transpile);
 
-    try cmd.addFlag(output_flag);
+    try cmd.addFlag(outdir_flag);
     try cmd.addPositionalArg(.{
         .name = "path",
         .description = "Path to .zx file or directory",
@@ -29,16 +29,15 @@ pub fn register(writer: *Writer, reader: *Reader, allocator: std.mem.Allocator) 
 }
 
 fn transpile(ctx: zli.CommandContext) !void {
-    const output = ctx.flag("output", []const u8); // type-safe flag access
+    const outdir = ctx.flag("outdir", []const u8); // type-safe flag access
+    const copy_dirs = [_][]const u8{ "assets", "public" };
 
     const path = ctx.getArg("path") orelse {
         try ctx.writer.print("Missing path arg\n", .{});
         return;
     };
 
-    std.debug.print("Transpiling {s} to {s}\n", .{ path, output });
-
-    try transpileCommand(ctx.allocator, path, output, false, &[_][]const u8{}, false);
+    try transpileCommand(ctx.allocator, path, outdir, false, &copy_dirs, false);
 }
 
 fn getBasename(path: []const u8) []const u8 {

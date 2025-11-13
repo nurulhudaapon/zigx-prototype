@@ -119,8 +119,8 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     const transpile_cmd = b.addRunArtifact(zx_exe);
     transpile_cmd.addArg("transpile");
     transpile_cmd.addArg(b.pathJoin(&.{"site"}));
-    transpile_cmd.addArg("--output");
-    const output_dir = transpile_cmd.addOutputDirectoryArg("site");
+    transpile_cmd.addArg("--outdir");
+    const outdir = transpile_cmd.addOutputDirectoryArg("site");
     transpile_cmd.expectExitCode(0);
 
     // --- ZX File Cache Invalidator ---
@@ -149,7 +149,7 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
         imports.append(.{ .name = entry.key_ptr.*, .module = entry.value_ptr.* }) catch @panic("OOM");
     }
     exe.root_module.addAnonymousImport("zx_meta", .{
-        .root_source_file = output_dir.path(b, "meta.zig"),
+        .root_source_file = outdir.path(b, "meta.zig"),
         .imports = imports.items,
     });
 
