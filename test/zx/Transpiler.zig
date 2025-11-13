@@ -104,8 +104,8 @@ test "component_multiple" {
 }
 
 test "performance" {
-    const MAX_TIME_MS = 100.0 * 100;
-    const MAX_TIME_PER_FILE_MS = 10.0 * 100;
+    const MAX_TIME_MS = 50.0 * 3; // 50ms is on M1 Pro
+    const MAX_TIME_PER_FILE_MS = 5.0 * 3; // 5ms is on M1 Pro
 
     var total_time_ns: f64 = 0.0;
     inline for (TestFileCache.test_files) |comptime_path| {
