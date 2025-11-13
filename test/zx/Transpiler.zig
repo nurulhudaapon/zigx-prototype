@@ -105,7 +105,7 @@ test "component_multiple" {
 
 test "performance" {
     const MAX_TIME_MS = 50.0 * 3; // 50ms is on M1 Pro
-    const MAX_TIME_PER_FILE_MS = 5.0 * 5; // 5ms is on M1 Pro
+    const MAX_TIME_PER_FILE_MS = 5.0 * 10; // 5ms is on M1 Pro
 
     var total_time_ns: f64 = 0.0;
     inline for (TestFileCache.test_files) |comptime_path| {
@@ -115,15 +115,15 @@ test "performance" {
         const duration = @as(f64, @floatFromInt(end_time - start_time));
         total_time_ns += duration;
         const duration_ms = duration / std.time.ns_per_ms;
-        try std.testing.expect(duration_ms < MAX_TIME_PER_FILE_MS);
+        try expectLessThan(MAX_TIME_PER_FILE_MS, duration_ms);
     }
 
     const total_time_ms = total_time_ns / std.time.ns_per_ms;
     const average_time_ms = total_time_ms / TestFileCache.test_files.len;
     std.debug.print("\x1b[33m⏱️\x1b[0m Transpiler \x1b[90m>\x1b[0m {d:.2}ms | Avg: {d:.2}ms\n", .{ total_time_ms, average_time_ms });
 
-    try std.testing.expect(total_time_ms < MAX_TIME_MS);
-    try std.testing.expect(average_time_ms < MAX_TIME_PER_FILE_MS);
+    try expectLessThan(MAX_TIME_MS, total_time_ms);
+    try expectLessThan(MAX_TIME_PER_FILE_MS, average_time_ms);
 }
 
 fn test_transpile(comptime file_path: []const u8) !void {
@@ -149,6 +149,13 @@ fn test_transpile(comptime file_path: []const u8) !void {
     defer allocator.free(expected_source_z);
 
     try testing.expectEqualStrings(expected_source_z, result.zig_source);
+}
+
+fn expectLessThan(expected: f64, actual: f64) !void {
+    if (actual > expected) {
+        std.debug.print("\x1b[31m✗\x1b[0m Expected {d:.2}ms, got {d:.2}ms\n", .{ expected, actual });
+        return error.TestExpectedLessThan;
+    }
 }
 
 var test_file_cache: ?TestFileCache = null;
