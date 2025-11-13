@@ -1,0 +1,13 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const about_zx = mod.get_about_zx();
+    return (
+        <main @allocator={ctx.allocator}>
+            <p>{about_zx}</p>
+            <br>
+            <a href="/">Back to Home</a>
+        </main>
+    );
+}
+
+const mod = @import("root_mod");
+const zx = @import("zx");

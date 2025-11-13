@@ -1,0 +1,13 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    return (
+        <main @allocator={ctx.arena}>
+            <h1>ZX</h1>
+            <p>ZX is a framework for building web applications with Zig.</p>
+            <a href="https://ziex.dev" target="_blank">See ZX Docs →</a>
+            <br>
+            <a href="/about">Navigate to About Page</a>
+        </main>
+    );
+}
+
+const zx = @import("zx");

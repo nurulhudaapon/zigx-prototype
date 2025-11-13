@@ -40,6 +40,7 @@ pub const App = struct {
                     return;
                 };
                 if (rendered) {
+                    res.header("Content-Type", "text/html; charset=UTF-8");
                     return;
                 }
             }

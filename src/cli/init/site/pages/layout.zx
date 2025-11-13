@@ -1,0 +1,23 @@
+pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
+    return (
+        <html @allocator={ctx.arena} lang="en-US">
+        
+        <head>
+            <style>
+                {
+                    [CSS_STYLES: s]
+                }
+            </style>
+        </head>
+        
+        <body>
+            {(children)}
+        </body>
+        
+        </html>
+    );
+}
+
+const zx = @import("zx");
+
+const CSS_STYLES = @embedFile("../assets/style.css");
