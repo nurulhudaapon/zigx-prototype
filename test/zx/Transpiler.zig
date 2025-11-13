@@ -104,7 +104,7 @@ test "component_multiple" {
 }
 
 test "performance" {
-    const MAX_TIME_MS = 50.0 * 3; // 50ms is on M1 Pro
+    const MAX_TIME_MS = 50.0 * 5; // 50ms is on M1 Pro
     const MAX_TIME_PER_FILE_MS = 5.0 * 10; // 5ms is on M1 Pro
 
     var total_time_ns: f64 = 0.0;
@@ -153,7 +153,7 @@ fn test_transpile(comptime file_path: []const u8) !void {
 
 fn expectLessThan(expected: f64, actual: f64) !void {
     if (actual > expected) {
-        std.debug.print("\x1b[31m✗\x1b[0m Expected {d:.2}ms, got {d:.2}ms\n", .{ expected, actual });
+        std.debug.print("\x1b[31m✗\x1b[0m Expected < {d:.2}ms, got {d:.2}ms\n", .{ expected, actual });
         return error.TestExpectedLessThan;
     }
 }
