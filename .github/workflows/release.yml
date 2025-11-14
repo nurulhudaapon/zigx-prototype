@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         target:
-          - name: linux-x86_64
+          - name: linux-x64
             os: linux
             arch: x86_64
             ext: ""
@@ -20,7 +20,7 @@ jobs:
             os: linux
             arch: aarch64
             ext: ""
-          - name: macos-x86_64
+          - name: macos-x64
             os: macos
             arch: x86_64
             ext: ""
@@ -28,7 +28,7 @@ jobs:
             os: macos
             arch: aarch64
             ext: ""
-          - name: windows-x86_64
+          - name: windows-x64
             os: windows
             arch: x86_64
             ext: ".exe"
