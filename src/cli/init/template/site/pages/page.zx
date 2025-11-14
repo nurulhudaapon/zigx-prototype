@@ -1,13 +1,17 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
+    counter += 1;
+
     return (
         <main @allocator={ctx.arena}>
-            <h1>ZX</h1>
             <p>ZX is a framework for building web applications with Zig.</p>
             <a href="https://ziex.dev" target="_blank">See ZX Docs →</a>
             <br>
             <a href="/about">Navigate to About Page</a>
+            <h5>{[counter:d]}</h5>
+            <h6>Visit Count</h6>
         </main>
     );
 }
+var counter: u64 = 0;
 
 const zx = @import("zx");

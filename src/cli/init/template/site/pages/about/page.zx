@@ -3,7 +3,6 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     return (
         <main @allocator={ctx.allocator}>
             <p>{about_zx}</p>
-            <br>
             <a href="/">Back to Home</a>
         </main>
     );

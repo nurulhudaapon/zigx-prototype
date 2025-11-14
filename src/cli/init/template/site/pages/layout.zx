@@ -3,14 +3,11 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
         <html @allocator={ctx.arena} lang="en-US">
         
         <head>
-            <style>
-                {
-                    [CSS_STYLES: s]
-                }
-            </style>
+            <link rel="stylesheet" href="/style.css" />
         </head>
         
         <body>
+            <h1>ZX</h1>
             {(children)}
         </body>
         
@@ -19,5 +16,3 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
 }
 
 const zx = @import("zx");
-
-const CSS_STYLES = @embedFile("../assets/style.css");
