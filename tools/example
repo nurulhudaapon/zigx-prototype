@@ -1,0 +1,3 @@
+#!/bin/bash
+cd src/cli/init/template
+zig fetch --save 'git+https://github.com/nurulhudaapon/zx'

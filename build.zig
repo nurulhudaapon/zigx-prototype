@@ -36,7 +36,6 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     // --- ZX LSP ---
-    const lsp_dep = b.dependency("lsp_kit", .{ .target = target, .optimize = optimize });
     const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
     const zxls_exe = b.addExecutable(.{
         .name = "zxls",
@@ -45,7 +44,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "lsp", .module = lsp_dep.module("lsp") },
                 .{ .name = "zls", .module = zls_dep.module("zls") },
             },
         }),
