@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - name: linux-x86_64
+            os: linux
+            arch: x86_64
+            ext: ""
+          - name: linux-aarch64
+            os: linux
+            arch: aarch64
+            ext: ""
+          - name: macos-x86_64
+            os: macos
+            arch: x86_64
+            ext: ""
+          - name: macos-aarch64
+            os: macos
+            arch: aarch64
+            ext: ""
+          - name: windows-x86_64
+            os: windows
+            arch: x86_64
+            ext: ".exe"
+          - name: windows-aarch64
+            os: windows
+            arch: aarch64
+            ext: ".exe"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Cache Zig build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/zig
+            zig-out
+          key: ${{ runner.os }}-zig-release-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-release-
+
+      - name: Build release binary
+        run: zig build release-${{ matrix.target.name }}
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          BINARY_NAME="zx-${{ matrix.target.name }}${{ matrix.target.ext }}"
+          if [ "${{ matrix.target.os }}" = "windows" ]; then
+            # For Windows, create a zip file
+            cd zig-out/bin/release
+            zip ../../../dist/zx-${{ matrix.target.name }}.zip "$BINARY_NAME"
+            cd ../../..
+          else
+            # For Unix-like systems, create a tar.gz file
+            cd zig-out/bin/release
+            tar -czf ../../../dist/zx-${{ matrix.target.name }}.tar.gz "$BINARY_NAME"
+            cd ../../..
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zx-${{ matrix.target.name }}
+          path: dist/zx-${{ matrix.target.name }}.*
+          retention-days: 30
+
+  create-release:
+    name: Create Release Assets
+    runs-on: ubuntu-latest
+    needs: build-release
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          cd dist
+          for file in *.tar.gz *.zip; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "${file}.sha256"
+            fi
+          done
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
