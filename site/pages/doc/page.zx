@@ -167,18 +167,52 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
         
                     <section id="getting-started" class="section">
                         <h2>Getting Started</h2>
+        
+                        <h3>Installation</h3>
+                        <p>Install the ZX CLI tool to get started with building ZX applications.</p>
+        
+                        <h4>Linux/MacOS</h4>
+                        <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | bash</code></pre>
+        
+                        <h4>Windows</h4>
+                        <pre><code class="language-powershell">powershell -c "irm ziex.dev/install.ps1 | iex"</code></pre>
+        
+                        <h3>Creating a New Project</h3>
                         <p>
-                            To get started quickly, you can pull the
-                            <a href="https://github.com/nurulhudaapon/zx-example-portfolio" target="_blank"
-                                rel="noopener noreferrer">
-                                zx-example-portfolio
-                            </a>
-                            repository as a template and try it out yourself.
+                            Create a new folder for your project, navigate into it, and run <code>zx init</code>:
                         </p>
+                        <pre><code class="language-bash">mkdir my-project
+cd my-project
+zx init</code></pre>
                         <p>
-                            A full, step-by-step getting started guide is currently a work in progress and will be available
-                            here soon.
+                            Make sure to run <code>zx init</code> inside a clean project folder. After running the command, you'll see:
                         </p>
+                        <pre><code class="language-bash">○ Initializing ZX project!  Template: default
+
+  + .vscode/extensions.json
+  + build.zig.zon
+  + build.zig
+  + README.md
+  + site/assets/style.css
+  + site/main.zig
+  + site/pages/about/page.zx
+  + site/pages/layout.zx
+  + site/pages/page.zx
+  + src/root.zig
+  + .gitignore
+
+Now run → 
+
+zig build serve</code></pre>
+                        <p>
+                            Then run the development server:
+                        </p>
+                        <pre><code class="language-bash">zig build serve</code></pre>
+                        <p>
+                            You'll see the server start:
+                        </p>
+                        <pre><code class="language-bash">ZX · 0.0.1-dev.90
+  - Local: http://localhost:3000</code></pre>
         
                         <h3 id="editor-setup">Editor Setup</h3>
                         <p>

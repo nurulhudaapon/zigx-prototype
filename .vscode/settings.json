@@ -3,5 +3,6 @@
         "build",
         "test",
         "TEST_FILTER=${filter}"
-    ]
+    ],
+    "editor.formatOnSave": false
 }
