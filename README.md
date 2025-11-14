@@ -6,6 +6,17 @@ ZX combines the power and performance of Zig with the expressiveness of JSX, ena
 
 **📚 [Full Documentation →](https://ziex.dev)**
 
+## Installation
+
+#### Linux/MacOS
+```bash
+curl -fsSL https://ziex.dev/install | bash
+```
+
+#### Windows
+```powershell
+powershell -c "irm ziex.dev/install.ps1 | iex"
+```
 ## Quick Example
 
 ```jsx
@@ -76,7 +87,7 @@ Core
 - [ ] Importing React Components
 
 Tooling
-- [ ] CLI
+- [x] CLI
 - [ ] Dev Server (HMR or Rebuild on Change)
 
 ### Editor Support

@@ -15,6 +15,7 @@ pub fn build(b: *std.Build) void {
 
     const options = b.addOptions();
     options.addOption([]const u8, "version_string", zx_build_zon.version);
+    options.addOption([]const u8, "description", zx_build_zon.description);
     mod.addOptions("zx_info", options);
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---

@@ -1,8 +1,8 @@
 pub fn build(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.Allocator) !*zli.Command {
     const root = try zli.Command.init(writer, reader, allocator, .{
         .name = "zx",
-        .description = "ZX is a framework for building web applications with Zig.",
-        // .version = .{ .major = 0, .minor = 0, .patch = 1, .pre = null, .build = null },
+        .description = zx.info.description,
+        .version = std.SemanticVersion.parse(zx.info.version_string) catch unreachable,
     }, showHelp);
 
     try root.addCommands(&.{
@@ -24,5 +24,6 @@ const init = @import("init.zig");
 const version = @import("version.zig");
 const transpile = @import("transpile.zig");
 
+const zx = @import("zx");
 const std = @import("std");
 const zli = @import("zli");

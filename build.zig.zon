@@ -1,6 +1,7 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.88",
+    .version = "0.0.1-dev.89",
+    .description = "ZX is a framework for building web applications with Zig.",
     .fingerprint = 0xcad77a8d2a3389f2,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{

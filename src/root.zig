@@ -436,3 +436,4 @@ const routing = @import("routing.zig");
 pub const App = @import("app.zig").App;
 pub const PageContext = routing.PageContext;
 pub const LayoutContext = routing.LayoutContext;
+pub const info = @import("zx_info");
