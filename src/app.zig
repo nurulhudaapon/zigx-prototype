@@ -26,6 +26,7 @@ pub const App = struct {
 
             const request_path = normalizePath(req.arena, path) catch {
                 res.body = "Internal Server Error";
+                res.status = 500;
                 return;
             };
 
@@ -37,6 +38,7 @@ pub const App = struct {
             for (self.meta.routes) |route| {
                 const rendered = matchRoute(request_path, route, empty_layouts, pagectx, layoutctx) catch {
                     res.body = "Internal Server Error";
+                    res.status = 500;
                     return;
                 };
                 if (rendered) {
@@ -45,7 +47,35 @@ pub const App = struct {
                 }
             }
 
-            res.body = "Not found";
+            const file_extension = std.fs.path.extension(request_path);
+            const content_type = if (std.mem.eql(u8, file_extension, ".html"))
+                "text/html; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".css"))
+                "text/css; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".txt"))
+                "text/plain; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".js"))
+                "application/javascript; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".json"))
+                "application/json; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".xml"))
+                "application/xml; charset=UTF-8"
+            else if (std.mem.eql(u8, file_extension, ".svg"))
+                "image/svg+xml; charset=UTF-8"
+            else
+                "application/octet-stream";
+
+            const public_path = std.fs.path.join(allocator, &.{ "site", "public", request_path }) catch return;
+            defer allocator.free(public_path);
+
+            const file_content = std.fs.cwd().readFileAlloc(allocator, public_path, std.math.maxInt(usize)) catch {
+                res.status = 404;
+                return;
+            };
+            res.header("Content-Type", content_type);
+            // res.header("Cache-Control", "max-age=31536000, public");
+            res.body = file_content;
+            return;
         }
     };
 
