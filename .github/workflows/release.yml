@@ -112,16 +112,6 @@ jobs:
             fi
           done
 
-      - name: Create checksums
-        shell: bash
-        run: |
-          cd dist
-          for file in *.tar.gz *.zip; do
-            if [ -f "$file" ]; then
-              sha256sum "$file" > "${file}.sha256"
-            fi
-          done
-
       - name: Upload to release
         uses: softprops/action-gh-release@v1
         with:
