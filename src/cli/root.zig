@@ -8,7 +8,7 @@ pub fn build(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.
     try root.addCommands(&.{
         try version.register(writer, reader, allocator),
         try init.register(writer, reader, allocator),
-        try serve.register(writer, reader, allocator),
+        // try serve.register(writer, reader, allocator),
         try transpile.register(writer, reader, allocator),
     });
 

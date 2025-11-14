@@ -19,7 +19,7 @@ fn init(ctx: zli.CommandContext) !void {
         return;
     }
 
-    std.debug.print("  Template: \x1b[90m{s}\x1b[0m\n\n", .{t_val});
+    std.debug.print(" Template: \x1b[90m{s}\x1b[0m\n\n", .{t_val});
 
     const output_dir = ".";
 
@@ -57,7 +57,7 @@ fn init(ctx: zli.CommandContext) !void {
         try file.writeAll(template.content);
     }
 
-    std.debug.print("\nNow run → \n\n\x1b[36mzx serve\x1b[0m\n\n", .{});
+    std.debug.print("\nNow run → \n\n\x1b[36mzig build serve\x1b[0m\n\n", .{});
 }
 
 const TemplateFile = struct {

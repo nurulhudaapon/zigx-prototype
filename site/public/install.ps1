@@ -8,7 +8,7 @@ param(
   # Skips adding the zx to the list of installed programs
   [Switch]$NoRegisterInstallation = $false,
   # Skips installing powershell completions to your profile
-  [Switch]$NoCompletions = $false,
+  [Switch]$NoCompletions = $true,
 
   # Debugging: Always download with 'Invoke-RestMethod' instead of 'curl.exe'
   [Switch]$DownloadWithoutCurl = $false
@@ -182,8 +182,18 @@ function Install-Zx {
     $global:ProgressPreference = 'SilentlyContinue';
     Expand-Archive "$ZipPath" "$ZxBin" -Force
     $global:ProgressPreference = $lastProgressPreference
-    if (!(Test-Path "${ZxBin}\$Target\zx.exe")) {
-      throw "The file '${ZxBin}\$Target\zx.exe' does not exist. Download is corrupt or intercepted Antivirus?`n"
+    
+    # The zip contains the binary directly as zx-windows-x64.exe (not in a subdirectory)
+    if (Test-Path "${ZxBin}\$Target.exe") {
+      Move-Item "${ZxBin}\$Target.exe" "${ZxBin}\zx.exe" -Force
+    }
+    elseif (Test-Path "${ZxBin}\$Target\zx.exe") {
+      # Legacy structure: binary in subdirectory
+      Move-Item "${ZxBin}\$Target\zx.exe" "${ZxBin}\zx.exe" -Force
+      Remove-Item "${ZxBin}\$Target" -Recurse -Force
+    }
+    else {
+      throw "The file '${ZxBin}\$Target.exe' does not exist. Download is corrupt or intercepted Antivirus?`n"
     }
   } catch {
     Write-Output "Install Failed - could not unzip $ZipPath"
@@ -191,12 +201,9 @@ function Install-Zx {
     return 1
   }
 
-  Move-Item "${ZxBin}\$Target\zx.exe" "${ZxBin}\zx.exe" -Force
-
-  Remove-Item "${ZxBin}\$Target" -Recurse -Force
   Remove-Item $ZipPath -Force
 
-  $ZxRevision = "$(& "${ZxBin}\zx.exe" --revision)"
+  $ZxRevision = "$(& "${ZxBin}\zx.exe" version)"
   if ($LASTEXITCODE -eq 1073741795) { # STATUS_ILLEGAL_INSTRUCTION
     if ($IsBaseline) {
       Write-Output "Install Failed - zx.exe (baseline) is not compatible with your CPU.`n"
@@ -239,12 +246,12 @@ function Install-Zx {
     # This completions script in general will install some extra stuff, mainly the `zxx` link.
     # It also installs completions.
     $output = "$(& "${ZxBin}\zx.exe" completions 2>&1)"
-    if ($LASTEXITCODE -ne 0) {
-      Write-Output $output
-      Write-Output "Install Failed - could not finalize installation"
-      Write-Output "The command '${ZxBin}\zx.exe completions' exited with code ${LASTEXITCODE}`n"
-      return 1
-    }
+    # if ($LASTEXITCODE -ne 0) {
+    #   Write-Output $output
+    #   Write-Output "Install Failed - could not finalize installation"
+    #   Write-Output "The command '${ZxBin}\zx.exe completions' exited with code ${LASTEXITCODE}`n"
+    #   return 1
+    # }
   } catch {
     # it is possible on powershell 5 that an error happens, but it is probably fine?
   }
@@ -254,7 +261,7 @@ function Install-Zx {
   $DisplayVersion = if ($ZxRevision -like "*-canary.*") {
     "${ZxRevision}"
   } else {
-    "$(& "${ZxBin}\zx.exe" --version)"
+    "$(& "${ZxBin}\zx.exe" version)"
   }
 
   $C_RESET = [char]27 + "[0m"
