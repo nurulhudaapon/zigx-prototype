@@ -73,6 +73,7 @@ const templates = [_]TemplateFile{
     .{ .path = "build.zig", .content = @embedFile(template_dir ++ "/build.zig") },
     .{ .path = "README.md", .content = @embedFile(template_dir ++ "/README.md") },
     .{ .path = "site/public/style.css", .content = @embedFile(template_dir ++ "/site/public/style.css") },
+    .{ .path = "site/public/favicon.ico", .content = @embedFile(template_dir ++ "/site/public/favicon.ico") },
     .{ .path = "site/main.zig", .content = @embedFile(template_dir ++ "/site/main.zig") },
     .{ .path = "site/pages/about/page.zx", .content = @embedFile(template_dir ++ "/site/pages/about/page.zx") },
     .{ .path = "site/pages/layout.zx", .content = @embedFile(template_dir ++ "/site/pages/layout.zx") },

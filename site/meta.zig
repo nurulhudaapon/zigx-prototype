@@ -41,6 +41,7 @@ pub const routes = [_]zx.App.Meta.Route{
     .{
         .path = "/doc",
         .page = @import(".zx/pages/doc/page.zig").Page,
+        .layout = @import(".zx/pages/layout.zig").Layout,
     },
 };
 

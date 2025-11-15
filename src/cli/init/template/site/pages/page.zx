@@ -6,9 +6,10 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <p>ZX is a framework for building web applications with Zig.</p>
             <a href="https://ziex.dev" target="_blank">See ZX Docs →</a>
             <br>
-            <a href="/about">Navigate to About Page</a>
             <h5>{[counter:d]}</h5>
             <h6>Visit Count</h6>
+            <hr>
+            <a href="/about">Navigate to About Page</a>
         </main>
     );
 }

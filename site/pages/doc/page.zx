@@ -85,30 +85,12 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const txt_expr = "{expression}";
     const fmt_expr = "{[expression:format]}";
 
-    var aw_icon_svg_base64: std.io.Writer.Allocating = .init(allocator);
-    std.base64.standard.Encoder.encodeWriter(&aw_icon_svg_base64.writer, @embedFile("../../public/zx-icon.svg")) catch unreachable;
-    const icon_href = std.fmt.allocPrint(allocator, "data:image/svg+xml;base64,{s}", .{aw_icon_svg_base64.written()}) catch unreachable;
-
     return (
-        <html @allocator={allocator}>
         
-        
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>ZX Documentation - JSX-like Syntax for Zig</title>
-            <link rel="stylesheet" href="./assets/styles.css">
+        <div  @allocator={allocator}>
+                    
             <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
-            <link rel="icon" href={icon_href} type="image/svg+xml">
-            <style>
-                {
-                    [@embedFile("../../assets/doc.css"):s]
-                }
-            </style>
-        </head>
-        
-        
-        <body>
+            <link rel="stylesheet" href="/doc.css">
         
             <div class="container">
         
@@ -417,17 +399,11 @@ zig build serve</code></pre>
                         </ul>
                     </section>
                 </main>
+
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js">
             </div>
-        
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js">
-            </script>
-            <script type="module">
-                {[@embedFile("../../assets/doc.js"):s]}
-            </script>
-        </body>
-        
-        </html>
+
     );
 }
 

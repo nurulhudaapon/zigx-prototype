@@ -1,15 +1,24 @@
-pub fn Page(allocator: zx.Allocator) zx.Component {
-    const user_names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
-
+pub fn Page(ctx: zx.Allocator) zx.Component {
+    const users = [_]struct { name: []const u8, role: UserRole }{
+        .{ .name = "John", .role = .admin },
+        .{ .name = "Jane", .role = .member },
+        .{ .name = "Jim", .role = .guest },
+    };
     return (
-        <main @allocator={allocator}>
-            {for (user_names) |name| {
-                (        <div>
-                    <p>{name}</p>
-                </div>)
-            }}
-        </main>
+        <main @allocator={ctx}>
+            {for (users) |user| (
+                                                                                                <div>
+                                                    <p>{user.name}</p>
+                                                    {switch (user.role) {
+                                                        .admin => (<span>Admin</span>),
+                                                        .member => (<span>Member</span>),
+                                                        .guest => (<span>Guest</span>),
+                                                    }}
+                                                </div>
+                )}
     );
 }
 
 const zx = @import("zx");
+
+const UserRole = enum { admin, member, guest };
