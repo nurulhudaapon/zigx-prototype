@@ -26,3 +26,11 @@ pub fn main() !void {
 const std = @import("std");
 const fs = std.fs;
 const cli = @import("cli/root.zig");
+
+pub const std_options = std.Options{
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .@"html/ast", .level = .info },
+        .{ .scope = .@"html/tokenizer", .level = .info },
+        .{ .scope = .@"html/ast/fmt", .level = .info },
+    },
+};

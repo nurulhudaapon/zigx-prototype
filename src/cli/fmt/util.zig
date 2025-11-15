@@ -467,25 +467,253 @@ fn parseHtmlPlaceholder(source: []const u8, start: usize) struct { index: usize,
     return .{ .index = html_index, .end = i };
 }
 
+fn trimLeadingTrailingNewlines(allocator: std.mem.Allocator, html: []const u8) ![]const u8 {
+    if (html.len == 0) return try allocator.dupe(u8, html);
+
+    var start: usize = 0;
+    var end: usize = html.len;
+
+    // Trim leading newlines/whitespace
+    while (start < end and (html[start] == '\n' or html[start] == '\r' or std.ascii.isWhitespace(html[start]))) {
+        start += 1;
+    }
+
+    // Trim trailing newlines/whitespace
+    while (end > start and (html[end - 1] == '\n' or html[end - 1] == '\r' or std.ascii.isWhitespace(html[end - 1]))) {
+        end -= 1;
+    }
+
+    return try allocator.dupe(u8, html[start..end]);
+}
+
+fn containsNewline(text: []const u8) bool {
+    for (text) |c| {
+        if (c == '\n' or c == '\r') return true;
+    }
+    return false;
+}
+
+fn getIndentationLevel(source: []const u8, pos: usize) usize {
+    // Find the start of the line containing pos
+    var line_start = pos;
+    while (line_start > 0 and source[line_start - 1] != '\n') {
+        line_start -= 1;
+    }
+
+    // Count leading spaces/tabs
+    var indent: usize = 0;
+    var i = line_start;
+    while (i < pos and i < source.len) {
+        if (source[i] == ' ') {
+            indent += 1;
+        } else if (source[i] == '\t') {
+            indent += 4; // Treat tab as 4 spaces
+        } else {
+            break;
+        }
+        i += 1;
+    }
+    return indent;
+}
+
+fn indentMultilineText(allocator: std.mem.Allocator, text: []const u8, indent_level: usize) ![]const u8 {
+    if (text.len == 0) return try allocator.dupe(u8, text);
+
+    var result = std.ArrayList(u8){};
+    defer result.deinit(allocator);
+
+    // Create indent string (spaces)
+    const indent_spaces = try allocator.alloc(u8, indent_level);
+    defer allocator.free(indent_spaces);
+    @memset(indent_spaces, ' ');
+
+    var i: usize = 0;
+    var line_start = true;
+
+    while (i < text.len) {
+        if (line_start and i < text.len and text[i] != '\n' and text[i] != '\r') {
+            try result.appendSlice(allocator, indent_spaces);
+            line_start = false;
+        }
+
+        if (text[i] == '\n') {
+            try result.append(allocator, text[i]);
+            line_start = true;
+        } else {
+            try result.append(allocator, text[i]);
+        }
+        i += 1;
+    }
+
+    return try result.toOwnedSlice(allocator);
+}
+
+fn findOpeningParenBefore(source: []const u8, pos: usize) ?usize {
+    var i = pos;
+    while (i > 0) {
+        i -= 1;
+        if (source[i] == '(') {
+            return i;
+        }
+        if (!std.ascii.isWhitespace(source[i])) {
+            return null;
+        }
+    }
+    return null;
+}
+
+fn findClosingParenAfter(source: []const u8, pos: usize) ?usize {
+    var i = pos;
+    // Skip whitespace (including newlines)
+    while (i < source.len and std.ascii.isWhitespace(source[i])) {
+        i += 1;
+    }
+    // If we find a closing paren right after whitespace, return it
+    if (i < source.len and source[i] == ')') {
+        return i;
+    }
+    // Otherwise, look for the next closing paren (might be on a different line)
+    var depth: i32 = 0;
+    while (i < source.len) {
+        if (source[i] == '(') {
+            depth += 1;
+        } else if (source[i] == ')') {
+            if (depth == 0) {
+                return i;
+            }
+            depth -= 1;
+        }
+        i += 1;
+    }
+    return null;
+}
+
 /// Replace @html(n) placeholders with the corresponding HTML segments
 pub fn patchInHtml(allocator: std.mem.Allocator, extract_html: ExtractHtmlResult) ![:0]const u8 {
     var result = std.ArrayList(u8){};
     defer result.deinit(allocator);
 
+    var last_copied: usize = 0;
     var i: usize = 0;
     while (i < extract_html.zig_source.len) {
         if (extract_html.zig_source[i] == '@') {
             const parsed = parseHtmlPlaceholder(extract_html.zig_source, i);
             if (parsed.end > i and parsed.index < extract_html.htmls.len) {
-                try result.appendSlice(allocator, extract_html.htmls[parsed.index]);
-                i = parsed.end;
-                continue;
+                const html = extract_html.htmls[parsed.index];
+
+                // Trim leading and trailing newlines/whitespace
+                const trimmed_html = try trimLeadingTrailingNewlines(allocator, html);
+                defer allocator.free(trimmed_html);
+
+                const is_multiline = containsNewline(trimmed_html);
+
+                // Find opening parenthesis before @html(n)
+                const open_paren_pos = findOpeningParenBefore(extract_html.zig_source, i);
+
+                // Find closing parenthesis after @html(n)
+                const close_paren_pos = findClosingParenAfter(extract_html.zig_source, parsed.end);
+
+                if (is_multiline) {
+                    if (open_paren_pos) |open_pos| {
+                        // Get indentation level of opening parenthesis
+                        const open_paren_indent = getIndentationLevel(extract_html.zig_source, open_pos);
+                        // HTML block should be indented one level more (assuming 4 spaces per level)
+                        const html_indent = open_paren_indent + 4;
+                        // Closing paren should match opening paren indentation
+                        const close_paren_indent = open_paren_indent;
+
+                        // Copy everything from last_copied up to (but not including) the opening paren
+                        try result.appendSlice(allocator, extract_html.zig_source[last_copied..open_pos]);
+
+                        // Copy the opening paren
+                        try result.append(allocator, '(');
+
+                        // Add newline after opening paren
+                        try result.append(allocator, '\n');
+
+                        // Indent and add the trimmed HTML
+                        const indented_html = try indentMultilineText(allocator, trimmed_html, html_indent);
+                        defer allocator.free(indented_html);
+                        try result.appendSlice(allocator, indented_html);
+
+                        // Skip the @html(n) placeholder in source
+                        last_copied = parsed.end;
+                        i = parsed.end;
+
+                        // Look for closing paren after the placeholder
+                        if (close_paren_pos) |close_pos| {
+                            // Skip any whitespace between placeholder and closing paren
+                            var j = parsed.end;
+                            while (j < close_pos and std.ascii.isWhitespace(extract_html.zig_source[j])) {
+                                j += 1;
+                            }
+
+                            // Add newline before closing paren (for multiline HTML)
+                            try result.append(allocator, '\n');
+
+                            // Add indentation for closing paren
+                            var indent_idx: usize = 0;
+                            while (indent_idx < close_paren_indent) {
+                                try result.append(allocator, ' ');
+                                indent_idx += 1;
+                            }
+
+                            // Copy the closing paren
+                            try result.append(allocator, ')');
+
+                            last_copied = close_pos + 1;
+                            i = close_pos + 1;
+                        } else {
+                            // No closing paren found immediately, but for multiline HTML
+                            // we should still look ahead for a closing paren
+                            var j = parsed.end;
+                            while (j < extract_html.zig_source.len and std.ascii.isWhitespace(extract_html.zig_source[j])) {
+                                j += 1;
+                            }
+                            if (j < extract_html.zig_source.len and extract_html.zig_source[j] == ')') {
+                                // Found closing paren after whitespace, add newline and indentation before it
+                                try result.append(allocator, '\n');
+
+                                // Add indentation for closing paren
+                                var indent_idx: usize = 0;
+                                while (indent_idx < close_paren_indent) {
+                                    try result.append(allocator, ' ');
+                                    indent_idx += 1;
+                                }
+
+                                try result.append(allocator, ')');
+                                last_copied = j + 1;
+                                i = j + 1;
+                            } else {
+                                // No closing paren found, continue normally
+                                i = parsed.end;
+                            }
+                        }
+                        continue;
+                    } else {
+                        // Multiline but no opening paren, just insert trimmed HTML
+                        try result.appendSlice(allocator, extract_html.zig_source[last_copied..i]);
+                        try result.appendSlice(allocator, trimmed_html);
+                        last_copied = parsed.end;
+                        i = parsed.end;
+                        continue;
+                    }
+                } else {
+                    // Single line or no parens found, copy everything up to @html(n) and insert trimmed HTML
+                    try result.appendSlice(allocator, extract_html.zig_source[last_copied..i]);
+                    try result.appendSlice(allocator, trimmed_html);
+                    last_copied = parsed.end;
+                    i = parsed.end;
+                    continue;
+                }
             }
         }
 
-        try result.append(allocator, extract_html.zig_source[i]);
         i += 1;
     }
+
+    // Copy remaining source
+    try result.appendSlice(allocator, extract_html.zig_source[last_copied..]);
 
     try result.append(allocator, 0);
     const result_slice = result.items[0 .. result.items.len - 1 :0];
