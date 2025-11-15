@@ -6,13 +6,13 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     };
     return (
         <main @allocator={ctx.arena}>
-            {for (users) |user| {
-                if (user.is_active) {
-                    (<p>{user.name} (Active)</p>)
-                } else {
-                    (<p>{user.name} (Inactive)</p>)
-                }
-            }}
+            {for (users) |user| (
+                if (user.is_active) (
+                    <p>{user.name} (Active)</p>
+                ) else (
+                    <p>{user.name} (Inactive)</p>
+                )
+            )}
         </main>
     );
 }

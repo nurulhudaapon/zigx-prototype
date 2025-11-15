@@ -11,11 +11,11 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 {if (is_admin) ("Powerful") else ("Powerless")}
             </section>
             <section>
-                {if (is_logged_in) {
+                {if (is_logged_in) (
                     (<p>Welcome, User!</p>)
-                } else {
+                ) else (
                     (<p>Please log in to continue.</p>)
-                }}
+                )}
             </section>
         </main>
     );

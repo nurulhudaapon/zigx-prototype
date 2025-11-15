@@ -136,6 +136,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "zx", .module = mod },
                     .{ .name = "httpz", .module = httpz_dep.module("httpz") },
                     .{ .name = "zli", .module = zli_dep.module("zli") },
+                    .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
                 },
             }),
         });

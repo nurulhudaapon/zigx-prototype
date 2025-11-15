@@ -2,7 +2,7 @@ This is a developer preview of ZX, some features are work in progress.
 
 ## Installation
 
-##### Linux/MacOS
+##### Linux/macOS
 ```bash
 curl -fsSL https://ziex.dev/install | bash
 ```

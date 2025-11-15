@@ -1,95 +1,9 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
-    const allocator = ctx.arena;
-    
-    const is_loading = true;
-    const test_chars = "abc";
-    const names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
-    const user_swtc = users[0];
-
     return (
-        <body @allocator={allocator}>
+        <main @allocator={ctx.arena}>
             <h1>About</h1>
-
-            <section>
-                {if (is_loading) ("Loading...") else ("Loaded")}
-            </section>
-
-            <section>
-                {if (is_loading) (<h1>Loading...</h1>) else (<h1>Loaded</h1>)}
-            </section>
-
-            <section>
-                {for (test_chars) |cc| (<span>{[cc:c]}</span>)}
-            </section>
-
-            <section>
-                {for (test_chars) |cc| {
-                    (<span>{[cc:c]}</span>)
-                }}
-            </section>
-
-            <section>
-                {for (names) |name| (<span>{name}</span>)}
-            </section>
-
-            <section>
-                {for (names) |name| {
-                    (<p>{name}</p>)
-                }}
-            </section>
-                        
-            <section>
-                {for (test_chars) |cc| {
-                    (<h1><span>{[cc:c]}</span></h1>)
-                }}
-            </section>
-
-            <section>
-                {for (users) |user| {
-                    (<p>{user.name} - {[user.age:d]}</p>)
-                }}
-            </section>
-
-            <section>
-                {for (users) |user| {
-                    (<p>{user.name} - {[user.age:d]} - 
-                    
-                    {switch (user.user_type) {
-                        .admin => ("Admin"),
-                        .member => ("Member"),
-                    }}
-                    </p>)
-                }}
-            </section>
-
-            <section>
-                {switch (user_swtc.user_type) {
-                    .admin => ("Admin"),
-                    .member => ("Member"),
-                }}
-                {switch (user_swtc.user_type) {
-                    .admin => (<p>Admin</p>),
-                    .member => (<p>Member</p>),
-                }}
-            </section>
-
-        </body>
+        </main>
     );
 }
 
 const zx = @import("zx");
-
-const UserType = enum { admin, member };
-
-const User = struct {
-    name: []const u8,
-    age: u32,
-    user_type: UserType,
-};
-
-const users = [_]User{
-    .{ .name = "John", .age = 20, .user_type = .admin },
-    .{ .name = "Jane", .age = 21, .user_type = .member },
-    .{ .name = "Jim", .age = 22, .user_type = .admin },
-    .{ .name = "Jill", .age = 23, .user_type = .member },
-};

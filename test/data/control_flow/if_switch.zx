@@ -3,14 +3,14 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const user_type: UserType = .admin;
     return (
         <main @allocator={allocator}>
-            {if (show_user_type) {
+            {if (show_user_type) (
                 switch (user_type) {
                     .admin => (<p>Admin</p>),
                     .member => (<p>Member</p>),
                 }
-            } else {
+            ) else (
                 (<p>User type hidden</p>)
-            }}
+            )}
         </main>
     );
 }
