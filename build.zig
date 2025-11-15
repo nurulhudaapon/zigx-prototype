@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---
     const zli_dep = b.dependency("zli", .{ .target = target, .optimize = optimize });
+    const htmlz_dep = b.dependency("superhtml", .{ .target = target, .optimize = optimize });
     const exe = b.addExecutable(.{
         .name = "zx",
         .root_module = b.createModule(.{
@@ -30,6 +31,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "zx", .module = mod },
                 .{ .name = "httpz", .module = httpz_dep.module("httpz") },
                 .{ .name = "zli", .module = zli_dep.module("zli") },
+                .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
             },
         }),
     });

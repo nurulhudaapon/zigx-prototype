@@ -1,10 +1,3 @@
-// src/cli/run.zig
-const std = @import("std");
-const Writer = std.Io.Writer;
-const Reader = std.Io.Reader;
-const zli = @import("zli");
-const zx = @import("zx");
-
 const outdir_flag = zli.Flag{
     .name = "outdir",
     .shortcut = "o",
@@ -13,7 +6,7 @@ const outdir_flag = zli.Flag{
     .default_value = .{ .String = ".zx" },
 };
 
-pub fn register(writer: *Writer, reader: *Reader, allocator: std.mem.Allocator) !*zli.Command {
+pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.Allocator) !*zli.Command {
     const cmd = try zli.Command.init(writer, reader, allocator, .{
         .name = "transpile",
         .description = "Transpile a .zx file or directory to zig source code.",
@@ -37,6 +30,63 @@ fn transpile(ctx: zli.CommandContext) !void {
         return;
     };
 
+    // Check if path is a file and outdir is default
+    const default_outdir = ".zx";
+    const is_default_outdir = std.mem.eql(u8, outdir, default_outdir);
+
+    // Check if path is a file (not a directory)
+    const stat = std.fs.cwd().statFile(path) catch |err| switch (err) {
+        error.IsDir => {
+            // It's a directory, proceed with normal transpileCommand
+            try transpileCommand(ctx.allocator, path, outdir, false, &copy_dirs, false);
+            return;
+        },
+        else => {
+            std.debug.print("Error: Could not access path '{s}': {}\n", .{ path, err });
+            return err;
+        },
+    };
+
+    // Path is a file
+    if (stat.kind == .file) {
+        const is_zx = std.mem.endsWith(u8, path, ".zx");
+        const is_zig = std.mem.endsWith(u8, path, ".zig");
+
+        if (is_zx or is_zig) {
+            // If outdir is default and path is a file, output to stdout
+            if (is_default_outdir) {
+                // For .zig files, check if they contain zx syntax
+                if (is_zig) {
+                    const has_zx = try hasZXSyntax(ctx.allocator, path);
+                    if (!has_zx) {
+                        std.debug.print("Info: File '{s}' does not contain zx syntax, skipping\n", .{path});
+                        return;
+                    }
+                }
+
+                // Read the source file
+                const source = try std.fs.cwd().readFileAlloc(
+                    ctx.allocator,
+                    path,
+                    std.math.maxInt(usize),
+                );
+                defer ctx.allocator.free(source);
+
+                const source_z = try ctx.allocator.dupeZ(u8, source);
+                defer ctx.allocator.free(source_z);
+
+                // Parse and transpile
+                var result = try zx.Ast.parse(ctx.allocator, source_z);
+                defer result.deinit(ctx.allocator);
+
+                // Output to stdout
+                try ctx.writer.writeAll(result.zig_source);
+                return;
+            }
+        }
+    }
+
+    // Otherwise, proceed with normal transpileCommand
     try transpileCommand(ctx.allocator, path, outdir, false, &copy_dirs, false);
 }
 
@@ -716,3 +766,7 @@ fn transpileCommand(
         return error.InvalidPath;
     }
 }
+
+const std = @import("std");
+const zli = @import("zli");
+const zx = @import("zx");
