@@ -16,6 +16,8 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <h2>Form</h2>
             <FormExample />
             <hr />
+            <h2>Quick Example</h2>
+            <QuickExample />
         </div>
     );
 }
@@ -25,3 +27,4 @@ const ForExample = @import("for.zig").Page;
 const IfExample = @import("if.zig").Page;
 const SwitchExample = @import("switch.zig").Page;
 const FormExample = @import("form.zig").FormExample;
+const QuickExample = @import("overview.zig").QuickExample;

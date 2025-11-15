@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# Script to sync code blocks in README.md with actual file contents
+# Usage: ./tools/syncdoc
+
+README_FILE="README.md"
+TEMP_FILE=$(mktemp)
+
+# Check if README.md exists
+if [ ! -f "$README_FILE" ]; then
+    echo "Error: $README_FILE not found" >&2
+    exit 1
+fi
+
+# Process the file line by line
+in_code_block=0
+code_block_lang=""
+code_block_file=""
+code_block_content=""
+
+while IFS= read -r line || [ -n "$line" ]; do
+    # Check for end of code block first (when already in a block)
+    if [ $in_code_block -eq 1 ] && [[ "$line" =~ ^\`\`\`$ ]]; then
+        # End of code block
+        if [ -n "$code_block_file" ] && [ -f "$code_block_file" ]; then
+            # Replace with actual file content
+            while IFS= read -r file_line || [ -n "$file_line" ]; do
+                echo "$file_line"
+            done < "$code_block_file"
+            echo "$line"
+        else
+            # Keep original content
+            if [ -n "$code_block_content" ]; then
+                echo -n "$code_block_content"
+            fi
+            echo "$line"
+        fi
+        in_code_block=0
+        code_block_lang=""
+        code_block_file=""
+        code_block_content=""
+        continue
+    fi
+    
+    # Check for code block start (```language path/to/file or ```language)
+    if [ $in_code_block -eq 0 ] && [[ "$line" =~ ^\`\`\`([^[:space:]]+)[[:space:]]+(.+)$ ]]; then
+        code_block_lang="${BASH_REMATCH[1]}"
+        code_block_file="${BASH_REMATCH[2]}"
+        
+        # Check if the second part looks like a file path (contains / or ends with common extensions)
+        if [[ "$code_block_file" =~ ^[^/]+/ ]] || [[ "$code_block_file" =~ \.(zx|zig|ts|tsx|js|jsx|py|rs|go|java|cpp|h|hpp|md|sh|bash|zsh)$ ]]; then
+            in_code_block=1
+            code_block_content=""
+            echo "$line"
+            continue
+        else
+            # Not a file path, treat as regular code block
+            in_code_block=1
+            code_block_lang="${BASH_REMATCH[1]}"
+            code_block_file=""
+            code_block_content=""
+            echo "$line"
+            continue
+        fi
+    elif [ $in_code_block -eq 0 ] && [[ "$line" =~ ^\`\`\`([^[:space:]]*)$ ]]; then
+        # Code block start without file path (just ``` or ```language)
+        in_code_block=1
+        code_block_lang="${BASH_REMATCH[1]}"
+        code_block_file=""
+        code_block_content=""
+        echo "$line"
+        continue
+    fi
+    
+    if [ $in_code_block -eq 1 ]; then
+        if [ -z "$code_block_file" ]; then
+            # Regular code block without file path, accumulate content
+            code_block_content+="$line"$'\n'
+        fi
+        # If we have a file path, skip accumulating (we'll replace with file content)
+    else
+        echo "$line"
+    fi
+done < "$README_FILE" > "$TEMP_FILE"
+
+# Replace original file
+mv "$TEMP_FILE" "$README_FILE"
+
+echo "Synced code blocks in $README_FILE"
+
+# Sync feature checklist from README.md to RELEASE.md
+RELEASE_FILE="RELEASE.md"
+
+if [ ! -f "$RELEASE_FILE" ]; then
+    echo "Warning: $RELEASE_FILE not found, skipping feature checklist sync" >&2
+    exit 0
+fi
+
+# Extract feature checklist from README.md
+FEATURE_CHECKLIST_TEMP=$(mktemp)
+in_feature_section=0
+feature_started=0
+
+while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ ^##[[:space:]]+Feature[[:space:]]+Checklist ]]; then
+        in_feature_section=1
+        feature_started=1
+        echo "$line" > "$FEATURE_CHECKLIST_TEMP"
+        continue
+    fi
+    
+    if [ $in_feature_section -eq 1 ]; then
+        # Stop at next section (starts with ## or more)
+        if [[ "$line" =~ ^##+[[:space:]]+ ]] && [ $feature_started -eq 1 ]; then
+            break
+        fi
+        echo "$line" >> "$FEATURE_CHECKLIST_TEMP"
+    fi
+done < "$README_FILE"
+
+# If we didn't find the feature checklist, skip
+if [ $feature_started -eq 0 ]; then
+    echo "Warning: Feature Checklist section not found in $README_FILE" >&2
+    rm -f "$FEATURE_CHECKLIST_TEMP"
+    exit 0
+fi
+
+# Replace feature checklist in RELEASE.md
+RELEASE_TEMP=$(mktemp)
+in_feature_section=0
+feature_found=0
+
+while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ ^##[[:space:]]+Feature[[:space:]]+Checklist ]]; then
+        in_feature_section=1
+        feature_found=1
+        # Output the feature checklist from README.md
+        cat "$FEATURE_CHECKLIST_TEMP"
+        continue
+    fi
+    
+    if [ $in_feature_section -eq 1 ]; then
+        # Skip lines until we hit the next section or end of file
+        if [[ "$line" =~ ^##+[[:space:]]+ ]]; then
+            in_feature_section=0
+            echo "$line"
+        fi
+        # If we're still in the feature section, skip the line (it's being replaced)
+        continue
+    fi
+    
+    echo "$line"
+done < "$RELEASE_FILE" > "$RELEASE_TEMP"
+
+# Replace original file
+mv "$RELEASE_TEMP" "$RELEASE_FILE"
+
+# Clean up
+rm -f "$FEATURE_CHECKLIST_TEMP"
+
+if [ $feature_found -eq 1 ]; then
+    echo "Synced feature checklist to $RELEASE_FILE"
+else
+    echo "Warning: Feature Checklist section not found in $RELEASE_FILE" >&2
+fi
