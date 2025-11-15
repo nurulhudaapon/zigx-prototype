@@ -36,6 +36,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(exe);
+    b.installArtifact(htmlz_dep.artifact("superhtml"));
 
     // --- ZX LSP ---
     const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
