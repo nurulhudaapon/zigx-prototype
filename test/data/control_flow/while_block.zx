@@ -3,8 +3,11 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 
     return (
         <main @allocator={allocator}>
-            {while (i < 3) : (i +=1) { (<p>{n}</p>)
-                }}
+            {while (i < 3) : (i +=1) (
+                <div>
+                    <p>{n}</p>
+                </div>
+            )}
         </main>
     );
 }

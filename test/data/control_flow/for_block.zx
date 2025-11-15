@@ -2,9 +2,11 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const chars = "ABC";
     return (
         <main @allocator={allocator}>
-            {for (chars) |char| {
-                (<i>{[char:c]}</i>)
-            }}
+            {for (chars) |char| (
+                <div>
+                    <i>{[char:c]}</i>
+                </div>
+            )}
         </main>
     );
 }

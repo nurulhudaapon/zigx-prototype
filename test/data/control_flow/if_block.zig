@@ -7,17 +7,31 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
             .allocator = allocator,
             .children = &.{
                 if ((is_logged_in)) _zx.zx(
-                    .p,
+                    .div,
                     .{
                         .children = &.{
-                            _zx.txt("Welcome, User "),
+                            _zx.zx(
+                                .p,
+                                .{
+                                    .children = &.{
+                                        _zx.txt("Welcome, User "),
+                                    },
+                                },
+                            ),
                         },
                     },
                 ) else _zx.zx(
-                    .p,
+                    .div,
                     .{
                         .children = &.{
-                            _zx.txt("Please log in to continue."),
+                            _zx.zx(
+                                .p,
+                                .{
+                                    .children = &.{
+                                        _zx.txt("Please log in to continue."),
+                                    },
+                                },
+                            ),
                         },
                     },
                 ),
