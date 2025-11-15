@@ -100,6 +100,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                             <h1>ZX</h1>
                         </div>
                         <p class="nav-subtitle">HTML within Zig</p>
+                        <code>v{zx.info.version_string}</code>
                     </div>
                     <ul class="nav-menu">
                         <li><a href="#introduction">Introduction</a></li>
