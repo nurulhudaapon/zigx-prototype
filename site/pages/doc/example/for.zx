@@ -7,15 +7,16 @@ pub fn Page(ctx: zx.Allocator) zx.Component {
     return (
         <main @allocator={ctx}>
             {for (users) |user| (
-                                                                                                <div>
-                                                    <p>{user.name}</p>
-                                                    {switch (user.role) {
-                                                        .admin => (<span>Admin</span>),
-                                                        .member => (<span>Member</span>),
-                                                        .guest => (<span>Guest</span>),
-                                                    }}
-                                                </div>
-                )}
+              <div>
+                <p>{user.name}</p>
+                {switch (user.role) {
+                    .admin => (<span>Admin</span>),
+                    .member => (<span>Member</span>),
+                    .guest => (<span>Guest</span>),
+                }}
+              </div>
+            )}
+        </main>
     );
 }
 
