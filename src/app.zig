@@ -117,7 +117,7 @@ pub const App = struct {
         const thrd = try self.server.listenInNewThread();
 
         for (self.meta.routes) |route| {
-            try processRoute(self.allocator, route, options, &printer);
+            try processRoute(self.allocator, self.server.port, route, options, &printer);
         }
 
         copyDirectory(self.allocator, "site/public", outdir, &printer) catch |err| {
@@ -184,7 +184,7 @@ pub const App = struct {
         }
     }
 
-    fn processRoute(allocator: std.mem.Allocator, route: zx.App.Meta.Route, options: ExportOptions, printer: *Printer) !void {
+    fn processRoute(allocator: std.mem.Allocator, port: u16, route: zx.App.Meta.Route, options: ExportOptions, printer: *Printer) !void {
         const outdir = options.outdir.?;
         // Fetch the route's HTML content
         var client = std.http.Client{ .allocator = allocator };
@@ -193,7 +193,7 @@ pub const App = struct {
         var aw = std.Io.Writer.Allocating.init(allocator);
         defer aw.deinit();
 
-        const url = try std.fmt.allocPrint(allocator, "http://0.0.0.0:5588{s}", .{route.path});
+        const url = try std.fmt.allocPrint(allocator, "http://0.0.0.0:{d}{s}", .{ port, route.path });
         defer allocator.free(url);
 
         _ = client.fetch(.{
@@ -251,7 +251,7 @@ pub const App = struct {
         // Recursively process nested routes
         if (route.routes) |nested_routes| {
             for (nested_routes) |nested_route| {
-                try processRoute(allocator, nested_route, options, printer);
+                try processRoute(allocator, port, nested_route, options, printer);
             }
         }
     }
