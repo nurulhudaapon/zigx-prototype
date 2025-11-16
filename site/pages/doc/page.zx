@@ -154,7 +154,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                         <h3>Installation</h3>
                         <p>Install the ZX CLI tool to get started with building ZX applications.</p>
         
-                        <h4>Linux/MacOS</h4>
+                        <h4>Linux/macOS</h4>
                         <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | bash</code></pre>
         
                         <h4>Windows</h4>

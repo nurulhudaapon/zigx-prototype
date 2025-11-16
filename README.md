@@ -77,13 +77,13 @@ const zx = @import("zx");
 ## Feature Checklist
 
 - [x] Server Side Rendering (SSR)
-- [ ] Static Site Generation (SSG)
+- [x] Static Site Generation (SSG)
 - [ ] Client Side Rendering (CSR) via WebAssembly
 - [ ] Client Side Rendering (CSR) via React
 - [x] Type Safety
 - [x] Routing
     - [x] File-system Routing
-    - [ ] Search Parameters
+    - [x] Search Parameters
     - [ ] Path Segments
 - [x] Components
 - [x] Control Flow
@@ -113,9 +113,9 @@ const zx = @import("zx");
     - [x] `transpile` Transpile .zx files to Zig source code
     - [x] `serve` Serve the project
     - [ ] `dev` HMR or Rebuild on Change
-    - [ ] `fmt` Format the ZX source code
+    - [x] `fmt` Format the ZX source code (_Alpha_)
     - [ ] `export --container` Generate containerizable assets
-    - [ ] `export --ssg` Generate static site assets
+    - [x] `export --ssg` Generate static site assets
     - [x] `version` Show the version of the ZX CLI
     - [ ] `revision` Show the current revision of the ZX CLI
 
