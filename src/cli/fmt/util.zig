@@ -100,8 +100,25 @@ fn extractAndFormatJsxSegment(
     const html_segment_z = try allocator.dupeZ(u8, html_segment);
     defer allocator.free(html_segment_z);
 
-    const formatted_html = try formatHtml(arena, stderr, null, html_segment_z, true);
-    const html_copy = try allocator.dupe(u8, formatted_html orelse "");
+    const formatted_html = formatHtml(arena, stderr, null, html_segment_z, true) catch {
+        // If HTML formatting fails, use the original JSX segment
+        const html_copy = try allocator.dupe(u8, html_segment);
+        try html_segments.append(allocator, html_copy);
+        // Remove leading whitespace that was added to cleaned_source
+        if (html_start < jsx_start) {
+            const chars_to_remove = jsx_start - html_start;
+            if (cleaned_source.items.len >= chars_to_remove) {
+                cleaned_source.items.len -= chars_to_remove;
+            }
+        }
+        const placeholder = try std.fmt.allocPrint(allocator, "@html({d})", .{html_segments.items.len - 1});
+        defer allocator.free(placeholder);
+        try cleaned_source.appendSlice(allocator, placeholder);
+        return html_end_extended;
+    };
+    
+    // If formatted_html is null (syntax errors), use original JSX
+    const html_copy = try allocator.dupe(u8, formatted_html orelse html_segment);
     try html_segments.append(allocator, html_copy);
 
     // Remove leading whitespace that was added to cleaned_source
