@@ -10,13 +10,15 @@ pub const ParseResult = struct {
     }
 };
 
-pub fn parse(allocator: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult {
-    const zig_source = try Transpiler.transpile(allocator, zx_source);
-    errdefer allocator.free(zig_source);
+pub fn parse(gpa: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult {
+    var aa = std.heap.ArenaAllocator.init(gpa);
+    defer aa.deinit();
+    const arena = aa.allocator();
+    const allocator = aa.allocator();
 
-    // std.debug.print("Transpiled ZX source:\n{s}\n", .{zig_source});
+    const zig_source = try Transpiler.transpile(arena, zx_source);
 
-    const ast = try std.zig.Ast.parse(allocator, zig_source, .zig);
+    var ast = try std.zig.Ast.parse(gpa, zig_source, .zig);
 
     if (ast.errors.len > 0) {
         for (ast.errors) |err| {
@@ -25,18 +27,17 @@ pub fn parse(allocator: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult
             try ast.renderError(err, &w.writer);
             std.debug.print("{s}\n", .{w.written()});
         }
+        ast.deinit(gpa);
         return error.ParseError;
     }
 
     const rendered_zig_source = try ast.renderAlloc(allocator);
     const rendered_zig_source_z = try allocator.dupeZ(u8, rendered_zig_source);
-    defer allocator.free(rendered_zig_source);
-    errdefer allocator.free(rendered_zig_source_z);
 
     return ParseResult{
         .zig_ast = ast,
-        .zx_source = zig_source,
-        .zig_source = rendered_zig_source_z,
+        .zx_source = try gpa.dupeZ(u8, zig_source),
+        .zig_source = try gpa.dupeZ(u8, rendered_zig_source_z),
     };
 }
 

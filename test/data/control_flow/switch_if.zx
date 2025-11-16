@@ -4,20 +4,14 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     return (
         <main @allocator={allocator}>
             {switch (user_type) {
-                .admin => {
-                    if (is_active) {
-                        (<p>Active Admin</p>)
-                    } else {
-                        (<p>Inactive Admin</p>)
-                    }
-                },
-                .member => {
-                    if (is_active) {
-                        (<p>Active Member</p>)
-                    } else {
-                        (<p>Inactive Member</p>)
-                    }
-                },
+                .admin => if (is_active)
+                    (<p>Active Admin</p>)
+                else
+                    (<p>Inactive Admin</p>),
+                .member => if (is_active)
+                    (<p>Active Member</p>)
+                else
+                    (<p>Inactive Member</p>),
             }}
         </main>
     );
@@ -26,4 +20,3 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 const zx = @import("zx");
 
 const UserType = enum { admin, member };
-

@@ -4,6 +4,8 @@ const Ast = std.zig.Ast;
 const Token = std.zig.Token;
 const Tokenizer = std.zig.Tokenizer;
 
+const log = std.log.scoped(.zx_transpiler);
+
 /// Escapes text content for use in Zig string literals
 fn escapeTextForStringLiteral(allocator: std.mem.Allocator, text: []const u8) ![]const u8 {
     var result = std.ArrayList(u8){};
@@ -134,6 +136,7 @@ const ZXElement = struct {
         const SwitchCaseValue = union(enum) {
             string_literal: []const u8, // For ("Admin")
             jsx_element: *ZXElement, // For (<p>Admin</p>)
+            conditional_expr: struct { condition: []const u8, if_branch: *ZXElement, else_branch: *ZXElement }, // For if (cond) (<JSX>) else (<JSX>)
         };
     };
 
@@ -181,9 +184,18 @@ const ZXElement = struct {
             } else if (child == .switch_expr) {
                 var switch_expr = child.switch_expr;
                 for (switch_expr.cases.items) |switch_case| {
-                    if (switch_case.value == .jsx_element) {
-                        switch_case.value.jsx_element.deinit();
-                        self.allocator.destroy(switch_case.value.jsx_element);
+                    switch (switch_case.value) {
+                        .jsx_element => |jsx_elem| {
+                            jsx_elem.deinit();
+                            self.allocator.destroy(jsx_elem);
+                        },
+                        .conditional_expr => |cond| {
+                            cond.if_branch.deinit();
+                            self.allocator.destroy(cond.if_branch);
+                            cond.else_branch.deinit();
+                            self.allocator.destroy(cond.else_branch);
+                        },
+                        .string_literal => {},
                     }
                 }
                 switch_expr.cases.deinit(self.allocator);
@@ -476,6 +488,7 @@ fn isVoidElement(tag: []const u8) bool {
 /// Parse JSX syntax into a JsxElement
 fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx, OutOfMemory }!*ZXElement {
     var i: usize = 0;
+    log.debug("parseJsx called with content length: {d}, content: '{s}'", .{ content.len, content });
 
     // Skip whitespace
     while (i < content.len and std.ascii.isWhitespace(content[i])) i += 1;
@@ -665,8 +678,10 @@ fn parseJsx(allocator: std.mem.Allocator, content: []const u8) error{ InvalidJsx
 /// Parse JSX children (text, expressions, nested elements)
 fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: []const u8) error{ InvalidJsx, OutOfMemory }!void {
     var i: usize = 0;
+    log.debug("parseJsxChildren called with content length: {d}, content: '{s}'", .{ content.len, content });
 
     while (i < content.len) {
+        log.debug("parseJsxChildren: i={d}, content[i..]='{s}'", .{ i, if (i < content.len) content[i..] else "" });
         // Check for closing tag
         if (content[i] == '<' and i + 1 < content.len and content[i + 1] == '/') {
             break;
@@ -766,12 +781,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                     while (if_start < else_pos and expr[if_start] != '(') if_start += 1;
                     if (if_start < else_pos and expr[if_start] == '(') {
                         if_start += 1; // Skip opening paren
-                        // Find matching closing paren
+                        // Find matching closing paren, accounting for nested braces from expressions like {switch ...}
                         var if_end = if_start;
                         paren_depth = 1;
+                        var if_brace_depth: i32 = 0;
                         while (if_end < else_pos and paren_depth > 0) {
                             if (expr[if_end] == '(') paren_depth += 1;
                             if (expr[if_end] == ')') paren_depth -= 1;
+                            if (expr[if_end] == '{') if_brace_depth += 1;
+                            if (expr[if_end] == '}') if_brace_depth -= 1;
                             if (paren_depth > 0) if_end += 1;
                         }
                         const if_jsx_content = expr[if_start..if_end];
@@ -783,12 +801,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                         while (else_start < expr.len and expr[else_start] != '(') else_start += 1;
                         if (else_start < expr.len and expr[else_start] == '(') {
                             else_start += 1; // Skip opening paren
-                            // Find matching closing paren
+                            // Find matching closing paren, accounting for nested braces from expressions like {switch ...}
                             var else_end = else_start;
                             paren_depth = 1;
+                            var else_brace_depth: i32 = 0;
                             while (else_end < expr.len and paren_depth > 0) {
                                 if (expr[else_end] == '(') paren_depth += 1;
                                 if (expr[else_end] == ')') paren_depth -= 1;
+                                if (expr[else_end] == '{') else_brace_depth += 1;
+                                if (expr[else_end] == '}') else_brace_depth -= 1;
                                 if (paren_depth > 0) else_end += 1;
                             }
                             const else_jsx_content = expr[else_start..else_end];
@@ -865,63 +886,42 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             // Check for opening paren: {for (iterable) |item| (<JSX>)}
                             if (pipe_pos < expr.len and expr[pipe_pos] == '(') {
                                 pipe_pos += 1; // Skip opening paren
-                                // Find matching closing paren
+                                // Find matching closing paren, accounting for nested braces from expressions like {switch ...}
                                 jsx_content_start = pipe_pos;
                                 jsx_content_end = pipe_pos;
                                 paren_depth = 1;
+                                var for_brace_depth: i32 = 0;
                                 while (jsx_content_end < expr.len and paren_depth > 0) {
                                     if (expr[jsx_content_end] == '(') paren_depth += 1;
                                     if (expr[jsx_content_end] == ')') paren_depth -= 1;
+                                    if (expr[jsx_content_end] == '{') for_brace_depth += 1;
+                                    if (expr[jsx_content_end] == '}') for_brace_depth -= 1;
                                     if (paren_depth > 0) jsx_content_end += 1;
                                 }
                                 found_jsx = true;
                             }
-                            // Check for opening brace: {for (iterable) |item| { (<JSX>) }}
-                            else if (pipe_pos < expr.len and expr[pipe_pos] == '{') {
-                                pipe_pos += 1; // Skip opening brace
-                                // Find matching closing brace
-                                var brace_end = pipe_pos;
-                                var for_brace_depth: i32 = 1;
-                                while (brace_end < expr.len and for_brace_depth > 0) {
-                                    if (expr[brace_end] == '{') for_brace_depth += 1;
-                                    if (expr[brace_end] == '}') for_brace_depth -= 1;
-                                    if (for_brace_depth > 0) brace_end += 1;
-                                }
-
-                                // Now look for (<JSX>) inside the braces
-                                var inner_start = pipe_pos;
-                                // Skip whitespace at the start
-                                while (inner_start < brace_end and std.ascii.isWhitespace(expr[inner_start])) inner_start += 1;
-
-                                if (inner_start < brace_end and expr[inner_start] == '(') {
-                                    inner_start += 1; // Skip opening paren
-                                    jsx_content_start = inner_start;
-                                    jsx_content_end = inner_start;
-                                    var for_paren_depth: i32 = 1;
-                                    while (jsx_content_end < brace_end and for_paren_depth > 0) {
-                                        if (expr[jsx_content_end] == '(') for_paren_depth += 1;
-                                        if (expr[jsx_content_end] == ')') for_paren_depth -= 1;
-                                        if (for_paren_depth > 0) jsx_content_end += 1;
-                                    }
-                                    found_jsx = true;
-                                }
-                            }
 
                             if (found_jsx) {
                                 const jsx_content = expr[jsx_content_start..jsx_content_end];
+                                log.debug("For loop extracted JSX content: '{s}'", .{jsx_content});
 
-                                // Parse JSX body
-                                if (parseJsx(allocator, jsx_content)) |body_elem| {
-                                    try parent.children.append(allocator, .{ .for_loop_expr = .{
-                                        .iterable = iterable,
-                                        .item_name = item_name,
-                                        .body = body_elem,
-                                    } });
-                                    continue;
+                                // Parse JSX body - wrap in a fragment if it doesn't start with <
+                                var body_elem: *ZXElement = undefined;
+                                if (parseJsx(allocator, jsx_content)) |parsed_elem| {
+                                    log.debug("Successfully parsed for loop JSX body as JSX element", .{});
+                                    body_elem = parsed_elem;
                                 } else |_| {
-                                    // Parsing failed
-                                    parsed_for_loop = false;
+                                    // Content doesn't start with <, so wrap it in a fragment and parse as children
+                                    log.debug("JSX content doesn't start with <, wrapping in fragment", .{});
+                                    body_elem = try ZXElement.init(allocator, "fragment");
+                                    try parseJsxChildren(allocator, body_elem, jsx_content);
                                 }
+                                try parent.children.append(allocator, .{ .for_loop_expr = .{
+                                    .iterable = iterable,
+                                    .item_name = item_name,
+                                    .body = body_elem,
+                                } });
+                                continue;
                             } else {
                                 parsed_for_loop = false;
                             }
@@ -1003,6 +1003,118 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             // Skip whitespace after =>
                             while (arrow_pos < expr.len and std.ascii.isWhitespace(expr[arrow_pos])) arrow_pos += 1;
 
+                            // Check for conditional expression: if (cond) (<JSX>) else (<JSX>)
+                            var check_pos = arrow_pos;
+                            while (check_pos < expr.len and std.ascii.isWhitespace(expr[check_pos])) check_pos += 1;
+
+                            if (check_pos + 2 < expr.len and std.mem.startsWith(u8, expr[check_pos..], "if")) {
+                                // Parse conditional expression
+                                log.debug("Found conditional expression in switch case value", .{});
+                                var cond_pos = check_pos + 2; // Skip "if"
+
+                                // Skip whitespace
+                                while (cond_pos < expr.len and std.ascii.isWhitespace(expr[cond_pos])) cond_pos += 1;
+
+                                // Check for opening paren for condition
+                                if (cond_pos < expr.len and expr[cond_pos] == '(') {
+                                    cond_pos += 1;
+                                    const cond_start = cond_pos;
+                                    // Find matching closing paren for condition
+                                    var cond_paren_depth: i32 = 1;
+                                    var cond_brace_depth: i32 = 0;
+                                    while (cond_pos < expr.len and cond_paren_depth > 0) {
+                                        if (expr[cond_pos] == '(') cond_paren_depth += 1;
+                                        if (expr[cond_pos] == ')') cond_paren_depth -= 1;
+                                        if (expr[cond_pos] == '{') cond_brace_depth += 1;
+                                        if (expr[cond_pos] == '}') cond_brace_depth -= 1;
+                                        if (cond_paren_depth > 0) cond_pos += 1;
+                                    }
+                                    // Advance past closing paren
+                                    if (cond_pos < expr.len and expr[cond_pos] == ')') cond_pos += 1;
+                                    const condition_str = expr[cond_start .. cond_pos - 1];
+
+                                    // Skip whitespace
+                                    while (cond_pos < expr.len and std.ascii.isWhitespace(expr[cond_pos])) cond_pos += 1;
+
+                                    // Parse if branch
+                                    if (cond_pos < expr.len and expr[cond_pos] == '(') {
+                                        cond_pos += 1;
+                                        const if_start = cond_pos;
+                                        var if_paren_depth: i32 = 1;
+                                        var if_brace_depth: i32 = 0;
+                                        while (cond_pos < expr.len and if_paren_depth > 0) {
+                                            if (expr[cond_pos] == '(') if_paren_depth += 1;
+                                            if (expr[cond_pos] == ')') if_paren_depth -= 1;
+                                            if (expr[cond_pos] == '{') if_brace_depth += 1;
+                                            if (expr[cond_pos] == '}') if_brace_depth -= 1;
+                                            if (if_paren_depth > 0) cond_pos += 1;
+                                        }
+                                        const if_end = cond_pos;
+                                        if (cond_pos < expr.len and expr[cond_pos] == ')') cond_pos += 1;
+
+                                        // Skip whitespace
+                                        while (cond_pos < expr.len and std.ascii.isWhitespace(expr[cond_pos])) cond_pos += 1;
+
+                                        // Check for "else"
+                                        if (cond_pos + 4 <= expr.len and std.mem.eql(u8, expr[cond_pos .. cond_pos + 4], "else")) {
+                                            cond_pos += 4; // Skip "else"
+
+                                            // Skip whitespace
+                                            while (cond_pos < expr.len and std.ascii.isWhitespace(expr[cond_pos])) cond_pos += 1;
+
+                                            // Parse else branch
+                                            if (cond_pos < expr.len and expr[cond_pos] == '(') {
+                                                cond_pos += 1;
+                                                const else_start = cond_pos;
+                                                var else_paren_depth: i32 = 1;
+                                                var else_brace_depth: i32 = 0;
+                                                while (cond_pos < expr.len and else_paren_depth > 0) {
+                                                    if (expr[cond_pos] == '(') else_paren_depth += 1;
+                                                    if (expr[cond_pos] == ')') else_paren_depth -= 1;
+                                                    if (expr[cond_pos] == '{') else_brace_depth += 1;
+                                                    if (expr[cond_pos] == '}') else_brace_depth -= 1;
+                                                    if (else_paren_depth > 0) cond_pos += 1;
+                                                }
+                                                const else_end = cond_pos;
+                                                if (cond_pos < expr.len and expr[cond_pos] == ')') cond_pos += 1;
+
+                                                const if_jsx_content = expr[if_start..if_end];
+                                                const else_jsx_content = expr[else_start..else_end];
+
+                                                // Parse both JSX branches
+                                                if (parseJsx(allocator, if_jsx_content)) |if_elem| {
+                                                    if (parseJsx(allocator, else_jsx_content)) |else_elem| {
+                                                        try cases.append(allocator, .{
+                                                            .pattern = pattern,
+                                                            .value = .{ .conditional_expr = .{
+                                                                .condition = condition_str,
+                                                                .if_branch = if_elem,
+                                                                .else_branch = else_elem,
+                                                            } },
+                                                        });
+                                                        arrow_pos = cond_pos; // Update arrow_pos to end of conditional
+                                                        // Skip whitespace and comma
+                                                        while (arrow_pos < expr.len and (std.ascii.isWhitespace(expr[arrow_pos]) or expr[arrow_pos] == ',')) {
+                                                            arrow_pos += 1;
+                                                        }
+                                                        case_start = arrow_pos;
+                                                        continue;
+                                                    } else |_| {
+                                                        if_elem.deinit();
+                                                        allocator.destroy(if_elem);
+                                                        parsed_switch = false;
+                                                        break;
+                                                    }
+                                                } else |_| {
+                                                    parsed_switch = false;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Parse value - either ("string") or (<JSX>)
                             if (arrow_pos < expr.len and expr[arrow_pos] == '(') {
                                 arrow_pos += 1; // Skip opening paren
@@ -1027,10 +1139,13 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                 } else {
                                     // JSX element: (<p>Admin</p>)
                                     var jsx_paren_depth: i32 = 1;
+                                    var jsx_brace_depth: i32 = 0;
                                     var jsx_end = arrow_pos;
                                     while (jsx_end < expr.len and jsx_paren_depth > 0) {
                                         if (expr[jsx_end] == '(') jsx_paren_depth += 1;
                                         if (expr[jsx_end] == ')') jsx_paren_depth -= 1;
+                                        if (expr[jsx_end] == '{') jsx_brace_depth += 1;
+                                        if (expr[jsx_end] == '}') jsx_brace_depth -= 1;
                                         if (jsx_paren_depth > 0) jsx_end += 1;
                                     }
                                     const jsx_content = expr[value_start..jsx_end];
@@ -1166,6 +1281,143 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
             try parent.children.append(allocator, .{ .element = child_elem });
             i = j;
             continue;
+        }
+
+        // Skip whitespace before checking for conditional expression
+        var check_pos = i;
+        while (check_pos < content.len and std.ascii.isWhitespace(content[check_pos])) check_pos += 1;
+
+        // Check for conditional expression directly in JSX content: if (cond) (JSX) else (JSX)
+        if (check_pos + 2 < content.len and std.mem.startsWith(u8, content[check_pos..], "if")) {
+            log.debug("Found potential conditional expression at position {d} (after whitespace at {d})", .{ check_pos, i });
+            const cond_start = check_pos;
+            var cond_pos = check_pos + 2; // Skip "if"
+
+            // Skip whitespace
+            while (cond_pos < content.len and std.ascii.isWhitespace(content[cond_pos])) cond_pos += 1;
+
+            // Check for opening paren
+            if (cond_pos < content.len and content[cond_pos] == '(') {
+                log.debug("Found opening paren for condition at position {d}", .{cond_pos});
+                cond_pos += 1;
+                // Find matching closing paren for condition
+                var cond_paren_depth: i32 = 1;
+                var cond_brace_depth: i32 = 0;
+                while (cond_pos < content.len and cond_paren_depth > 0) {
+                    if (content[cond_pos] == '(') cond_paren_depth += 1;
+                    if (content[cond_pos] == ')') cond_paren_depth -= 1;
+                    if (content[cond_pos] == '{') cond_brace_depth += 1;
+                    if (content[cond_pos] == '}') cond_brace_depth -= 1;
+                    if (cond_paren_depth > 0) cond_pos += 1;
+                }
+                // cond_pos is now at the closing paren, advance past it
+                if (cond_pos < content.len and content[cond_pos] == ')') cond_pos += 1;
+                log.debug("Found closing paren for condition, now at position {d}", .{cond_pos});
+
+                // Skip whitespace after condition
+                while (cond_pos < content.len and std.ascii.isWhitespace(content[cond_pos])) cond_pos += 1;
+                log.debug("After skipping whitespace, cond_pos={d}, content[cond_pos..]='{s}'", .{ cond_pos, if (cond_pos < content.len) content[cond_pos..] else "" });
+
+                // Check for opening paren for if branch
+                if (cond_pos < content.len and content[cond_pos] == '(') {
+                    log.debug("Found opening paren for if branch at position {d}", .{cond_pos});
+                    cond_pos += 1;
+                    const if_start = cond_pos;
+                    // Find matching closing paren for if branch
+                    var if_paren_depth: i32 = 1;
+                    var if_brace_depth: i32 = 0;
+                    while (cond_pos < content.len and if_paren_depth > 0) {
+                        if (content[cond_pos] == '(') if_paren_depth += 1;
+                        if (content[cond_pos] == ')') if_paren_depth -= 1;
+                        if (content[cond_pos] == '{') if_brace_depth += 1;
+                        if (content[cond_pos] == '}') if_brace_depth -= 1;
+                        if (if_paren_depth > 0) cond_pos += 1;
+                    }
+                    const if_end = cond_pos;
+                    log.debug("If branch ends at position {d}, content at that position: '{c}'", .{ if_end, if (if_end < content.len) content[if_end] else '?' });
+                    // cond_pos is at the closing paren, advance past it
+                    if (cond_pos < content.len and content[cond_pos] == ')') cond_pos += 1;
+                    log.debug("After if branch, cond_pos={d}, content[cond_pos..]='{s}'", .{ cond_pos, if (cond_pos < content.len) content[cond_pos..] else "" });
+
+                    // Skip whitespace
+                    while (cond_pos < content.len and std.ascii.isWhitespace(content[cond_pos])) cond_pos += 1;
+
+                    // Check for "else"
+                    if (cond_pos + 4 <= content.len and std.mem.eql(u8, content[cond_pos .. cond_pos + 4], "else")) {
+                        log.debug("Found 'else' at position {d}", .{cond_pos});
+                        cond_pos += 4; // Skip "else"
+
+                        // Skip whitespace
+                        while (cond_pos < content.len and std.ascii.isWhitespace(content[cond_pos])) cond_pos += 1;
+
+                        // Check for opening paren for else branch
+                        if (cond_pos < content.len and content[cond_pos] == '(') {
+                            log.debug("Found opening paren for else branch at position {d}", .{cond_pos});
+                            cond_pos += 1;
+                            const else_start = cond_pos;
+                            // Find matching closing paren for else branch
+                            var else_paren_depth: i32 = 1;
+                            var else_brace_depth: i32 = 0;
+                            while (cond_pos < content.len and else_paren_depth > 0) {
+                                if (content[cond_pos] == '(') else_paren_depth += 1;
+                                if (content[cond_pos] == ')') else_paren_depth -= 1;
+                                if (content[cond_pos] == '{') else_brace_depth += 1;
+                                if (content[cond_pos] == '}') else_brace_depth -= 1;
+                                if (else_paren_depth > 0) cond_pos += 1;
+                            }
+                            const else_end = cond_pos;
+                            log.debug("Found closing paren for else branch at position {d}", .{cond_pos});
+                            cond_pos += 1; // Advance past the closing paren of else branch
+
+                            // Extract condition properly
+                            var cond_start2 = cond_start + 2; // Skip "if"
+                            while (cond_start2 < content.len and std.ascii.isWhitespace(content[cond_start2])) cond_start2 += 1;
+                            if (cond_start2 < content.len and content[cond_start2] == '(') {
+                                cond_start2 += 1;
+                                var cond_end2 = cond_start2;
+                                var cond_paren_depth3: i32 = 1;
+                                var cond_brace_depth3: i32 = 0;
+                                while (cond_end2 < content.len and cond_paren_depth3 > 0) {
+                                    if (content[cond_end2] == '(') cond_paren_depth3 += 1;
+                                    if (content[cond_end2] == ')') cond_paren_depth3 -= 1;
+                                    if (content[cond_end2] == '{') cond_brace_depth3 += 1;
+                                    if (content[cond_end2] == '}') cond_brace_depth3 -= 1;
+                                    if (cond_paren_depth3 > 0) cond_end2 += 1;
+                                }
+                                const condition_str = content[cond_start2 .. cond_end2 - 1];
+                                const if_jsx_content = content[if_start..if_end];
+                                const else_jsx_content = content[else_start..else_end];
+
+                                log.debug("Extracted condition: '{s}'", .{condition_str});
+                                log.debug("Extracted if branch JSX: '{s}'", .{if_jsx_content});
+                                log.debug("Extracted else branch JSX: '{s}'", .{else_jsx_content});
+
+                                // Parse both JSX branches
+                                if (parseJsx(allocator, if_jsx_content)) |if_elem| {
+                                    log.debug("Successfully parsed if branch", .{});
+                                    if (parseJsx(allocator, else_jsx_content)) |else_elem| {
+                                        log.debug("Successfully parsed else branch, adding conditional_expr", .{});
+                                        try parent.children.append(allocator, .{ .conditional_expr = .{
+                                            .condition = condition_str,
+                                            .if_branch = if_elem,
+                                            .else_branch = else_elem,
+                                        } });
+                                        log.debug("Setting i from {d} to {d} (cond_pos), remaining content: '{s}'", .{ i, cond_pos, if (cond_pos < content.len) content[cond_pos..] else "" });
+                                        i = cond_pos;
+                                        continue;
+                                    } else |err| {
+                                        log.err("Failed to parse else branch JSX: {any}", .{err});
+                                        if_elem.deinit();
+                                        allocator.destroy(if_elem);
+                                    }
+                                } else |err| {
+                                    log.err("Failed to parse if branch JSX: {any}", .{err});
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Regular text
@@ -1563,9 +1815,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     .conditional_expr => |cond| {
                         // Conditional expression: {if (cond) (<JSX>) else (<JSX>)}
                         // Render as: if (condition) <render if_branch> else <render else_branch>
+                        log.debug("Rendering conditional_expr with condition: '{s}'", .{cond.condition});
                         try output.addToken(.keyword_if, "if");
                         try output.addToken(.l_paren, "(");
-                        try output.addToken(.identifier, cond.condition);
+                        // Render condition as raw text (may contain dots, function calls, etc.)
+                        try output.addToken(.invalid, cond.condition);
                         try output.addToken(.r_paren, ")");
                         try output.addToken(.invalid, " ");
 
@@ -1724,6 +1978,25 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                 .jsx_element => |jsx_elem| {
                                     // JSX element: _zx.zx(.p, .{ ... })
                                     try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item);
+                                },
+                                .conditional_expr => |cond| {
+                                    // Conditional expression: if (condition) <render if_branch> else <render else_branch>
+                                    try output.addToken(.keyword_if, "if");
+                                    try output.addToken(.l_paren, "(");
+                                    // Render condition as raw text (may contain dots, function calls, etc.)
+                                    try output.addToken(.invalid, cond.condition);
+                                    try output.addToken(.r_paren, ")");
+                                    try output.addToken(.invalid, " ");
+
+                                    // Render if branch
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item);
+
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.keyword_else, "else");
+                                    try output.addToken(.invalid, " ");
+
+                                    // Render else branch
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item);
                                 },
                             }
 
@@ -2067,7 +2340,8 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                     // Conditional expression: {if (cond) (<JSX>) else (<JSX>)}
                     try output.addToken(.keyword_if, "if");
                     try output.addToken(.l_paren, "(");
-                    try output.addToken(.identifier, cond.condition);
+                    // Render condition as raw text (may contain dots, function calls, etc.)
+                    try output.addToken(.invalid, cond.condition);
                     try output.addToken(.r_paren, ")");
                     try output.addToken(.invalid, " ");
 

@@ -6,16 +6,16 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     };
     return (
         <main @allocator={ctx.arena}>
-            {for (users) |user| {
-                (<div>
+            {for (users) |user| (
+                <div>
                     <p>{user.name}</p>
                     {switch (user.role) {
                         .admin => (<span>Admin</span>),
                         .member => (<span>Member</span>),
                         .guest => (<span>Guest</span>),
                     }}
-                </div>)
-            }}
+                </div>
+            )}
         </main>
     );
 }

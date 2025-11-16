@@ -11,6 +11,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+pub const std_options = std.Options{
+    .log_level = .warn, // Suppress debug and info logs
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .zx_transpiler, .level = .warn }, // Only show warnings and errors for zx_transpiler
+    },
+};
+
 const Allocator = std.mem.Allocator;
 
 const BORDER = "=" ** 80;

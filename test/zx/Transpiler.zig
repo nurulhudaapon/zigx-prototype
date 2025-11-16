@@ -52,8 +52,7 @@ test "if_switch" {
     // try test_transpile("control_flow/if_switch");
 }
 test "for_if" {
-    return error.Todo;
-    // try test_transpile("control_flow/for_if");
+    try test_transpile("control_flow/for_if");
 }
 test "for_for" {
     return error.Todo;
@@ -63,8 +62,7 @@ test "for_switch" {
     try test_transpile("control_flow/for_switch");
 }
 test "switch_if" {
-    return error.Todo;
-    // try test_transpile("control_flow/switch_if");
+    try test_transpile("control_flow/switch_if");
 }
 test "switch_for" {
     return error.Todo;
@@ -176,10 +174,10 @@ const TestFileCache = struct {
         // "control_flow/if_if",
         // "control_flow/if_for",
         // "control_flow/if_switch",
-        // "control_flow/for_if",
+        "control_flow/for_if",
         // "control_flow/for_for",
         "control_flow/for_switch",
-        // "control_flow/switch_if",
+        "control_flow/switch_if",
         // "control_flow/switch_for",
         // "control_flow/switch_switch",
         // "control_flow/while",
