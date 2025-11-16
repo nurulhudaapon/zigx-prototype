@@ -1,11 +1,11 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const users = [_]struct { name: []const u8, role: UserRole }{
         .{ .name = "John", .role = .admin },
         .{ .name = "Jane", .role = .member },
         .{ .name = "Jim", .role = .guest },
     };
     return (
-        <main @allocator={ctx.arena}>
+        <main @allocator={allocator}>
             {for (users) |user| (
                 <div>
                     <p>{user.name}</p>

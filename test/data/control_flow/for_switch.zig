@@ -1,14 +1,14 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const users = [_]struct { name: []const u8, role: UserRole }{
         .{ .name = "John", .role = .admin },
         .{ .name = "Jane", .role = .member },
         .{ .name = "Jim", .role = .guest },
     };
-    var _zx = zx.initWithAllocator(ctx.arena);
+    var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .main,
         .{
-            .allocator = ctx.arena,
+            .allocator = allocator,
             .children = blk: {
                 const __zx_children = _zx.getAllocator().alloc(zx.Component, users.len) catch unreachable;
                 for (users, 0..) |user, i| {

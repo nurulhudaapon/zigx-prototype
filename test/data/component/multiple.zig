@@ -1,9 +1,9 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
-    var _zx = zx.initWithAllocator(ctx.arena);
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .main,
         .{
-            .allocator = ctx.arena,
+            .allocator = allocator,
             .children = &.{
                 _zx.lazy(Button, .{ .title = "Submit" }),
                 _zx.lazy(Button, .{ .title = "Cancel" }),

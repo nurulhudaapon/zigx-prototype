@@ -1,13 +1,12 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const show_users = true;
     const user_names = [_][]const u8{ "John", "Jane", "Jim", "Jill" };
     return (
-        <main @allocator={ctx.arena}>
+        <main @allocator={allocator}>
             {if (show_users) (
                 for (user_names) |name| (<p>{name}</p>)
-            ) else (
-                (<p>Users hidden</p>)
-            )}
+            ) else (<p>Users hidden</p>)}
+        </main>
     );
 }
 

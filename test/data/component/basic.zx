@@ -1,6 +1,6 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     return (
-        <main @allocator={ctx.arena}>
+        <main @allocator={allocator}>
             <Button title="Custom Button" />
         </main>
     );
