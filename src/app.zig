@@ -108,6 +108,7 @@ pub const App = struct {
 
     pub fn build(self: *App, options: ExportOptions) !void {
         const outdir = options.outdir.?;
+        const port = self.server.config.port.?;
         std.debug.print("\x1b[1m○ Building static ZX site!\x1b[0m\n\n", .{});
         std.debug.print("  - \x1b[90m{s}\x1b[0m\n", .{outdir});
 
@@ -117,7 +118,7 @@ pub const App = struct {
         const thrd = try self.server.listenInNewThread();
 
         for (self.meta.routes) |route| {
-            try processRoute(self.allocator, self.server.port, route, options, &printer);
+            try processRoute(self.allocator, port, route, options, &printer);
         }
 
         copyDirectory(self.allocator, "site/public", outdir, &printer) catch |err| {
