@@ -11,6 +11,7 @@ pub fn build(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.
         // try serve.register(writer, reader, allocator),
         try transpile.register(writer, reader, allocator),
         try fmt.register(writer, reader, allocator),
+        try @"export".register(writer, reader, allocator),
     });
 
     return root;
@@ -25,7 +26,7 @@ const init = @import("init.zig");
 const version = @import("version.zig");
 const transpile = @import("transpile.zig");
 const fmt = @import("fmt.zig");
-
+const @"export" = @import("export.zig");
 const zx = @import("zx");
 const std = @import("std");
 const zli = @import("zli");
