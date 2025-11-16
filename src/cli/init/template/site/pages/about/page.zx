@@ -1,7 +1,7 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
     const about_zx = mod.get_about_zx();
     return (
-        <main @allocator={ctx.allocator}>
+        <main @allocator={ctx.arena}>
             <p>{about_zx}</p>
             <a href="/">Back to Home</a>
         </main>

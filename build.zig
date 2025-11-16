@@ -214,6 +214,20 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     exe.step.dependOn(&transpile_cmd.step);
     b.installArtifact(exe);
 
+    const site_export_exe = b.addExecutable(.{
+        .name = "zx_site_export",
+        .root_module = b.createModule(.{
+            .root_source_file = outdir.path(b, "main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = imports.items,
+        }),
+    });
+    site_export_exe.root_module.addImport("zx", zx_dep.module("zx"));
+    site_export_exe.step.dependOn(&transpile_cmd.step);
+    const site_export_step = b.step("export", "Build the site (docs, example, sample)");
+    site_export_step.dependOn(&b.addRunArtifact(site_export_exe).step);
+
     // --- Steps: Transpile (Not used for now) ---
     const transpile_step = b.step("transpile", "Transpile Zx components before running");
     transpile_step.dependOn(&transpile_cmd.step);

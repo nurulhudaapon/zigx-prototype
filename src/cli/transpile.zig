@@ -328,8 +328,21 @@ fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8, verbos
         .data = rendered_zig_source,
     });
 
+    var aa = std.heap.ArenaAllocator.init(allocator);
+    defer aa.deinit();
+    const arena = aa.allocator();
+
+    const main_zig_path = try std.fs.path.join(arena, &.{ output_dir, "main.zig" });
+    const main_export_file_content = @embedFile("./transpile/main_export.zig");
+
+    try std.fs.cwd().writeFile(.{
+        .sub_path = main_zig_path,
+        .data = main_export_file_content,
+    });
+
     if (verbose) {
         std.debug.print("Generated meta.zig at: {s}\n", .{meta_path});
+        std.debug.print("Generated main.zig at: {s}\n", .{main_zig_path});
     }
 }
 

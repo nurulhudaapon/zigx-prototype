@@ -4,7 +4,7 @@ const zx = @import("zx");
 
 const config = zx.App.Config{
     .server = .{
-        .port = 5588,
+        .port = 49152, // uncommon but valid port (highest dynamic/private port)
         .address = "0.0.0.0",
         .request = .{
             .max_form_count = 100,
