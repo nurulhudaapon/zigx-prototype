@@ -1,6 +1,7 @@
 const std = @import("std");
 const zli = @import("zli");
 const util = @import("fmt/util.zig");
+const log = std.log.scoped(.fmt);
 
 const stdio_flag = zli.Flag{
     .name = "stdio",
@@ -47,29 +48,28 @@ fn fmt(ctx: zli.CommandContext) !void {
         return;
     };
 
-    // Try to format as file first
-    formatFile(
-        ctx.allocator,
-        ctx.writer,
-        std.fs.cwd(),
-        path_value,
-        path_value,
-        use_stdout,
-    ) catch |err| switch (err) {
-        error.IsDir, error.AccessDenied => {
-            // It's a directory, format it
-            try formatDir(
-                ctx.allocator,
-                ctx.writer,
-                path_value,
-                use_stdout,
-            );
-        },
-        else => {
-            std.debug.print("Error: Could not access path '{s}': {}\n", .{ path_value, err });
-            return err;
-        },
-    };
+    // Check if path is a directory first
+    if (std.fs.cwd().openDir(path_value, .{ .iterate = true })) |dir| {
+        var dir_mut = dir;
+        dir_mut.close();
+        // It's a directory, format it
+        try formatDir(
+            ctx.allocator,
+            ctx.writer,
+            path_value,
+            use_stdout,
+        );
+    } else |_| {
+        // It's a file, format it
+        try formatFile(
+            ctx.allocator,
+            ctx.writer,
+            std.fs.cwd(),
+            path_value,
+            path_value,
+            use_stdout,
+        );
+    }
 }
 
 fn formatFromStdin(allocator: std.mem.Allocator, writer: *std.Io.Writer) !void {
@@ -144,16 +144,51 @@ fn formatDir(
     while (try walker.next()) |entry| {
         if (entry.kind != .file) continue;
 
-        formatFile(
+        // Check if file ends with .zx before processing
+        if (!std.mem.endsWith(u8, entry.path, ".zx")) continue;
+
+        // Construct full path relative to current working directory
+        // Normalize path by removing leading ./ if present
+        const normalized_path = if (std.mem.startsWith(u8, path, "./")) path[2..] else path;
+        const full_path = try std.fs.path.join(allocator, &.{ normalized_path, entry.path });
+        defer allocator.free(full_path);
+
+        // Read file using entry.dir (which is the directory containing the file)
+        const source = try entry.dir.readFileAlloc(
             allocator,
-            writer,
-            entry.dir,
             entry.basename,
-            entry.path,
-            use_stdout,
-        ) catch |err| {
-            std.debug.print("Error formatting {s}: {}\n", .{ entry.path, err });
-            continue;
+            std.math.maxInt(usize),
+        );
+        defer allocator.free(source);
+
+        const source_z = try allocator.dupeZ(u8, source);
+        defer allocator.free(source_z);
+
+        var format_result = util.format(allocator, source_z) catch |err| switch (err) {
+            error.ParseError => {
+                log.err("Error formatting {s}: {}\n", .{ full_path, err });
+                continue;
+            },
+            else => return err,
         };
+        defer format_result.deinit(allocator);
+
+        if (use_stdout) {
+            try writer.writeAll(format_result.formatted_zx);
+            continue;
+        }
+
+        // Skip writing if content unchanged
+        if (std.mem.eql(u8, format_result.formatted_zx, source)) {
+            continue;
+        }
+
+        // Write formatted content back to file using entry.dir
+        var atomic_file = try entry.dir.atomicFile(entry.basename, .{ .write_buffer = &.{} });
+        defer atomic_file.deinit();
+
+        try atomic_file.file_writer.interface.writeAll(format_result.formatted_zx);
+        try atomic_file.finish();
+        try writer.print("{s}\n", .{full_path});
     }
 }
