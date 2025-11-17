@@ -10,7 +10,9 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     };
     
     return (
-        <main @allocator={allocator}>
+        <div @allocator={allocator}>
+            <link rel="stylesheet" href="/about.css">
+            <main>
             <h1>About ZX</h1>
             <p>ZX is a modern web framework that combines the expressiveness of JSX with the performance and safety of Zig.</p>
             
@@ -33,7 +35,8 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <footer>
                 <p>Copyright {[year:d]} - ZX Framework - Built with Zig</p>
             </footer>
-        </main>
+            </main>
+        </div>
     );
 }
 
