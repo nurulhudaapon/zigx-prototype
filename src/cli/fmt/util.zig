@@ -32,7 +32,7 @@ pub fn formatHtml(
     }
 
     var w: std.io.Writer.Allocating = .init(arena);
-    try fmt_html.render(html_ast, src, &w.writer);
+    try fmt_html.render(arena, html_ast, src, &w.writer);
     const result = w.written();
     return result;
 }
