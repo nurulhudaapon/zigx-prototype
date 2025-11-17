@@ -58,6 +58,14 @@ pub const Component = union(enum) {
     text: []const u8,
     element: Element,
     component_fn: ComponentFn,
+    component_csr: ComponentCsr,
+
+    pub const ComponentCsr = struct {
+        name: []const u8,
+        path: []const u8,
+        id: []const u8,
+        props: ?*const anyopaque = null,
+    };
 
     pub const ComponentFn = struct {
         propsPtr: ?*const anyopaque,
@@ -191,6 +199,13 @@ pub const Component = union(enum) {
                 // Lazily invoke the component function and render its result
                 const component = func.call();
                 try component.internalRender(writer, slots);
+            },
+            .component_csr => |component_csr| {
+                try writer.print("<{s} id=\"{s}\">", .{ component_csr.name, component_csr.id });
+                if (component_csr.props) |props| {
+                    try writer.print(" data-props=\"{any}\">", .{props});
+                }
+                try writer.print("</{s}>", .{component_csr.name});
             },
             .element => |elem| {
                 // Check if this element has a 'slot' attribute and we're collecting slots
@@ -418,8 +433,39 @@ const ZxContext = struct {
             return .{ .component_fn = Component.ComponentFn.init(func, allocator, props) };
         }
     }
+
+    pub fn client(self: *ZxContext, options: ClientComponentOptions, props: anytype) Component {
+        const allocator = self.getAllocator();
+
+        const name_copy = allocator.alloc(u8, options.name.len) catch @panic("OOM");
+        @memcpy(name_copy, options.name);
+        const path_copy = allocator.alloc(u8, options.path.len) catch @panic("OOM");
+        @memcpy(path_copy, options.path);
+        const id_copy = allocator.alloc(u8, options.id.len) catch @panic("OOM");
+        @memcpy(id_copy, options.id);
+
+        // Allocate and copy props struct
+        const PropsType = @TypeOf(props);
+        const props_copy = blk: {
+            const p = allocator.create(PropsType) catch @panic("OOM");
+            p.* = props;
+            break :blk @as(?*const anyopaque, @ptrCast(p));
+        };
+
+        return .{ .component_csr = .{
+            .name = name_copy,
+            .path = path_copy,
+            .id = id_copy,
+            .props = props_copy,
+        } };
+    }
 };
 
+const ClientComponentOptions = struct {
+    name: []const u8,
+    path: []const u8,
+    id: []const u8,
+};
 /// Initialize a ZxContext without an allocator
 /// The allocator must be provided via @allocator attribute on the parent element
 pub fn init() ZxContext {

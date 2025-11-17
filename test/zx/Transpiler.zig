@@ -114,6 +114,10 @@ test "component_multiple" {
     try test_transpile("component/multiple");
     try test_render(@import("./../data/component/multiple.zig").Page);
 }
+test "component_csr_react" {
+    try test_transpile("component/csr_react");
+    try test_render(@import("./../data/component/csr_react.zig").Page);
+}
 
 test "performance" {
     const MAX_TIME_MS = 50.0 * 8; // 50ms is on M1 Pro
@@ -219,6 +223,7 @@ const TestFileCache = struct {
         // Component
         "component/basic",
         "component/multiple",
+        "component/csr_react",
     };
     fn init(allocator: std.mem.Allocator) !TestFileCache {
         var cache = TestFileCache{
