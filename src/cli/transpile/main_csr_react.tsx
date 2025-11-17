@@ -1,12 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-type ComponentMetadata = {
-  name: string;
-  path: string;
-  id: string;
-  import: () => Promise<(props: unknown) => React.ReactElement>;
-}
+const components = `{[ZX_COMPONENTS]s}` as unknown as ComponentMetadata[];
+
+for (const component of components) renderComponent(component).catch(console.error);
 
 async function renderComponent(component: ComponentMetadata) {
   const domNode = document.getElementById(component.id);
@@ -18,6 +15,9 @@ async function renderComponent(component: ComponentMetadata) {
   createRoot(domNode).render(<ImportedComponent {...props} />);
 }
 
-const components = `{[ZX_COMPONENTS]s}` as unknown as ComponentMetadata[];
-
-for (const component of components) renderComponent(component).catch(console.error);
+type ComponentMetadata = {
+  name: string;
+  path: string;
+  id: string;
+  import: () => Promise<(props: unknown) => React.ReactElement>;
+}

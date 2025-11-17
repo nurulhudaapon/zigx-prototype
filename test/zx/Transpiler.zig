@@ -184,7 +184,7 @@ fn test_render(comptime cmp: fn (allocator: std.mem.Allocator) zx.Component) !vo
     const rendered = aw.written();
     try testing.expect(rendered.len > 0);
 
-    std.debug.print("rendered: {s}\n", .{rendered});
+    // std.debug.print("rendered: {s}\n", .{rendered});
 
     // try testing.expectEqualStrings(expected_source_z, rendered);
 }

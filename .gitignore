@@ -3,3 +3,4 @@ zig-out
 .zx
 tmp
 dist
+site/public/index.js
