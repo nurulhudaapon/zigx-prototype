@@ -85,12 +85,15 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const txt_expr = "{expression}";
     const fmt_expr = "{[expression:format]}";
 
+    const js_version = std.fmt.allocPrint(allocator, "doc.js?v={s}", .{zx.info.version_string}) catch unreachable;
+    const css_version = std.fmt.allocPrint(allocator, "doc.css?v={s}", .{zx.info.version_string}) catch unreachable;
+
     return (
         
         <div  @allocator={allocator}>
                     
             <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
-            <link rel="stylesheet" href="/doc.css">
+            <link rel="stylesheet" href={css_version}>
         
             <div class="container">
         
@@ -403,8 +406,7 @@ zig build serve</code></pre>
 
                 </main>
 
-                <script async type="module" src="doc.js"></script>
-                <script async type="module" src="prism-zx.js"></script>
+                <script async type="module" src={js_version}></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js">
             </div>

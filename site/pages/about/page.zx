@@ -1,6 +1,5 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
     const allocator = ctx.arena;
-    const year = 2024;
     const features = [_][]const u8{
         "JSX-like syntax in Zig",
         "Server-Side Rendering (SSR)",
@@ -36,7 +35,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                     </ul>
                     
                     <footer>
-                        <p>Copyright {[year:d]} - ZX Framework - Built with Zig</p>
+                        <p>Copyright - ZX Framework - Built with Zig</p>
                     </footer>
                 </section>
             </div>
