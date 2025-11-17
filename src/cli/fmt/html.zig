@@ -75,17 +75,18 @@ const ExpressionAst = struct {
         if (std.mem.startsWith(u8, remaining, "switch")) {
             return try parseSwitch(allocator, text, expr_start, i + 6);
         } else if (std.mem.startsWith(u8, remaining, "if")) {
-            return try parseIf(allocator, text, expr_start, i + 2);
+            return try parseIf(text, expr_start, i + 2);
         } else if (std.mem.startsWith(u8, remaining, "for")) {
-            return try parseFor(allocator, text, expr_start, i + 3);
+            return try parseFor(text, expr_start, i + 3);
         } else if (std.mem.startsWith(u8, remaining, "while")) {
-            return try parseWhile(allocator, text, expr_start, i + 5);
+            return try parseWhile(text, expr_start, i + 5);
         }
 
         return null;
     }
 
     fn parseSwitch(allocator: std.mem.Allocator, text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
+        fmtlog.debug("parseSwitch: text = '{s}'", .{text});
         var i = keyword_end;
         // Skip whitespace
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
@@ -193,12 +194,19 @@ const ExpressionAst = struct {
         };
     }
 
-    fn parseIf(allocator: std.mem.Allocator, text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
-        _ = allocator;
+    fn parseIf(text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
+        fmtlog.debug("parseIf: text = '{s}', start = {}, keyword_end = {}", .{ text, start, keyword_end });
         var i = keyword_end;
         // Skip whitespace
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
-        if (i >= text.len or text[i] != '(') return null;
+        if (i >= text.len) {
+            fmtlog.debug("parseIf: failed at check 1: i >= text.len (i={}, text.len={})", .{ i, text.len });
+            return null;
+        }
+        if (text[i] != '(') {
+            fmtlog.debug("parseIf: failed at check 2: text[i] != '(', text[i] = '{c}'", .{text[i]});
+            return null;
+        }
 
         // Find condition: (expr)
         var paren_depth: i32 = 1;
@@ -209,13 +217,25 @@ const ExpressionAst = struct {
             if (text[i] == ')') paren_depth -= 1;
             if (paren_depth > 0) i += 1;
         }
-        if (i >= text.len) return null;
+        if (i >= text.len) {
+            fmtlog.debug("parseIf: failed at check 3: condition not closed (i={}, text.len={})", .{ i, text.len });
+            return null;
+        }
         const condition_end = i;
         i += 1; // Skip ')'
+        fmtlog.debug("parseIf: condition found: '{s}'", .{text[condition_start..condition_end]});
 
         // Skip whitespace
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
-        if (i >= text.len or text[i] != '(') return null;
+        if (i >= text.len) {
+            fmtlog.debug("parseIf: failed at check 4: i >= text.len after condition (i={}, text.len={})", .{ i, text.len });
+            return null;
+        }
+        if (text[i] != '(') {
+            const remaining_text = if (i < text.len) text[i..] else "";
+            fmtlog.debug("parseIf: failed at check 5: then branch doesn't start with '(', text[i] = '{c}', remaining = '{s}'", .{ text[i], remaining_text });
+            return null;
+        }
 
         // Find then branch: (value)
         paren_depth = 1;
@@ -226,9 +246,13 @@ const ExpressionAst = struct {
             if (text[i] == ')') paren_depth -= 1;
             if (paren_depth > 0) i += 1;
         }
-        if (i >= text.len) return null;
+        if (i >= text.len) {
+            fmtlog.debug("parseIf: failed at check 6: then branch not closed (i={}, text.len={}, paren_depth={})", .{ i, text.len, paren_depth });
+            return null;
+        }
         const then_end = i;
         i += 1; // Skip ')'
+        fmtlog.debug("parseIf: then_branch found: '{s}'", .{text[then_start..then_end]});
 
         // Check for else
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
@@ -249,13 +273,18 @@ const ExpressionAst = struct {
                     const else_end = i;
                     else_branch = .{ .start = else_start, .end = else_end };
                     i += 1; // Skip ')'
+                    fmtlog.debug("parseIf: else_branch found: '{s}'", .{text[else_start..else_end]});
                 }
             }
         }
 
         // Find closing brace
         while (i < text.len and text[i] != '}') i += 1;
-        const expr_end = if (i < text.len) i + 1 else text.len;
+        if (i >= text.len) {
+            fmtlog.debug("parseIf: failed at check 7: closing brace not found (i={}, text.len={})", .{ i, text.len });
+            return null;
+        }
+        const expr_end = i + 1;
 
         return ExpressionAst{
             .kind = .{ .if_expr = .{
@@ -269,8 +298,8 @@ const ExpressionAst = struct {
         };
     }
 
-    fn parseFor(allocator: std.mem.Allocator, text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
-        _ = allocator;
+    fn parseFor(text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
+        fmtlog.debug("parseFor: text = '{s}'", .{text});
         var i = keyword_end;
         // Skip whitespace
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
@@ -332,8 +361,8 @@ const ExpressionAst = struct {
         };
     }
 
-    fn parseWhile(allocator: std.mem.Allocator, text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
-        _ = allocator;
+    fn parseWhile(text: []const u8, start: usize, keyword_end: usize) !?ExpressionAst {
+        fmtlog.debug("parseWhile: text = '{s}'", .{text});
         var i = keyword_end;
         // Skip whitespace
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
@@ -492,6 +521,7 @@ fn formatBlockContent(content: []const u8, indent_level: u32, w: *Writer) !void 
     var it = std.mem.splitScalar(u8, content, '\n');
     var first = true;
 
+    fmtlog.debug("formatBlockContent: content = '{s}'", .{content});
     while (it.next()) |line| {
         const trimmed = std.mem.trim(u8, line, &std.ascii.whitespace);
         if (trimmed.len == 0) {
@@ -530,6 +560,7 @@ fn hasControlFlow(text: []const u8) bool {
                 std.mem.startsWith(u8, remaining, "for") or
                 std.mem.startsWith(u8, remaining, "while"))
             {
+                fmtlog.debug("hasControlFlow: found control flow keyword: {s}", .{remaining});
                 return true;
             }
         }
@@ -538,38 +569,170 @@ fn hasControlFlow(text: []const u8) bool {
     return false;
 }
 
+/// Find the full expression span in the source, starting from a given position
+/// Returns the start and end positions of the complete expression (including the closing '}')
+fn findFullExpressionSpan(src: []const u8, start_pos: usize) ?struct { start: usize, end: usize } {
+    if (start_pos >= src.len or src[start_pos] != '{') return null;
+
+    var i = start_pos + 1; // Skip opening '{'
+    var brace_depth: i32 = 1;
+
+    while (i < src.len and brace_depth > 0) {
+        if (src[i] == '{') brace_depth += 1;
+        if (src[i] == '}') brace_depth -= 1;
+        if (brace_depth > 0) i += 1;
+    }
+
+    if (brace_depth == 0 and i < src.len) {
+        return .{ .start = start_pos, .end = i + 1 }; // Include closing '}'
+    }
+
+    return null;
+}
+
 /// Format text that may contain control flow expressions (switch, if, for, while)
 /// by applying proper indentation to the content inside them.
+/// Note: This function may receive partial content when expressions span multiple text nodes
+/// (e.g., when HTML elements are inside the expression).
+/// If full_source and text_start_pos are provided, it will try to reconstruct the full expression.
 fn formatControlFlowText(
     allocator: std.mem.Allocator,
     text: []const u8,
     base_indent: u32,
     w: *Writer,
+    full_source: ?[]const u8,
+    text_start_pos: ?usize,
 ) !void {
     fmtlog.debug("formatControlFlowText: text length = {}, base_indent = {}", .{ text.len, base_indent });
     fmtlog.debug("formatControlFlowText: text content = '{s}'", .{text});
 
-    if (!hasControlFlow(text)) {
+    // Analyze the text to understand its structure
+    const trimmed = std.mem.trimRight(u8, text, &std.ascii.whitespace);
+    const starts_with_brace = text.len > 0 and text[0] == '{';
+    const ends_with_brace = trimmed.len > 0 and trimmed[trimmed.len - 1] == '}';
+    const has_opening_brace = std.mem.indexOfScalar(u8, text, '{') != null;
+    const has_closing_brace = std.mem.indexOfScalar(u8, text, '}') != null;
+    const brace_count = std.mem.count(u8, text, "{");
+    const closing_brace_count = std.mem.count(u8, text, "}");
+
+    fmtlog.debug("formatControlFlowText: analysis - starts_with_brace={}, ends_with_brace={}, has_opening={}, has_closing={}, brace_count={}, closing_count={}", .{
+        starts_with_brace,
+        ends_with_brace,
+        has_opening_brace,
+        has_closing_brace,
+        brace_count,
+        closing_brace_count,
+    });
+
+    // Check if this looks like part of a control flow expression even without keywords
+    const looks_like_control_flow_part =
+        std.mem.startsWith(u8, std.mem.trimLeft(u8, text, &std.ascii.whitespace), ") else (") or
+        std.mem.startsWith(u8, std.mem.trimLeft(u8, text, &std.ascii.whitespace), ") }") or
+        (!starts_with_brace and ends_with_brace and !has_opening_brace); // ends with } but no {
+
+    if (!hasControlFlow(text) and !looks_like_control_flow_part) {
         // No control flow, just write as-is
+        fmtlog.debug("formatControlFlowText: no control flow detected and doesn't look like part of expression, writing as-is", .{});
         try w.writeAll(text);
         return;
     }
 
-    // Try to parse as control flow expression
-    if (try ExpressionAst.parse(allocator, text)) |expr_ast| {
-        // Successfully parsed, render it
-        try expr_ast.render(base_indent, w);
-        // Free allocated memory
-        switch (expr_ast.kind) {
-            .switch_expr => |switch_expr| {
-                allocator.free(switch_expr.cases);
-            },
-            else => {},
-        }
-    } else {
-        // Failed to parse, write as-is
-        try w.writeAll(text);
+    if (!hasControlFlow(text) and looks_like_control_flow_part) {
+        fmtlog.debug("formatControlFlowText: looks like part of control flow expression but no keywords, treating as partial", .{});
+        // Fall through to handle as partial
     }
+
+    // Strategy: Handle different cases of partial/complete expressions
+    // Case 1: Complete expression (starts with { and ends with })
+    if (starts_with_brace and ends_with_brace) {
+        fmtlog.debug("formatControlFlowText: appears to be complete expression, attempting to parse", .{});
+        if (try ExpressionAst.parse(allocator, text)) |expr_ast| {
+            fmtlog.debug("formatControlFlowText: successfully parsed as control flow expression {s}", .{@tagName(expr_ast.kind)});
+            try expr_ast.render(base_indent, w);
+            switch (expr_ast.kind) {
+                .switch_expr => |switch_expr| {
+                    fmtlog.debug("formatControlFlowText: freeing switch_expr.cases", .{});
+                    allocator.free(switch_expr.cases);
+                },
+                else => {},
+            }
+            return;
+        } else {
+            fmtlog.debug("formatControlFlowText: failed to parse complete expression, writing as-is", .{});
+            try w.writeAll(text);
+            return;
+        }
+    }
+
+    // Case 2: Starts with { but doesn't end with } - likely start of expression
+    // Try to reconstruct the full expression from the source
+    if (starts_with_brace and !ends_with_brace) {
+        fmtlog.debug("formatControlFlowText: starts with brace but doesn't end with brace - attempting to reconstruct full expression", .{});
+
+        if (full_source) |src| {
+            if (text_start_pos) |start_pos| {
+                if (findFullExpressionSpan(src, start_pos)) |span| {
+                    const full_expr = src[span.start..span.end];
+                    fmtlog.debug("formatControlFlowText: found full expression in source: '{s}'", .{full_expr});
+
+                    // Try to parse the full expression
+                    if (try ExpressionAst.parse(allocator, full_expr)) |expr_ast| {
+                        fmtlog.debug("formatControlFlowText: successfully parsed full expression {s}", .{@tagName(expr_ast.kind)});
+                        try expr_ast.render(base_indent, w);
+                        switch (expr_ast.kind) {
+                            .switch_expr => |switch_expr| {
+                                fmtlog.debug("formatControlFlowText: freeing switch_expr.cases", .{});
+                                allocator.free(switch_expr.cases);
+                            },
+                            else => {},
+                        }
+                        return;
+                    } else {
+                        fmtlog.debug("formatControlFlowText: failed to parse full expression, writing partial as-is", .{});
+                    }
+                } else {
+                    fmtlog.debug("formatControlFlowText: couldn't find full expression span in source", .{});
+                }
+            }
+        }
+
+        // Fallback: write as-is if we can't reconstruct
+        fmtlog.debug("formatControlFlowText: writing partial expression as-is", .{});
+        try w.writeAll(text);
+        return;
+    }
+
+    // Case 3: Doesn't start with { but ends with } - likely end of expression
+    if (!starts_with_brace and ends_with_brace) {
+        fmtlog.debug("formatControlFlowText: ends with brace but doesn't start with brace - likely end of expression split across nodes", .{});
+        // This is the closing part of an expression, write it as-is
+        fmtlog.debug("formatControlFlowText: writing closing part as-is", .{});
+        try w.writeAll(text);
+        return;
+    }
+
+    // Case 4: Looks like middle part of control flow (e.g., ") else (")
+    const trimmed_left = std.mem.trimLeft(u8, text, &std.ascii.whitespace);
+    if (std.mem.startsWith(u8, trimmed_left, ") else (") or
+        std.mem.startsWith(u8, trimmed_left, ") }"))
+    {
+        fmtlog.debug("formatControlFlowText: appears to be middle part of control flow expression (e.g., ') else (')", .{});
+        fmtlog.debug("formatControlFlowText: writing as-is", .{});
+        try w.writeAll(text);
+        return;
+    }
+
+    // Case 5: Contains braces but neither starts nor ends with them - middle part of expression
+    if (has_opening_brace or has_closing_brace) {
+        fmtlog.debug("formatControlFlowText: contains braces but is partial - middle part of expression", .{});
+        fmtlog.debug("formatControlFlowText: writing as-is", .{});
+        try w.writeAll(text);
+        return;
+    }
+
+    // Case 6: Has control flow keyword but no braces visible - might be in the middle
+    fmtlog.debug("formatControlFlowText: has control flow keyword but unclear structure, writing as-is", .{});
+    try w.writeAll(text);
 }
 
 pub fn render(allocator: std.mem.Allocator, ast: htmlz.html.Ast, src: []const u8, w: *Writer) !void {
@@ -583,6 +746,9 @@ pub fn render(allocator: std.mem.Allocator, ast: htmlz.html.Ast, src: []const u8
     var last_rbracket: u32 = 0;
     var last_was_text = false;
     var pre: u32 = 0;
+    // Track the end position of the last processed control flow expression
+    // Text nodes that start before this position are part of an already-processed expression
+    var last_processed_expr_end: ?usize = null;
     while (true) {
         // const zone_outer = tracy.trace(@src());
         // defer zone_outer.end();
@@ -720,6 +886,26 @@ pub fn render(allocator: std.mem.Allocator, ast: htmlz.html.Ast, src: []const u8
                 std.debug.assert(direction == .enter);
 
                 const txt = current.open.slice(src);
+                fmtlog.debug("processing text node: txt = '{s}' (len={}), start={}, end={}", .{ txt, txt.len, current.open.start, current.open.end });
+
+                // Skip if this text node is part of an already-processed expression
+                if (last_processed_expr_end) |expr_end| {
+                    if (current.open.start < expr_end) {
+                        fmtlog.debug("skipping text node - part of already-processed expression (start={} < expr_end={})", .{ current.open.start, expr_end });
+                        last_rbracket = current.open.end;
+                        if (current.next_idx != 0) {
+                            current = ast.nodes[current.next_idx];
+                        } else {
+                            current = ast.nodes[current.parent_idx];
+                            direction = .exit;
+                        }
+                        continue;
+                    } else {
+                        // We've passed the processed expression, reset
+                        last_processed_expr_end = null;
+                    }
+                }
+
                 const parent_kind = ast.nodes[current.parent_idx].kind;
                 switch (parent_kind) {
                     else => blk: {
@@ -727,12 +913,54 @@ pub fn render(allocator: std.mem.Allocator, ast: htmlz.html.Ast, src: []const u8
                             try w.writeAll(txt);
                             break :blk;
                         }
-                        // Check if text contains control flow expressions
-                        if (hasControlFlow(txt)) {
-                            fmtlog.debug("text contains control flow, using formatControlFlowText", .{});
-                            try formatControlFlowText(allocator, txt, indentation, w);
+                        // Check if text contains control flow expressions or is part of one
+                        // This includes:
+                        // 1. Text that starts with { and has control flow keywords (complete or partial)
+                        // 2. Text that looks like part of a control flow expression (e.g., ") else (", ")}")
+                        const txt_trimmed_left = std.mem.trimLeft(u8, txt, &std.ascii.whitespace);
+                        const txt_trimmed_right = std.mem.trimRight(u8, txt, &std.ascii.whitespace);
+                        const is_control_flow = hasControlFlow(txt) or
+                            std.mem.startsWith(u8, txt_trimmed_left, ") else (") or
+                            std.mem.startsWith(u8, txt_trimmed_left, ") }") or
+                            (txt_trimmed_right.len > 0 and
+                                txt_trimmed_right[txt_trimmed_right.len - 1] == '}' and
+                                std.mem.indexOfScalar(u8, txt, '{') == null); // ends with } but doesn't contain {
+
+                        // Only process if it's the start of an expression (has control flow keyword and starts with {)
+                        // Other parts will be handled when we process the start
+                        const starts_with_brace_after_trim = txt_trimmed_left.len > 0 and txt_trimmed_left[0] == '{';
+                        if (is_control_flow and hasControlFlow(txt) and starts_with_brace_after_trim) {
+                            fmtlog.debug("text appears to be start of control flow expression, using formatControlFlowText txt = '{s}'", .{txt});
+                            // Try to find and process the full expression
+                            if (findFullExpressionSpan(src, current.open.start)) |span| {
+                                const full_expr = src[span.start..span.end];
+                                fmtlog.debug("found full expression span: start={}, end={}, expr='{s}'", .{ span.start, span.end, full_expr });
+
+                                if (try ExpressionAst.parse(allocator, full_expr)) |expr_ast| {
+                                    fmtlog.debug("successfully parsed full expression {s}", .{@tagName(expr_ast.kind)});
+                                    try expr_ast.render(indentation, w);
+                                    // Mark that we've processed this expression
+                                    last_processed_expr_end = span.end;
+                                    switch (expr_ast.kind) {
+                                        .switch_expr => |switch_expr| {
+                                            allocator.free(switch_expr.cases);
+                                        },
+                                        else => {},
+                                    }
+                                    break :blk;
+                                }
+                            }
+                            // Fallback: try formatControlFlowText
+                            try formatControlFlowText(allocator, txt, indentation, w, src, current.open.start);
+                            break :blk;
+                        } else if (is_control_flow and !hasControlFlow(txt)) {
+                            // This is a middle/end part - should be skipped if we processed the start
+                            // But if we didn't process the start, write it as-is
+                            fmtlog.debug("text is middle/end part of control flow expression", .{});
+                            try w.writeAll(txt);
                             break :blk;
                         }
+                        fmtlog.debug("text node doesn't contain control flow, processing normally", .{});
                         var it = std.mem.splitScalar(u8, txt, '\n');
                         var first = true;
                         var empty_line = false;
