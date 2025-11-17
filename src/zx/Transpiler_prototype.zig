@@ -6,7 +6,7 @@ const Tokenizer = std.zig.Tokenizer;
 
 const log = std.log.scoped(.zx_transpiler);
 
-const ClientComponentMetadata = struct {
+pub const ClientComponentMetadata = struct {
     name: []const u8,
     path: []const u8,
     id: []const u8,
@@ -248,8 +248,13 @@ const ZXElement = struct {
     }
 };
 
+const TranspilationResult = struct {
+    zig_source: [:0]const u8,
+    client_components: std.ArrayList(ClientComponentMetadata),
+};
+
 /// Transpile a .zx file to .zig by transforming JSX syntax
-pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const u8 {
+pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) !TranspilationResult {
     var result = std.ArrayList(u8){};
     try result.ensureTotalCapacity(allocator, source.len);
     errdefer result.deinit(allocator);
@@ -259,14 +264,6 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
     // Track client components (components with @rendering attribute)
     var client_components = std.ArrayList(ClientComponentMetadata){};
     try client_components.ensureTotalCapacity(allocator, 8);
-    defer {
-        for (client_components.items) |*metadata| {
-            allocator.free(metadata.name);
-            allocator.free(metadata.path);
-            allocator.free(metadata.id);
-        }
-        client_components.deinit(allocator);
-    }
 
     // Track @jsImport declarations: component name -> path
     var js_imports = std.StringHashMap([]const u8).init(allocator);
@@ -591,7 +588,10 @@ pub fn transpile(allocator: std.mem.Allocator, source: [:0]const u8) ![:0]const 
 
     const result_z = try allocator.dupeZ(u8, result.items);
 
-    return result_z;
+    return TranspilationResult{
+        .zig_source = result_z,
+        .client_components = client_components,
+    };
 }
 
 /// Find the start of JSX content after a position (looks for <)

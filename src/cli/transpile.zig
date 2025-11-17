@@ -263,8 +263,30 @@ const Route = struct {
     }
 };
 
-/// Generate meta.zig file from the pages directory structure
-fn generateMetaFile(allocator: std.mem.Allocator, output_dir: []const u8, verbose: bool) !void {
+fn generateClientComponentJson(allocator: std.mem.Allocator, components: []const zx.Ast.ClientComponentMetadata, output_dir: []const u8) !void {
+    const json_str = std.json.Stringify.valueAlloc(allocator, components, .{
+        .whitespace = .indent_4,
+    }) catch @panic("OOM");
+    defer allocator.free(json_str);
+
+    const client_component_json_path = try std.fs.path.join(allocator, &.{ output_dir, "public", "components.json" });
+    defer allocator.free(client_component_json_path);
+
+    // Ensure the public directory exists
+    const public_dir = try std.fs.path.join(allocator, &.{ output_dir, "public" });
+    defer allocator.free(public_dir);
+    std.fs.cwd().makePath(public_dir) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+
+    try std.fs.cwd().writeFile(.{
+        .sub_path = client_component_json_path,
+        .data = json_str,
+    });
+}
+
+fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: bool) !void {
     const pages_dir = try std.fs.path.join(allocator, &.{ output_dir, "pages" });
     defer allocator.free(pages_dir);
 
@@ -526,7 +548,7 @@ fn copySpecifiedDirectories(
     }
 }
 
-fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8, verbose: bool) !void {
+fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8, global_components: *std.array_list.Managed(zx.Ast.ClientComponentMetadata), verbose: bool) !void {
     // Read the source file
     const source = try std.fs.cwd().readFileAlloc(
         allocator,
@@ -541,6 +563,20 @@ fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_p
     // Parse and transpile
     var result = try zx.Ast.parse(allocator, source_z);
     defer result.deinit(allocator);
+
+    // Append components from this file to the global list
+    for (result.client_components.items) |component| {
+        // Clone the component metadata to add to global list
+        const cloned_name = try allocator.dupe(u8, component.name);
+        const cloned_path = try allocator.dupe(u8, component.path);
+        const cloned_id = try allocator.dupe(u8, component.id);
+
+        try global_components.append(.{
+            .name = cloned_name,
+            .path = cloned_path,
+            .id = cloned_id,
+        });
+    }
 
     // Create output directory if needed
     if (std.fs.path.dirname(output_path)) |dir| {
@@ -567,6 +603,7 @@ fn transpileDirectory(
     output_dir: []const u8,
     include_zig: bool,
     copy_dirs: []const []const u8,
+    global_components: *std.array_list.Managed(zx.Ast.ClientComponentMetadata),
     verbose: bool,
 ) !void {
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
@@ -663,7 +700,7 @@ fn transpileDirectory(
         defer allocator.free(output_path);
 
         if (should_transpile) {
-            transpileFile(allocator, input_path, output_path, verbose) catch |err| {
+            transpileFile(allocator, input_path, output_path, global_components, verbose) catch |err| {
                 std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
                 continue;
             };
@@ -701,6 +738,17 @@ fn transpileCommand(
     copy_dirs: []const []const u8,
     verbose: bool,
 ) !void {
+    // Initialize global component metadata list
+    var global_components = std.array_list.Managed(zx.Ast.ClientComponentMetadata).init(allocator);
+    defer {
+        for (global_components.items) |*component| {
+            allocator.free(component.name);
+            allocator.free(component.path);
+            allocator.free(component.id);
+        }
+        global_components.deinit();
+    }
+
     // Check if path is a file or directory
     const stat = std.fs.cwd().statFile(path) catch |err| switch (err) {
         error.IsDir => std.fs.File.Stat{ .kind = .directory, .size = 0, .mode = 0, .atime = 0, .mtime = 0, .ctime = 0, .inode = 0 },
@@ -714,10 +762,10 @@ fn transpileCommand(
         if (verbose) {
             std.debug.print("Transpiling directory: {s}\n", .{path});
         }
-        try transpileDirectory(allocator, path, output_dir, include_zig, copy_dirs, verbose);
+        try transpileDirectory(allocator, path, output_dir, include_zig, copy_dirs, &global_components, verbose);
 
         // Generate meta.zig after transpiling directory
-        generateMetaFile(allocator, output_dir, verbose) catch |err| {
+        generateFiles(allocator, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
         };
     } else if (stat.kind == .file) {
@@ -759,7 +807,7 @@ fn transpileCommand(
         const output_path = try std.fs.path.join(allocator, &.{ output_dir, output_rel_path });
         defer allocator.free(output_path);
 
-        try transpileFile(allocator, path, output_path, verbose);
+        try transpileFile(allocator, path, output_path, &global_components, verbose);
 
         // Copy specified directories after transpiling the file
         copySpecifiedDirectories(allocator, path, output_dir, copy_dirs, verbose) catch |err| {
@@ -767,7 +815,7 @@ fn transpileCommand(
         };
 
         // Generate meta.zig if pages directory exists
-        generateMetaFile(allocator, output_dir, verbose) catch |err| {
+        generateFiles(allocator, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate meta.zig: {}\n", .{err});
         };
 
@@ -777,6 +825,13 @@ fn transpileCommand(
     } else {
         std.debug.print("Error: Path must be a file or directory\n", .{});
         return error.InvalidPath;
+    }
+
+    // Write the single components.json file after all files are transpiled
+    if (global_components.items.len > 0) {
+        generateClientComponentJson(allocator, global_components.items, output_dir) catch |err| {
+            std.debug.print("Warning: Failed to generate components.json: {}\n", .{err});
+        };
     }
 }
 

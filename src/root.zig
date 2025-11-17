@@ -64,7 +64,7 @@ pub const Component = union(enum) {
         name: []const u8,
         path: []const u8,
         id: []const u8,
-        props: ?*const anyopaque = null,
+        props_json: ?[]const u8 = null,
     };
 
     pub const ComponentFn = struct {
@@ -173,6 +173,15 @@ pub const Component = union(enum) {
                 // Free the props that were allocated
                 func.deinit();
             },
+            .component_csr => |component_csr| {
+                // Free allocated strings
+                allocator.free(component_csr.name);
+                allocator.free(component_csr.path);
+                allocator.free(component_csr.id);
+                if (component_csr.props_json) |props_json| {
+                    allocator.free(props_json);
+                }
+            },
         }
     }
 
@@ -201,11 +210,15 @@ pub const Component = union(enum) {
                 try component.internalRender(writer, slots);
             },
             .component_csr => |component_csr| {
-                try writer.print("<{s} id=\"{s}\">", .{ component_csr.name, component_csr.id });
-                if (component_csr.props) |props| {
-                    try writer.print(" data-props=\"{any}\">", .{props});
+                try writer.print("<{s} id=\"{s}\"", .{ "div", component_csr.id });
+                if (component_csr.props_json) |props_json| {
+                    try writer.print(" data-name=\"{s}\" data-props=\"", .{component_csr.name});
+                    // Escape JSON for HTML attribute
+                    try escapeAttributeValueToWriter(writer, props_json);
+                    try writer.print("\"", .{});
                 }
-                try writer.print("</{s}>", .{component_csr.name});
+                try writer.print(">", .{});
+                try writer.print("</{s}>", .{"div"});
             },
             .element => |elem| {
                 // Check if this element has a 'slot' attribute and we're collecting slots
@@ -325,58 +338,10 @@ const ZxContext = struct {
 
     fn escapeHtml(self: *ZxContext, text: []const u8) []const u8 {
         const allocator = self.getAllocator();
-        // First pass: calculate the escaped length
-        var escaped_len: usize = 0;
-        for (text) |char| {
-            escaped_len += switch (char) {
-                '&' => 5, // &amp;
-                '<' => 4, // &lt;
-                '>' => 4, // &gt;
-                '"' => 6, // &quot;
-                '\'' => 6, // &#x27;
-                else => 1,
-            };
-        }
-
-        // If no escaping needed, return original text
-        if (escaped_len == text.len) {
-            const copy = allocator.alloc(u8, text.len) catch @panic("OOM");
-            @memcpy(copy, text);
-            return copy;
-        }
-
-        // Second pass: allocate and escape
-        const escaped = allocator.alloc(u8, escaped_len) catch @panic("OOM");
-        var i: usize = 0;
-        for (text) |char| {
-            switch (char) {
-                '&' => {
-                    @memcpy(escaped[i..][0..5], "&amp;");
-                    i += 5;
-                },
-                '<' => {
-                    @memcpy(escaped[i..][0..4], "&lt;");
-                    i += 4;
-                },
-                '>' => {
-                    @memcpy(escaped[i..][0..4], "&gt;");
-                    i += 4;
-                },
-                '"' => {
-                    @memcpy(escaped[i..][0..6], "&quot;");
-                    i += 6;
-                },
-                '\'' => {
-                    @memcpy(escaped[i..][0..6], "&#x27;");
-                    i += 6;
-                },
-                else => {
-                    escaped[i] = char;
-                    i += 1;
-                },
-            }
-        }
-        return escaped;
+        // Use a buffer writer to leverage the shared escaping logic
+        var aw = std.io.Writer.Allocating.init(allocator);
+        escapeAttributeValueToWriter(&aw.writer, text) catch @panic("OOM");
+        return aw.written();
     }
 
     pub fn zx(self: *ZxContext, tag: ElementTag, options: ZxOptions) Component {
@@ -444,19 +409,13 @@ const ZxContext = struct {
         const id_copy = allocator.alloc(u8, options.id.len) catch @panic("OOM");
         @memcpy(id_copy, options.id);
 
-        // Allocate and copy props struct
-        const PropsType = @TypeOf(props);
-        const props_copy = blk: {
-            const p = allocator.create(PropsType) catch @panic("OOM");
-            p.* = props;
-            break :blk @as(?*const anyopaque, @ptrCast(p));
-        };
+        const props_json = std.json.Stringify.valueAlloc(allocator, props, .{}) catch @panic("OOM");
 
         return .{ .component_csr = .{
             .name = name_copy,
             .path = path_copy,
             .id = id_copy,
-            .props = props_copy,
+            .props_json = props_json,
         } };
     }
 };

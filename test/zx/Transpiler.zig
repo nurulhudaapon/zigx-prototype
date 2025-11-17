@@ -118,6 +118,10 @@ test "component_csr_react" {
     try test_transpile("component/csr_react");
     try test_render(@import("./../data/component/csr_react.zig").Page);
 }
+test "component_csr_react_multiple" {
+    try test_transpile("component/csr_react_multiple");
+    try test_render(@import("./../data/component/csr_react_multiple.zig").Page);
+}
 
 test "performance" {
     const MAX_TIME_MS = 50.0 * 8; // 50ms is on M1 Pro
@@ -180,6 +184,8 @@ fn test_render(comptime cmp: fn (allocator: std.mem.Allocator) zx.Component) !vo
     const rendered = aw.written();
     try testing.expect(rendered.len > 0);
 
+    std.debug.print("rendered: {s}\n", .{rendered});
+
     // try testing.expectEqualStrings(expected_source_z, rendered);
 }
 
@@ -224,6 +230,7 @@ const TestFileCache = struct {
         "component/basic",
         "component/multiple",
         "component/csr_react",
+        "component/csr_react_multiple",
     };
     fn init(allocator: std.mem.Allocator) !TestFileCache {
         var cache = TestFileCache{

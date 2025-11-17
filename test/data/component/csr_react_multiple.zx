@@ -1,0 +1,14 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    const max_count = 10;
+
+    return (
+        <main @allocator={allocator}>
+            <CounterComponent @rendering={.csr} max_count={max_count} />
+            <AnotherComponent @rendering={.csr} />
+        </main>
+    );
+}
+
+const zx = @import("zx");
+const CounterComponent = @jsImport("csr_react.tsx");
+const AnotherComponent = @jsImport("csr_react_multiple.tsx");
