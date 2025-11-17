@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
     mod.addOptions("zx_info", options);
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---
-    const zli_dep = b.dependency("zli", .{ .target = target, .optimize = optimize });
+    const zli_dep = b.lazyDependency("zli", .{ .target = target, .optimize = optimize });
     const htmlz_dep = b.dependency("superhtml", .{ .target = target, .optimize = optimize });
     const exe = b.addExecutable(.{
         .name = "zx",
@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "zx", .module = mod },
                 .{ .name = "httpz", .module = httpz_dep.module("httpz") },
-                .{ .name = "zli", .module = zli_dep.module("zli") },
+                .{ .name = "zli", .module = zli_dep.?.module("zli") },
                 .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
             },
         }),
@@ -90,7 +90,7 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_cmd.addArgs(args);
 
     // --- Steps: Run Docs ---
-    const run_docs_step = b.step("run-site", "Run the site (docs, example, sample)");
+    const run_docs_step = b.step("serve", "Run the site (docs, example, sample)");
     const run_docs_cmd = b.addRunArtifact(site_exe);
     run_docs_step.dependOn(&run_docs_cmd.step);
     run_docs_cmd.step.dependOn(b.getInstallStep());
@@ -149,7 +149,7 @@ pub fn build(b: *std.Build) void {
                 .imports = &.{
                     .{ .name = "zx", .module = mod },
                     .{ .name = "httpz", .module = httpz_dep.module("httpz") },
-                    .{ .name = "zli", .module = zli_dep.module("zli") },
+                    .{ .name = "zli", .module = zli_dep.?.module("zli") },
                     .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
                 },
             }),

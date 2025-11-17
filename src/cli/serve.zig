@@ -2,19 +2,21 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     const cmd = try zli.Command.init(writer, reader, allocator, .{
         .name = "serve",
         .description = "Run the server",
-    }, run);
+    }, serve);
 
     try cmd.addFlag(port_flag);
 
     return cmd;
 }
 
-fn run(ctx: zli.CommandContext) !void {
-    const port = ctx.flag("port", u32); // type-safe flag access
-
-    std.debug.print("○ Running server on port \x1b[90m{d}\x1b[0m\n", .{port});
-
-    std.debug.print("TODO", .{});
+fn serve(ctx: zli.CommandContext) !void {
+    const port = ctx.flag("port", u32);
+    const port_str = try std.fmt.allocPrint(ctx.allocator, "{d}", .{port});
+    defer ctx.allocator.free(port_str);
+    var system = std.process.Child.init(&.{ "zig", "build", "serve", "--", "--port", port_str }, ctx.allocator);
+    try system.spawn();
+    const term = try system.wait();
+    _ = term;
 }
 
 const port_flag = zli.Flag{
@@ -23,6 +25,7 @@ const port_flag = zli.Flag{
     .description = "Port to run the server on",
     .type = .Int,
     .default_value = .{ .Int = 3000 },
+    .hidden = true,
 };
 
 const std = @import("std");

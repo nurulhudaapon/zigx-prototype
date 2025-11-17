@@ -291,6 +291,7 @@ pre {
     max-width: 100%;
     box-sizing: border-box;
     scrollbar-gutter: stable;
+    position: relative;
 }
 
 pre code {
@@ -413,6 +414,7 @@ pre code {
     min-width: 0;
     max-width: 100%;
     overflow: visible;
+    position: relative;
 }
 
 .code-wrapper pre {
@@ -424,6 +426,7 @@ pre code {
     white-space: pre;
     max-width: 100%;
     box-sizing: border-box;
+    position: relative;
 }
 
 .code-wrapper code {
@@ -794,6 +797,57 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
+}
+
+/* Copy button styles */
+.copy-button {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #f6f8fa;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    transition: all 0.2s ease;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+}
+
+pre:hover .copy-button,
+.code-wrapper:hover .copy-button {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.copy-button:hover {
+    background: #eaeef2;
+    border-color: #d0d7de;
+    color: var(--link-color);
+}
+
+.copy-button:active {
+    background: #d0d7de;
+}
+
+.copy-button.copied {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.copy-button svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .example-code pre code {

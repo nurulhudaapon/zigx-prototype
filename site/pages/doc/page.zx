@@ -399,8 +399,12 @@ zig build serve</code></pre>
                             </li>
                         </ul>
                     </section>
+                    
+
                 </main>
 
+                <script async type="module" src="doc.js"></script>
+                <script async type="module" src="prism-zx.js"></script>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js">
             </div>
@@ -439,7 +443,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
         <div class="code-example" @allocator={allocator}>
             <div class="example-code">
                 <h4>ZX</h4>
-                <pre><code id={zx_code_id} class="language-jsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>
+                <pre><code id={zx_code_id} class="language-tsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>
             </div>
             <div class="example-code">
                 <input type="radio" id={preview_id} name={name_id} class="tab-radio" checked>
