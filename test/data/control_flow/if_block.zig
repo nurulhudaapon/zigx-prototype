@@ -14,7 +14,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                                 .p,
                                 .{
                                     .children = &.{
-                                        _zx.txt("Welcome, User "),
+                                        _zx.txt("Welcome, User"),
                                     },
                                 },
                             ),

@@ -1,6 +1,7 @@
 const std = @import("std");
 const htmlz = @import("htmlz");
-const fmt_html = @import("html.zig");
+const expr = @import("expr.zig");
+const fmtlog = std.log.scoped(.fmt_util);
 
 const stderr_buffer_size = 4096;
 var stderr_buffer: [stderr_buffer_size]u8 = undefined;
@@ -32,9 +33,16 @@ pub fn formatHtml(
     }
 
     var w: std.io.Writer.Allocating = .init(arena);
-    try fmt_html.render(arena, html_ast, src, &w.writer);
-    const result = w.written();
-    return result;
+    try html_ast.render(src, &w.writer);
+    const fmtted_html = w.written();
+
+    fmtlog.debug("fmtted_html: \n```\n{s}\n```", .{fmtted_html});
+    // Parse expressions from the formatted HTML
+    const expressions = try expr.parse(arena, fmtted_html);
+
+    // Render with expressions formatted
+    const formatted = try expr.render(arena, fmtted_html, expressions);
+    return formatted;
 }
 
 fn findLeadingWhitespaceStart(source: []const u8, jsx_start: usize) usize {
