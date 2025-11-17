@@ -11,31 +11,35 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     
     return (
         <div @allocator={allocator}>
-            <link rel="stylesheet" href="/about.css">
-            <main>
-            <h1>About ZX</h1>
-            <p>ZX is a modern web framework that combines the expressiveness of JSX with the performance and safety of Zig.</p>
-            
-            <h2>Key Features</h2>
-            <ul>
-                {for (features) |feature| (
-                    <li>{feature}</li>
-                )}
-            </ul>
-            
-            <h2>Why ZX?</h2>
-            <p>Built with Zig, ZX offers:</p>
-            <ul>
-                <li>Blazing fast server-side rendering</li>
-                <li>Memory safety without garbage collection</li>
-                <li>Compile-time guarantees</li>
-                <li>Zero-cost abstractions</li>
-            </ul>
-            
-            <footer>
-                <p>Copyright {[year:d]} - ZX Framework - Built with Zig</p>
-            </footer>
-            </main>
+            <link rel="stylesheet" href="/doc.css">
+            <div class="content">
+                <section class="section">
+                    <div class="section-header">
+                        <h2>About ZX</h2>
+                    </div>
+                    <p>ZX is a modern web framework that combines the expressiveness of JSX with the performance and safety of Zig.</p>
+                    
+                    <h3>Key Features</h3>
+                    <ul>
+                        {for (features) |feature| (
+                            <li>{feature}</li>
+                        )}
+                    </ul>
+                    
+                    <h3>Why ZX?</h3>
+                    <p>Built with Zig, ZX offers:</p>
+                    <ul>
+                        <li>Blazing fast server-side rendering</li>
+                        <li>Memory safety without garbage collection</li>
+                        <li>Compile-time guarantees</li>
+                        <li>Zero-cost abstractions</li>
+                    </ul>
+                    
+                    <footer>
+                        <p>Copyright {[year:d]} - ZX Framework - Built with Zig</p>
+                    </footer>
+                </section>
+            </div>
         </div>
     );
 }
