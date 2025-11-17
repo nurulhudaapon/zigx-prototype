@@ -12,6 +12,15 @@ const ExpressionAst = struct {
     start: usize,
     end: usize,
 
+    const Span = struct {
+        start: usize,
+        end: usize,
+
+        fn slice(self: Span, source: []const u8) []const u8 {
+            return source[self.start..self.end];
+        }
+    };
+
     const Kind = union(enum) {
         switch_expr: SwitchExpr,
         if_expr: IfExpr,
@@ -21,29 +30,29 @@ const ExpressionAst = struct {
     };
 
     const SwitchExpr = struct {
-        condition: []const u8, // Text between switch and opening brace
+        condition: Span, // Text between switch and opening brace
         cases: []Case,
         const Case = struct {
-            pattern: []const u8,
-            value: []const u8,
+            pattern: Span,
+            value: Span,
         };
     };
 
     const IfExpr = struct {
-        condition: []const u8,
-        then_branch: []const u8,
-        else_branch: ?[]const u8,
+        condition: Span,
+        then_branch: Span,
+        else_branch: ?Span,
     };
 
     const ForExpr = struct {
-        iterable: []const u8,
-        capture: []const u8, // e.g., "|name|"
-        body: []const u8,
+        iterable: Span,
+        capture: Span, // e.g., "|name|"
+        body: Span,
     };
 
     const WhileExpr = struct {
-        condition: []const u8,
-        body: []const u8,
+        condition: Span,
+        body: Span,
     };
 
     /// Parse a control flow expression from text
@@ -119,7 +128,9 @@ const ExpressionAst = struct {
 
             // Look for case pattern => value
             if (text[i] == '=' and i + 1 < text.len and text[i + 1] == '>') {
-                const pattern = std.mem.trim(u8, text[case_start..i], &std.ascii.whitespace);
+                // Store pattern span (before trimming)
+                const pattern_start = case_start;
+                const pattern_end = i;
                 i += 2; // Skip '=>'
 
                 // Skip whitespace
@@ -152,29 +163,10 @@ const ExpressionAst = struct {
                     }
                     if (i >= text.len) value_end = text.len;
                 }
-                // Extract value without outer parentheses if present
-                var value = std.mem.trim(u8, text[value_start..value_end], &std.ascii.whitespace);
-                // Remove outer parentheses if they wrap the entire value
-                if (value.len >= 2 and value[0] == '(' and value[value.len - 1] == ')') {
-                    // Check if it's balanced parentheses
-                    var depth: i32 = 0;
-                    var is_balanced = true;
-                    for (value, 0..) |c, idx| {
-                        if (c == '(') depth += 1;
-                        if (c == ')') depth -= 1;
-                        if (idx < value.len - 1 and depth == 0) {
-                            is_balanced = false;
-                            break;
-                        }
-                    }
-                    if (is_balanced and depth == 0) {
-                        value = value[1 .. value.len - 1]; // Remove outer parentheses
-                    }
-                }
 
                 try cases.append(.{
-                    .pattern = pattern,
-                    .value = value,
+                    .pattern = .{ .start = pattern_start, .end = pattern_end },
+                    .value = .{ .start = value_start, .end = value_end },
                 });
 
                 // Skip comma if present
@@ -192,7 +184,7 @@ const ExpressionAst = struct {
 
         return ExpressionAst{
             .kind = .{ .switch_expr = .{
-                .condition = text[condition_start..condition_end],
+                .condition = .{ .start = condition_start, .end = condition_end },
                 .cases = try cases.toOwnedSlice(),
             } },
             .source = text,
@@ -240,7 +232,7 @@ const ExpressionAst = struct {
 
         // Check for else
         while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
-        var else_branch: ?[]const u8 = null;
+        var else_branch: ?Span = null;
         if (i + 4 < text.len and std.mem.eql(u8, text[i .. i + 4], "else")) {
             i += 4; // Skip "else"
             while (i < text.len and std.ascii.isWhitespace(text[i])) i += 1;
@@ -255,7 +247,7 @@ const ExpressionAst = struct {
                 }
                 if (i < text.len) {
                     const else_end = i;
-                    else_branch = text[else_start..else_end];
+                    else_branch = .{ .start = else_start, .end = else_end };
                     i += 1; // Skip ')'
                 }
             }
@@ -267,8 +259,8 @@ const ExpressionAst = struct {
 
         return ExpressionAst{
             .kind = .{ .if_expr = .{
-                .condition = text[condition_start..condition_end],
-                .then_branch = text[then_start..then_end],
+                .condition = .{ .start = condition_start, .end = condition_end },
+                .then_branch = .{ .start = then_start, .end = then_end },
                 .else_branch = else_branch,
             } },
             .source = text,
@@ -330,9 +322,9 @@ const ExpressionAst = struct {
 
         return ExpressionAst{
             .kind = .{ .for_expr = .{
-                .iterable = text[iterable_start..iterable_end],
-                .capture = text[capture_start..capture_end],
-                .body = text[body_start..body_end],
+                .iterable = .{ .start = iterable_start, .end = iterable_end },
+                .capture = .{ .start = capture_start, .end = capture_end },
+                .body = .{ .start = body_start, .end = body_end },
             } },
             .source = text,
             .start = start,
@@ -383,8 +375,8 @@ const ExpressionAst = struct {
 
         return ExpressionAst{
             .kind = .{ .while_expr = .{
-                .condition = text[condition_start..condition_end],
-                .body = text[body_start..body_end],
+                .condition = .{ .start = condition_start, .end = condition_end },
+                .body = .{ .start = body_start, .end = body_end },
             } },
             .source = text,
             .start = start,
@@ -397,36 +389,66 @@ const ExpressionAst = struct {
         switch (self.kind) {
             .switch_expr => |switch_expr| {
                 try w.writeAll("{switch (");
-                try w.writeAll(switch_expr.condition);
+                try w.writeAll(switch_expr.condition.slice(self.source));
                 try w.writeAll(") {\n");
 
                 for (switch_expr.cases) |case| {
-                    for (0..base_indent + 2) |_| {
+                    for (0..base_indent + 1) |_| {
                         try w.writeAll("\t");
                     }
-                    try w.writeAll(case.pattern);
+                    // Trim pattern from original source
+                    const pattern_text = std.mem.trim(u8, case.pattern.slice(self.source), &std.ascii.whitespace);
+                    try w.writeAll(pattern_text);
                     try w.writeAll(" => (");
-                    try formatBlockContent(case.value, base_indent + 2, w);
+                    // Extract value from original source
+                    var value_text = case.value.slice(self.source);
+                    // Trim and remove outer parentheses if present (matching original logic)
+                    value_text = std.mem.trim(u8, value_text, &std.ascii.whitespace);
+                    if (value_text.len >= 2 and value_text[0] == '(' and value_text[value_text.len - 1] == ')') {
+                        // Check if it's balanced parentheses
+                        var depth: i32 = 0;
+                        var is_balanced = true;
+                        for (value_text, 0..) |c, idx| {
+                            if (c == '(') depth += 1;
+                            if (c == ')') depth -= 1;
+                            if (idx < value_text.len - 1 and depth == 0) {
+                                is_balanced = false;
+                                break;
+                            }
+                        }
+                        if (is_balanced and depth == 0) {
+                            value_text = value_text[1 .. value_text.len - 1]; // Remove outer parentheses
+                        }
+                    }
+                    // Check if value is a simple single-line value (no newlines)
+                    const trimmed_value = std.mem.trim(u8, value_text, &std.ascii.whitespace);
+                    if (std.mem.indexOfScalar(u8, trimmed_value, '\n') == null) {
+                        // Simple single-line value, write directly without extra indentation
+                        try w.writeAll(trimmed_value);
+                    } else {
+                        // Multi-line value, format with indentation
+                        try formatBlockContent(value_text, base_indent + 2, w);
+                    }
                     try w.writeAll("),\n");
                 }
 
-                for (0..base_indent + 1) |_| {
+                for (0..base_indent) |_| {
                     try w.writeAll("\t");
                 }
                 try w.writeAll("}}");
             },
             .if_expr => |if_expr| {
                 try w.writeAll("{if (");
-                try w.writeAll(if_expr.condition);
+                try w.writeAll(if_expr.condition.slice(self.source));
                 try w.writeAll(") (\n");
-                try formatBlockContent(if_expr.then_branch, base_indent + 2, w);
+                try formatBlockContent(if_expr.then_branch.slice(self.source), base_indent + 2, w);
                 try w.writeAll("\n");
                 for (0..base_indent + 1) |_| {
                     try w.writeAll("\t");
                 }
                 if (if_expr.else_branch) |else_branch| {
                     try w.writeAll(") else (\n");
-                    try formatBlockContent(else_branch, base_indent + 2, w);
+                    try formatBlockContent(else_branch.slice(self.source), base_indent + 2, w);
                     try w.writeAll("\n");
                     for (0..base_indent + 1) |_| {
                         try w.writeAll("\t");
@@ -436,11 +458,11 @@ const ExpressionAst = struct {
             },
             .for_expr => |for_expr| {
                 try w.writeAll("{for (");
-                try w.writeAll(for_expr.iterable);
+                try w.writeAll(for_expr.iterable.slice(self.source));
                 try w.writeAll(") |");
-                try w.writeAll(for_expr.capture);
+                try w.writeAll(for_expr.capture.slice(self.source));
                 try w.writeAll("| (\n");
-                try formatBlockContent(for_expr.body, base_indent + 2, w);
+                try formatBlockContent(for_expr.body.slice(self.source), base_indent + 2, w);
                 try w.writeAll("\n");
                 for (0..base_indent + 1) |_| {
                     try w.writeAll("\t");
@@ -449,9 +471,9 @@ const ExpressionAst = struct {
             },
             .while_expr => |while_expr| {
                 try w.writeAll("{while (");
-                try w.writeAll(while_expr.condition);
+                try w.writeAll(while_expr.condition.slice(self.source));
                 try w.writeAll(") (\n");
-                try formatBlockContent(while_expr.body, base_indent + 2, w);
+                try formatBlockContent(while_expr.body.slice(self.source), base_indent + 2, w);
                 try w.writeAll("\n");
                 for (0..base_indent + 1) |_| {
                     try w.writeAll("\t");
