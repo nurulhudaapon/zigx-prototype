@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
     mod.addOptions("zx_info", options);
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---
-    const zli_dep = b.lazyDependency("zli", .{ .target = target, .optimize = optimize });
+    const zli_dep = b.dependency("zli", .{ .target = target, .optimize = optimize });
     const htmlz_dep = b.dependency("superhtml", .{ .target = target, .optimize = optimize });
     const exe = b.addExecutable(.{
         .name = "zx",
@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "zx", .module = mod },
                 .{ .name = "httpz", .module = httpz_dep.module("httpz") },
-                .{ .name = "zli", .module = zli_dep.?.module("zli") },
+                .{ .name = "zli", .module = zli_dep.module("zli") },
                 .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
             },
         }),
@@ -149,7 +149,7 @@ pub fn build(b: *std.Build) void {
                 .imports = &.{
                     .{ .name = "zx", .module = mod },
                     .{ .name = "httpz", .module = httpz_dep.module("httpz") },
-                    .{ .name = "zli", .module = zli_dep.?.module("zli") },
+                    .{ .name = "zli", .module = zli_dep.module("zli") },
                     .{ .name = "htmlz", .module = htmlz_dep.module("superhtml") },
                 },
             }),

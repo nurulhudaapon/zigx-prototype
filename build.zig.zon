@@ -1,6 +1,6 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.127",
+    .version = "0.0.1-dev.128",
     .description = "ZX is a framework for building web applications with Zig.",
     .fingerprint = 0xcad77a8d2a3389f2,
     .minimum_zig_version = "0.15.2",
@@ -16,7 +16,6 @@
         .zli = .{
             .url = "git+https://github.com/nurulhudaapon/cliz.git#aff3b54879e7514afaf8c87f1abe22121b8992d4",
             .hash = "zli-4.3.0-LeUjpu_fAABOSVASSCW2fFh8SFVNHrxQGDXGPNzcSE_i",
-            .lazy = true,
         },
         .superhtml = .{
             .url = "git+https://github.com/nurulhudaapon/htmlz.git#8b5bb272b269afdd38cdf641c4a707dd92fbe902",
