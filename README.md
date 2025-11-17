@@ -79,7 +79,7 @@ const zx = @import("zx");
 - [x] Server Side Rendering (SSR)
 - [x] Static Site Generation (SSG)
 - [ ] Client Side Rendering (CSR) via WebAssembly
-- [ ] Client Side Rendering (CSR) via React
+- [x] Client Side Rendering (CSR) via React
 - [x] Type Safety
 - [x] Routing
     - [x] File-system Routing
@@ -114,10 +114,8 @@ const zx = @import("zx");
     - [x] `serve` Serve the project
     - [ ] `dev` HMR or Rebuild on Change
     - [x] `fmt` Format the ZX source code (_Alpha_)
-    - [ ] `export --container` Generate containerizable assets
-    - [x] `export --ssg` Generate static site assets
+    - [x] `export` Generate static site assets
     - [x] `version` Show the version of the ZX CLI
-    - [ ] `revision` Show the current revision of the ZX CLI
 
 #### Editor Support
 
@@ -133,6 +131,7 @@ const zx = @import("zx");
 
 ## Similar Projects
 
+* [Yew](https://github.com/yewstack/yew) - Rust / Wasm framework for creating reliable and efficient web applications
 * [ZTS](https://github.com/zigster64/zts) — Zig Templates made Simple, a templating system for Zig
 * [zmpl](https://github.com/jetzig-framework/zmpl) — Mode-based templating language that compiles to Zig functions at build time, used in Jetzig
 * [mustache-zig](https://github.com/batiati/mustache-zig) — Mustache template engine implementation in Zig
