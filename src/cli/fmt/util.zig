@@ -1,5 +1,6 @@
 const std = @import("std");
 const htmlz = @import("htmlz");
+const fmt_html = @import("html.zig");
 
 const stderr_buffer_size = 4096;
 var stderr_buffer: [stderr_buffer_size]u8 = undefined;
@@ -9,8 +10,8 @@ pub const ExtractHtmlResult = struct {
     zig_source: [:0]const u8,
 
     pub fn deinit(self: *ExtractHtmlResult, allocator: std.mem.Allocator) void {
-        for (self.htmls) |html| {
-            allocator.free(html);
+        for (self.htmls) |h| {
+            allocator.free(h);
         }
         allocator.free(self.htmls); // Free the array itself
         allocator.free(self.zig_source);
@@ -30,9 +31,10 @@ pub fn formatHtml(
         return null;
     }
 
-    return try std.fmt.allocPrint(arena, "{f}", .{
-        html_ast.formatter(src),
-    });
+    var w: std.io.Writer.Allocating = .init(arena);
+    try fmt_html.render(html_ast, src, &w.writer);
+    const result = w.written();
+    return result;
 }
 
 fn findLeadingWhitespaceStart(source: []const u8, jsx_start: usize) usize {
@@ -116,7 +118,7 @@ fn extractAndFormatJsxSegment(
         try cleaned_source.appendSlice(allocator, placeholder);
         return html_end_extended;
     };
-    
+
     // If formatted_html is null (syntax errors), use original JSX
     const html_copy = try allocator.dupe(u8, formatted_html orelse html_segment);
     try html_segments.append(allocator, html_copy);
@@ -484,23 +486,23 @@ fn parseHtmlPlaceholder(source: []const u8, start: usize) struct { index: usize,
     return .{ .index = html_index, .end = i };
 }
 
-fn trimLeadingTrailingNewlines(allocator: std.mem.Allocator, html: []const u8) ![]const u8 {
-    if (html.len == 0) return try allocator.dupe(u8, html);
+fn trimLeadingTrailingNewlines(allocator: std.mem.Allocator, h: []const u8) ![]const u8 {
+    if (h.len == 0) return try allocator.dupe(u8, h);
 
     var start: usize = 0;
-    var end: usize = html.len;
+    var end: usize = h.len;
 
     // Trim leading newlines/whitespace
-    while (start < end and (html[start] == '\n' or html[start] == '\r' or std.ascii.isWhitespace(html[start]))) {
+    while (start < end and (h[start] == '\n' or h[start] == '\r' or std.ascii.isWhitespace(h[start]))) {
         start += 1;
     }
 
     // Trim trailing newlines/whitespace
-    while (end > start and (html[end - 1] == '\n' or html[end - 1] == '\r' or std.ascii.isWhitespace(html[end - 1]))) {
+    while (end > start and (h[end - 1] == '\n' or h[end - 1] == '\r' or std.ascii.isWhitespace(h[end - 1]))) {
         end -= 1;
     }
 
-    return try allocator.dupe(u8, html[start..end]);
+    return try allocator.dupe(u8, h[start..end]);
 }
 
 fn containsNewline(text: []const u8) bool {
