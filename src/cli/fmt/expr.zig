@@ -372,7 +372,7 @@ pub const ExpressionAst = struct {
             i += 1;
         }
 
-        return indent;
+        return @divTrunc(indent, 4);
     }
 
     /// Render the expression with proper formatting
@@ -449,21 +449,33 @@ pub const ExpressionAst = struct {
                 try w.writeAll("}");
             },
             .for_expr => |for_expr| {
+                const base_indent = detectIndentAt(self.source, self.start);
+                fmtlog.debug("base_indent: {d}", .{base_indent});
                 const before_body = self.source[self.start..for_expr.body.start];
-                try w.writeAll(before_body);
-                try w.writeAll("\n");
-
                 const body_content = for_expr.body.slice(self.source);
-                try indentContent(body_content, 1, w);
-
                 const after_body = self.source[for_expr.body.end..self.end];
-                // Write closing ) and } with proper indentation
-                try w.writeAll("\n");
-                const indent = detectIndentAt(self.source, self.start);
-                for (0..indent) |_| {
-                    try w.writeAll(" ");
+
+                const is_multiline_body = std.mem.count(u8, body_content, "\n") > 0;
+
+                if (is_multiline_body) {
+                    fmtlog.debug("before_body: '{s}'", .{before_body});
+                    try w.writeAll(before_body);
+                    try w.writeAll("\n");
+
+                    try indentContent(body_content, base_indent + 2, w);
+
+                    // Write closing ) and } with proper indentation
+                    try w.writeAll("\n");
+                    const indent = detectIndentAt(self.source, self.start);
+                    for (0..indent) |_| {
+                        try w.writeAll(" ");
+                    }
+                    try indentContent(after_body, 1, w);
+                } else {
+                    try w.writeAll(before_body);
+                    try w.writeAll(body_content);
+                    try w.writeAll(after_body);
                 }
-                try w.writeAll(after_body);
             },
             .while_expr => |while_expr| {
                 const before_body = self.source[self.start..while_expr.body.start];
