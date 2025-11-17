@@ -102,6 +102,99 @@ fn getBasename(path: []const u8) []const u8 {
     return path;
 }
 
+/// Resolve a relative path against a base directory
+fn resolvePath(allocator: std.mem.Allocator, base_dir: []const u8, relative_path: []const u8) ![]const u8 {
+    // If the path is already absolute (starts with /), return it as-is
+    if (std.fs.path.isAbsolute(relative_path)) {
+        return try allocator.dupe(u8, relative_path);
+    }
+
+    // Normalize base_dir (remove trailing separator)
+    var base = base_dir;
+    const sep = std.fs.path.sep_str;
+    if (std.mem.endsWith(u8, base_dir, sep)) {
+        base = base_dir[0 .. base_dir.len - sep.len];
+    }
+
+    // Join base_dir and relative_path, then normalize
+    const joined = try std.fs.path.join(allocator, &.{ base, relative_path });
+    defer allocator.free(joined);
+
+    // Normalize the path to remove ./ and ../ components
+    return try std.fs.path.resolve(allocator, &.{joined});
+}
+
+/// Calculate relative path from base to target
+fn relativePath(allocator: std.mem.Allocator, base: []const u8, target: []const u8) ![]const u8 {
+    const sep = std.fs.path.sep_str;
+
+    // Normalize paths
+    var base_normalized = base;
+    var target_normalized = target;
+    if (std.mem.endsWith(u8, base, sep)) {
+        base_normalized = base[0 .. base.len - sep.len];
+    }
+    if (std.mem.endsWith(u8, target, sep)) {
+        target_normalized = target[0 .. target.len - sep.len];
+    }
+
+    // Split paths into components
+    var base_parts = std.ArrayList([]const u8){};
+    defer base_parts.deinit(allocator);
+    var target_parts = std.ArrayList([]const u8){};
+    defer target_parts.deinit(allocator);
+
+    var base_iter = std.mem.splitScalar(u8, base_normalized, std.fs.path.sep);
+    while (base_iter.next()) |part| {
+        if (part.len > 0) {
+            try base_parts.append(allocator, part);
+        }
+    }
+
+    var target_iter = std.mem.splitScalar(u8, target_normalized, std.fs.path.sep);
+    while (target_iter.next()) |part| {
+        if (part.len > 0) {
+            try target_parts.append(allocator, part);
+        }
+    }
+
+    // Find common prefix
+    var common_len: usize = 0;
+    const min_len = @min(base_parts.items.len, target_parts.items.len);
+    while (common_len < min_len and std.mem.eql(u8, base_parts.items[common_len], target_parts.items[common_len])) {
+        common_len += 1;
+    }
+
+    // Build relative path
+    var result = std.ArrayList(u8){};
+    defer result.deinit(allocator);
+
+    // Add ".." for each directory in base that's not in target
+    var i = common_len;
+    while (i < base_parts.items.len) : (i += 1) {
+        if (result.items.len > 0) {
+            try result.appendSlice(allocator, sep);
+        }
+        try result.appendSlice(allocator, "..");
+    }
+
+    // Add remaining target parts
+    i = common_len;
+    while (i < target_parts.items.len) : (i += 1) {
+        if (result.items.len > 0) {
+            try result.appendSlice(allocator, sep);
+        }
+        try result.appendSlice(allocator, target_parts.items[i]);
+    }
+
+    // If result is empty, return "."
+    if (result.items.len == 0) {
+        return try allocator.dupe(u8, ".");
+    }
+
+    return try result.toOwnedSlice(allocator);
+}
+
 /// Check if output_dir is a subdirectory of dir_path and return the relative path if so
 /// Returns null if output_dir is not a subdirectory of dir_path
 fn getOutputDirRelativePath(allocator: std.mem.Allocator, dir_path: []const u8, output_dir: []const u8) !?[]const u8 {
@@ -263,14 +356,79 @@ const Route = struct {
     }
 };
 
-fn generateClientComponentJson(allocator: std.mem.Allocator, components: []const zx.Ast.ClientComponentMetadata, output_dir: []const u8) !void {
-    const json_str = std.json.Stringify.valueAlloc(allocator, components, .{
-        .whitespace = .indent_4,
+const ClientComponentJson = struct {
+    id: []const u8,
+    name: []const u8,
+    path: []const u8,
+    import: []const u8,
+};
+
+fn generateClientComponentJson(allocator: std.mem.Allocator, components: []const ClientComponentJson, output_dir: []const u8) !void {
+    var components_json = std.ArrayList(ClientComponentJson).initCapacity(allocator, components.len) catch @panic("OOM");
+    defer components_json.deinit(allocator);
+
+    for (components) |component| {
+        // Components already have the correct import path, just clone them
+        try components_json.append(allocator, ClientComponentJson{
+            .id = try allocator.dupe(u8, component.id),
+            .name = try allocator.dupe(u8, component.name),
+            .path = try allocator.dupe(u8, component.path),
+            .import = try allocator.dupe(u8, component.import),
+        });
+    }
+
+    defer {
+        for (components_json.items) |*component| {
+            allocator.free(component.id);
+            allocator.free(component.name);
+            allocator.free(component.path);
+            allocator.free(component.import);
+        }
+    }
+
+    var json_str = std.json.Stringify.valueAlloc(allocator, components_json.items, .{
+        .whitespace = .indent_2,
     }) catch @panic("OOM");
+    errdefer allocator.free(json_str);
+
+    // Replace all instances of "@ and @" with empty string
+    const placeHolder_start = "\"@";
+    const placeHolder_end = "@\"";
+
+    while (std.mem.indexOf(u8, json_str, placeHolder_start)) |index| {
+        const old_json_str = json_str;
+        const before = json_str[0..index];
+        const after = json_str[index + placeHolder_start.len ..];
+        json_str = try std.mem.concat(allocator, u8, &.{ before, "", after });
+        allocator.free(old_json_str);
+    }
+    while (std.mem.indexOf(u8, json_str, placeHolder_end)) |index| {
+        const old_json_str = json_str;
+        const before = json_str[0..index];
+        const after = json_str[index + placeHolder_end.len ..];
+        json_str = try std.mem.concat(allocator, u8, &.{ before, "", after });
+        allocator.free(old_json_str);
+    }
     defer allocator.free(json_str);
+
+    const main_csr_react = @embedFile("./transpile/main_csr_react.tsx");
+
+    // Replace {ZX_COMPONENTS} with the json_str using compile-time string replacement
+    const placeholder = "`{[ZX_COMPONENTS]s}`";
+    const placeholder_index = std.mem.indexOf(u8, main_csr_react, placeholder) orelse {
+        @panic("Placeholder {ZX_COMPONENTS} not found in main_csr_react.tsx");
+    };
+
+    const before = main_csr_react[0..placeholder_index];
+    const after = main_csr_react[placeholder_index + placeholder.len ..];
+
+    const main_csr_react_z = try std.mem.concat(allocator, u8, &.{ before, json_str, after });
+    defer allocator.free(main_csr_react_z);
 
     const client_component_json_path = try std.fs.path.join(allocator, &.{ output_dir, "public", "components.json" });
     defer allocator.free(client_component_json_path);
+    const main_csr_react_path = try std.fs.path.join(allocator, &.{ output_dir, "public", "main.tsx" });
+    defer allocator.free(main_csr_react_path);
 
     // Ensure the public directory exists
     const public_dir = try std.fs.path.join(allocator, &.{ output_dir, "public" });
@@ -283,6 +441,11 @@ fn generateClientComponentJson(allocator: std.mem.Allocator, components: []const
     try std.fs.cwd().writeFile(.{
         .sub_path = client_component_json_path,
         .data = json_str,
+    });
+
+    try std.fs.cwd().writeFile(.{
+        .sub_path = main_csr_react_path,
+        .data = main_csr_react_z,
     });
 }
 
@@ -548,7 +711,7 @@ fn copySpecifiedDirectories(
     }
 }
 
-fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8, global_components: *std.array_list.Managed(zx.Ast.ClientComponentMetadata), verbose: bool) !void {
+fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_path: []const u8, output_dir: []const u8, global_components: *std.array_list.Managed(ClientComponentJson), verbose: bool) !void {
     // Read the source file
     const source = try std.fs.cwd().readFileAlloc(
         allocator,
@@ -566,15 +729,35 @@ fn transpileFile(allocator: std.mem.Allocator, source_path: []const u8, output_p
 
     // Append components from this file to the global list
     for (result.client_components.items) |component| {
-        // Clone the component metadata to add to global list
-        const cloned_name = try allocator.dupe(u8, component.name);
-        const cloned_path = try allocator.dupe(u8, component.path);
+        // Resolve the component path relative to the source file directory
+        const source_dir = std.fs.path.dirname(source_path) orelse ".";
+        const resolved_component_path = try resolvePath(allocator, source_dir, component.path);
+        defer allocator.free(resolved_component_path);
+
+        // Make the path relative to output_dir root
+        const component_path_relative_to_output = try relativePath(allocator, output_dir, resolved_component_path);
+        defer allocator.free(component_path_relative_to_output);
+
+        // Create the import path (relative to output_dir/public, which is where components.json will be)
+        // The import should be from the public directory, so we need to go up to output_dir and then to the component
+        const import_path = try std.fmt.allocPrint(allocator, "../{s}", .{component_path_relative_to_output});
+        defer allocator.free(import_path);
+
+        // Create the import string
+        const import_str = try std.fmt.allocPrint(allocator, "@async () => (await import('{s}')).default@", .{import_path});
+        defer allocator.free(import_str);
+
+        // Clone strings for the ClientComponentJson
         const cloned_id = try allocator.dupe(u8, component.id);
+        const cloned_name = try allocator.dupe(u8, component.name);
+        const cloned_path = try allocator.dupe(u8, component_path_relative_to_output);
+        const cloned_import = try allocator.dupe(u8, import_str);
 
         try global_components.append(.{
+            .id = cloned_id,
             .name = cloned_name,
             .path = cloned_path,
-            .id = cloned_id,
+            .import = cloned_import,
         });
     }
 
@@ -603,7 +786,7 @@ fn transpileDirectory(
     output_dir: []const u8,
     include_zig: bool,
     copy_dirs: []const []const u8,
-    global_components: *std.array_list.Managed(zx.Ast.ClientComponentMetadata),
+    global_components: *std.array_list.Managed(ClientComponentJson),
     verbose: bool,
 ) !void {
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
@@ -700,7 +883,7 @@ fn transpileDirectory(
         defer allocator.free(output_path);
 
         if (should_transpile) {
-            transpileFile(allocator, input_path, output_path, global_components, verbose) catch |err| {
+            transpileFile(allocator, input_path, output_path, output_dir, global_components, verbose) catch |err| {
                 std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
                 continue;
             };
@@ -739,12 +922,13 @@ fn transpileCommand(
     verbose: bool,
 ) !void {
     // Initialize global component metadata list
-    var global_components = std.array_list.Managed(zx.Ast.ClientComponentMetadata).init(allocator);
+    var global_components = std.array_list.Managed(ClientComponentJson).init(allocator);
     defer {
         for (global_components.items) |*component| {
+            allocator.free(component.id);
             allocator.free(component.name);
             allocator.free(component.path);
-            allocator.free(component.id);
+            allocator.free(component.import);
         }
         global_components.deinit();
     }
@@ -807,7 +991,7 @@ fn transpileCommand(
         const output_path = try std.fs.path.join(allocator, &.{ output_dir, output_rel_path });
         defer allocator.free(output_path);
 
-        try transpileFile(allocator, path, output_path, &global_components, verbose);
+        try transpileFile(allocator, path, output_path, output_dir, &global_components, verbose);
 
         // Copy specified directories after transpiling the file
         copySpecifiedDirectories(allocator, path, output_dir, copy_dirs, verbose) catch |err| {

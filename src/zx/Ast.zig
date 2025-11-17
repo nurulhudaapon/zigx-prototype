@@ -52,7 +52,7 @@ pub fn parse(gpa: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult {
     var aw = std.io.Writer.Allocating.init(allocator);
     defer aw.deinit();
     std.zon.stringify.serialize(transpilation_result.client_components.items, .{ .whitespace = true }, &aw.writer) catch @panic("OOM");
-    astlog.debug("ClientComponents: \n{s}\n", .{aw.written()});
+    // astlog.debug("ClientComponents: \n{s}\n", .{aw.written()});
 
     const components = try transpilation_result.client_components.clone(gpa);
     for (components.items) |*component| {

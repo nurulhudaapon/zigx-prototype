@@ -4,6 +4,8 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     return (
         <div @allocator={allocator}>
             <h1>Examples</h1>
+            <h2>CSR React Example</h2>
+            <CsrReactExample />
             <h2>For Loop</h2>
             <ForExample />
             <hr />
@@ -18,6 +20,9 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <hr />
             <h2>Quick Example</h2>
             <QuickExample />
+            <hr />
+
+            <script src="/index.js" />
         </div>
     );
 }
@@ -28,3 +33,4 @@ const IfExample = @import("if.zig").Page;
 const SwitchExample = @import("switch.zig").Page;
 const FormExample = @import("form.zig").FormExample;
 const QuickExample = @import("overview.zig").QuickExample;
+const CsrReactExample = @import("csr_react.zig").Page;
