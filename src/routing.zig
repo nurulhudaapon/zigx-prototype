@@ -37,6 +37,70 @@ const BaseContext = struct {
     pub fn deinit(self: *BaseContext) void {
         self.allocator.destroy(self);
     }
+
+    /// Helper method to get query parameters from the request.
+    /// Returns an error if parsing fails.
+    ///
+    /// Example:
+    /// ```zig
+    /// const query = ctx.getQuery() catch return error.BadRequest;
+    /// if (query.get("search")) |search_term| {
+    ///     // Use search_term
+    /// }
+    /// ```
+    pub fn getQuery(self: *const BaseContext) !httpz.key_value.KeyValue {
+        return self.request.query();
+    }
+
+    /// Helper method to get form data from the request.
+    /// Returns an error if parsing fails.
+    ///
+    /// Example:
+    /// ```zig
+    /// const form = ctx.getFormData() catch return error.BadRequest;
+    /// if (form.get("username")) |username| {
+    ///     // Use username
+    /// }
+    /// ```
+    pub fn getFormData(self: *const BaseContext) !httpz.key_value.KeyValue {
+        return self.request.formData();
+    }
+
+    /// Helper method to get a specific header from the request.
+    /// Returns null if the header is not present.
+    ///
+    /// Example:
+    /// ```zig
+    /// if (ctx.getHeader("Authorization")) |auth| {
+    ///     // Process authorization header
+    /// }
+    /// ```
+    pub fn getHeader(self: *const BaseContext, name: []const u8) ?[]const u8 {
+        return self.request.header(name);
+    }
+
+    /// Helper method to set a response header.
+    ///
+    /// Example:
+    /// ```zig
+    /// ctx.setHeader("Cache-Control", "max-age=3600");
+    /// ```
+    pub fn setHeader(self: *BaseContext, name: []const u8, value: []const u8) void {
+        self.response.header(name, value);
+    }
+
+    /// Helper method to perform a redirect.
+    /// Sets the Location header and the appropriate status code.
+    ///
+    /// Example:
+    /// ```zig
+    /// ctx.redirect("/home", .found); // 302 redirect
+    /// ctx.redirect("/new-url", .moved_permanently); // 301 redirect
+    /// ```
+    pub fn redirect(self: *BaseContext, location: []const u8, status: httpz.Status) void {
+        self.response.header("Location", location);
+        self.response.status = @intFromEnum(status);
+    }
 };
 
 /// Context passed to page components. Provides access to the current HTTP request and response,
