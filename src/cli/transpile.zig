@@ -1,6 +1,7 @@
 const std = @import("std");
 const zli = @import("zli");
 const zx = @import("zx");
+const log = std.log.scoped(.transpile);
 
 // ============================================================================
 // Command Registration
@@ -37,6 +38,8 @@ fn transpile(ctx: zli.CommandContext) !void {
         try ctx.writer.print("Missing path arg\n", .{});
         return;
     };
+
+    log.debug("outdir: {s}", .{outdir});
 
     // Check if path is a file and outdir is default
     const default_outdir = ".zx";
@@ -368,7 +371,7 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     });
 
     // Now using system command to compile the main.tsx file
-    const outdir = try std.fs.path.join(allocator, &.{ output_dir, "public" });
+    const outdir = try std.fs.path.join(allocator, &.{ output_dir, "assets" });
     defer allocator.free(outdir);
     var system = std.process.Child.init(&.{ "bun", "build", main_csr_react_path, "--outdir", outdir }, allocator);
     _ = system.spawnAndWait() catch |err| {
@@ -411,7 +414,7 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
     }
 
     // Use .zx/pages as the import prefix since that's where the transpiled files are
-    const import_prefix = try std.mem.concat(allocator, u8, &.{ ".zx", "/", "pages" });
+    const import_prefix = try std.mem.concat(allocator, u8, &.{"pages"});
     defer allocator.free(import_prefix);
     var routes = try scanPagesDirectory(allocator, pages_dir, import_prefix);
     defer {
@@ -433,6 +436,7 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
 
     try writer.writeAll("pub const meta = zx.App.Meta{\n");
     try writer.writeAll("    .routes = &routes,\n");
+    try writer.print("    .outdir = \"{s}\",\n", .{output_dir});
     try writer.writeAll("};\n\n");
     try writer.writeAll("const zx = @import(\"zx\");\n");
 

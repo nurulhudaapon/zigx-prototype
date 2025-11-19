@@ -22,7 +22,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <QuickExample />
             <hr />
 
-            <script src="/main.js" />
+            <script src="/assets/main.js" />
         </div>
     );
 }

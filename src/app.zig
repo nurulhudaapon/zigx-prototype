@@ -1,5 +1,6 @@
 const httpz = @import("httpz");
 const module_config = @import("zx_info");
+const log = std.log.scoped(.app);
 
 pub const App = struct {
     pub const ExportType = enum { static };
@@ -15,6 +16,7 @@ pub const App = struct {
             layout: ?*const fn (ctx: zx.LayoutContext, component: Component) Component = null,
         };
         routes: []const Route,
+        outdir: []const u8,
     };
     pub const Config = struct {
         server: httpz.Config,
@@ -50,13 +52,21 @@ pub const App = struct {
                 }
             }
 
-            const public_path = std.fs.path.join(allocator, &.{ "site", "public", request_path }) catch return;
-            defer allocator.free(public_path);
+            // log.debug("requst_path: {s}", .{request_path});
+            const assets_path = std.fs.path.join(allocator, &.{
+                self.meta.outdir,
+                if (std.mem.startsWith(u8, request_path, "/assets/")) "" else "public",
+                request_path,
+            }) catch return;
+            defer allocator.free(assets_path);
 
-            const file_content = std.fs.cwd().readFileAlloc(allocator, public_path, std.math.maxInt(usize)) catch {
+            // log.debug("trying to read assets from {s}", .{assets_path});
+            const file_content = std.fs.cwd().readFileAlloc(allocator, assets_path, std.math.maxInt(usize)) catch {
                 res.status = 404;
                 return;
             };
+
+            // log.debug("found asset serving {s}", .{assets_path});
             res.content_type = httpz.ContentType.forFile(request_path);
             // res.header("Cache-Control", "max-age=31536000, public");
             res.body = file_content;
@@ -116,11 +126,9 @@ pub const App = struct {
         // --- Flags --- //
         // --introspect: Print the metadata to stdout and exit
         var is_introspect = false;
-        var outdir: ?[]const u8 = null;
 
         while (args.next()) |arg| {
             if (std.mem.eql(u8, arg, "--introspect")) is_introspect = true;
-            if (std.mem.eql(u8, arg, "--outdir")) outdir = args.next() orelse return error.MissingOutdir;
         }
 
         var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
@@ -131,7 +139,6 @@ pub const App = struct {
             defer aw.deinit();
 
             var serilizable_meta = try SerilizableAppMeta.init(self.allocator, self);
-            serilizable_meta.outdir = outdir;
             defer serilizable_meta.deinit(self.allocator);
             try serilizable_meta.serialize(&aw.writer);
 
@@ -423,6 +430,7 @@ pub const App = struct {
                     .server = app.server.config,
                 },
                 .version = App.version,
+                .outdir = app.meta.outdir,
             };
         }
 
