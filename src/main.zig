@@ -8,11 +8,11 @@ pub fn main() !void {
 
     defer if (@import("builtin").mode == .Debug) std.debug.assert(dbg.deinit() == .ok);
 
-    var stdout_writer = fs.File.stdout().writerStreaming(&.{});
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
     var stdout = &stdout_writer.interface;
 
     var buf: [4096]u8 = undefined;
-    var stdin_reader = fs.File.stdin().readerStreaming(&buf);
+    var stdin_reader = std.fs.File.stdin().readerStreaming(&buf);
     const stdin = &stdin_reader.interface;
 
     const root = try cli.build(stdout, stdin, allocator);
@@ -24,7 +24,6 @@ pub fn main() !void {
 }
 
 const std = @import("std");
-const fs = std.fs;
 const cli = @import("cli/root.zig");
 
 pub const std_options = std.Options{

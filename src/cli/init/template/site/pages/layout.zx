@@ -3,6 +3,7 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
         <html @allocator={ctx.arena} lang="en-US">
         
         <head>
+            <title>ZX</title>
             <link rel="stylesheet" href="/style.css" />
         </head>
         

@@ -30,3 +30,26 @@ pub const std_options = std.Options{
         .{ .scope = .websocket, .level = .err },
     },
 };
+
+fn inspect() void {
+    var args = std.process.args();
+    defer args.deinit();
+
+    // --- Flags --- //
+    // --introspect: Print the metadata to stdout and exit
+    var is_introspect = false;
+
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--introspect")) is_introspect = true;
+    }
+
+    var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
+    var stdout = &stdout_writer.interface;
+
+    if (is_introspect) {
+        try stdout.print("{any}\n", .{Metadata.meta});
+        std.process.exit(0);
+    }
+
+    try stdout.flush();
+}

@@ -86,6 +86,9 @@ pub const App = struct {
         app.handler = Handler{ .meta = config.meta, .allocator = allocator };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
 
+        // Introspect the app, this will exit the program in some cases like --introspect flag
+        try app.introspect();
+
         return app;
     }
 
@@ -104,6 +107,39 @@ pub const App = struct {
             self._is_listening = false;
             return err;
         };
+    }
+
+    pub fn introspect(self: *App) !void {
+        var args = std.process.args();
+        defer args.deinit();
+
+        // --- Flags --- //
+        // --introspect: Print the metadata to stdout and exit
+        var is_introspect = false;
+        var outdir: ?[]const u8 = null;
+
+        while (args.next()) |arg| {
+            if (std.mem.eql(u8, arg, "--introspect")) is_introspect = true;
+            if (std.mem.eql(u8, arg, "--outdir")) outdir = args.next() orelse return error.MissingOutdir;
+        }
+
+        var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
+        var stdout = &stdout_writer.interface;
+
+        if (is_introspect) {
+            var aw = std.Io.Writer.Allocating.init(self.allocator);
+            defer aw.deinit();
+
+            var serilizable_meta = try SerilizableAppMeta.init(self.allocator, self);
+            serilizable_meta.outdir = outdir;
+            defer serilizable_meta.deinit(self.allocator);
+            try serilizable_meta.serialize(&aw.writer);
+
+            try stdout.print("{s}\n", .{aw.written()});
+            std.process.exit(0);
+        }
+
+        try stdout.flush();
     }
 
     pub fn build(self: *App, options: ExportOptions) !void {
@@ -332,6 +368,52 @@ pub const App = struct {
 
         return false;
     }
+
+    const SerilizableAppMeta = struct {
+        const Route = struct {
+            path: []const u8,
+        };
+        const Config = struct {
+            server: httpz.Config,
+        };
+
+        outdir: ?[]const u8 = null,
+        routes: []const Route,
+        config: SerilizableAppMeta.Config,
+        version: []const u8,
+
+        pub fn init(allocator: std.mem.Allocator, app: *const App) !SerilizableAppMeta {
+            var routes = try allocator.alloc(Route, app.meta.routes.len);
+
+            for (app.meta.routes, 0..) |route, i| {
+                routes[i] = Route{
+                    .path = try allocator.dupe(u8, route.path),
+                };
+            }
+
+            return SerilizableAppMeta{
+                .routes = routes,
+                .config = SerilizableAppMeta.Config{
+                    .server = app.server.config,
+                },
+                .version = App.version,
+            };
+        }
+
+        pub fn deinit(self: *SerilizableAppMeta, allocator: std.mem.Allocator) void {
+            for (self.routes) |route| {
+                allocator.free(route.path);
+            }
+            allocator.free(self.routes);
+        }
+
+        pub fn serialize(self: *const SerilizableAppMeta, writer: anytype) !void {
+            try std.zon.stringify.serialize(self, .{
+                .whitespace = true,
+                .emit_default_optional_fields = true,
+            }, writer);
+        }
+    };
 };
 
 const std = @import("std");
