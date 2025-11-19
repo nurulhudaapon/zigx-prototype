@@ -18,7 +18,7 @@ fn upgrade(ctx: zli.CommandContext) !void {
     // defer ctx.allocator.free(fetch_uri);
 
     const install_cmd = switch (builtin.os.tag) {
-        .windows => &.{ "powershell", "-c", "irm ziex.dev/install.ps1 | iex" },
+        .windows => [_][:0]const u8{ "powershell", "-c", "irm ziex.dev/install.ps1 | iex" },
         .linux, .macos => [_][:0]const u8{ "bash", "-c", "curl -fsSL https://ziex.dev/install | bash" },
         else => return error.UnsupportedOS,
     };
