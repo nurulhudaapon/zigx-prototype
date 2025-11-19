@@ -13,7 +13,6 @@ pub const App = struct {
             path: []const u8,
             page: *const fn (ctx: zx.PageContext) Component,
             layout: ?*const fn (ctx: zx.LayoutContext, component: Component) Component = null,
-            routes: ?[]const Route = null,
         };
         routes: []const Route,
     };
@@ -39,10 +38,8 @@ pub const App = struct {
             const pagectx = zx.PageContext.init(req, res, allocator);
             const layoutctx = zx.LayoutContext.init(req, res, allocator);
 
-            const empty_layouts: []const *const fn (ctx: zx.LayoutContext, component: Component) Component = &.{};
-
             for (self.meta.routes) |route| {
-                const rendered = matchRoute(request_path, route, empty_layouts, pagectx, layoutctx, null) catch {
+                const rendered = matchRoute(request_path, route, pagectx, layoutctx, null, self.meta.routes) catch {
                     res.body = "Internal Server Error";
                     res.status = 500;
                     return;
@@ -95,7 +92,10 @@ pub const App = struct {
     pub fn deinit(self: *App) void {
         const allocator = self.allocator;
 
-        if (self._is_listening) self.server.stop();
+        if (self._is_listening) {
+            self.server.stop();
+            self._is_listening = false;
+        }
         self.server.deinit();
         allocator.destroy(self);
     }
@@ -284,13 +284,6 @@ pub const App = struct {
         });
 
         printer.printFilePath(file_path);
-
-        // Recursively process nested routes
-        if (route.routes) |nested_routes| {
-            for (nested_routes) |nested_route| {
-                try processRoute(allocator, port, nested_route, options, printer);
-            }
-        }
     }
 
     fn normalizePath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -304,10 +297,10 @@ pub const App = struct {
     fn matchRoute(
         request_path: []const u8,
         route: App.Meta.Route,
-        parent_layouts: []const *const fn (ctx: zx.LayoutContext, component: Component) Component,
         pagectx: zx.PageContext,
         layoutctx: zx.LayoutContext,
         own_writer: ?*std.Io.Writer,
+        all_routes: []const App.Meta.Route,
     ) !bool {
         const normalized_route_path = normalizePath(pagectx.arena, route.path) catch return false;
 
@@ -315,14 +308,76 @@ pub const App = struct {
         if (std.mem.eql(u8, request_path, normalized_route_path)) {
             var page = route.page(pagectx);
 
-            // Apply all parent layouts first (in order from root to here)
-            for (parent_layouts) |layout| {
-                page = layout(layoutctx, page);
+            // Find and apply parent layouts based on path hierarchy
+            // Collect all parent layouts from root to this route
+            var layouts_to_apply: [10]*const fn (ctx: zx.LayoutContext, component: Component) Component = undefined;
+            var layouts_count: usize = 0;
+
+            // Build the path segments to traverse from root to current route
+            var path_segments = std.array_list.Managed([]const u8).init(pagectx.arena);
+            var path_iter = std.mem.splitScalar(u8, request_path, '/');
+            while (path_iter.next()) |segment| {
+                if (segment.len > 0) {
+                    try path_segments.append(segment);
+                }
+            }
+
+            // First check root path "/"
+            for (all_routes) |parent_route| {
+                const normalized_parent = normalizePath(pagectx.arena, parent_route.path) catch continue;
+                if (std.mem.eql(u8, normalized_parent, "/")) {
+                    if (parent_route.layout) |layout_fn| {
+                        if (layouts_count < layouts_to_apply.len) {
+                            layouts_to_apply[layouts_count] = layout_fn;
+                            layouts_count += 1;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // Traverse from root to current route, collecting layouts
+            // Only iterate if there are path segments beyond root
+            if (path_segments.items.len > 1) {
+                for (1..path_segments.items.len) |depth| {
+                    // Build the path up to this depth
+                    var path_buf: [256]u8 = undefined;
+                    var path_stream = std.io.fixedBufferStream(&path_buf);
+                    const path_writer = path_stream.writer();
+                    _ = path_writer.write("/") catch break;
+
+                    for (0..depth) |i| {
+                        _ = path_writer.write(path_segments.items[i]) catch break;
+                        if (i < depth - 1) {
+                            _ = path_writer.write("/") catch break;
+                        }
+                    }
+                    const parent_path = path_buf[0 .. path_stream.getPos() catch break];
+
+                    // Find route with matching path
+                    for (all_routes) |parent_route| {
+                        const normalized_parent = normalizePath(pagectx.arena, parent_route.path) catch continue;
+                        if (std.mem.eql(u8, normalized_parent, parent_path)) {
+                            if (parent_route.layout) |layout_fn| {
+                                if (layouts_count < layouts_to_apply.len) {
+                                    layouts_to_apply[layouts_count] = layout_fn;
+                                    layouts_count += 1;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Apply layouts in order (root to leaf)
+            for (0..layouts_count) |i| {
+                page = layouts_to_apply[i](layoutctx, page);
             }
 
             // Apply this route's own layout last
-            if (route.layout) |layout| {
-                page = layout(layoutctx, page);
+            if (route.layout) |layout_fn| {
+                page = layout_fn(layoutctx, page);
             }
 
             const writer = own_writer orelse &layoutctx.response.buffer.writer;
@@ -335,35 +390,6 @@ pub const App = struct {
                 return true;
             };
             return true;
-        }
-
-        // Check sub-routes if they exist
-        if (route.routes) |sub_routes| {
-            // Build the layout chain for sub-routes
-            // We need to accumulate parent_layouts + current route's layout (if it exists)
-            var layouts_buffer: [10]*const fn (ctx: zx.LayoutContext, component: Component) Component = undefined;
-            var layouts_count: usize = 0;
-
-            // Copy all parent layouts
-            for (parent_layouts) |layout| {
-                layouts_buffer[layouts_count] = layout;
-                layouts_count += 1;
-            }
-
-            // Add current route's layout if it exists
-            if (route.layout) |layout| {
-                layouts_buffer[layouts_count] = layout;
-                layouts_count += 1;
-            }
-
-            const layouts_to_pass = layouts_buffer[0..layouts_count];
-
-            for (sub_routes) |sub_route| {
-                const matched = try matchRoute(request_path, sub_route, layouts_to_pass, pagectx, layoutctx, null);
-                if (matched) {
-                    return true;
-                }
-            }
         }
 
         return false;
