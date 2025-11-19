@@ -1,7 +1,9 @@
 This is a developer preview of ZX, some features are work in progress.
 
 ## Changelog
-- Support for Client Side Rendering (CSR) via React
+- `zx dev` with auto restart on change
+- `zx update` to update the version of ZX dependency
+- `zx upgrade` to upgrade the version of ZX CLI
 
 ## Installation
 
@@ -52,8 +54,10 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
     - [x] `init` Project Template
     - [x] `transpile` Transpile .zx files to Zig source code
     - [x] `serve` Serve the project
-    - [ ] `dev` HMR or Rebuild on Change
+    - [x] `dev` HMR or Rebuild on Change
     - [x] `fmt` Format the ZX source code (_Alpha_)
     - [x] `export` Generate static site assets
     - [x] `version` Show the version of the ZX CLI
+    - [x] `update` Update the version of ZX dependency
+    - [x] `upgrade` Upgrade the version of ZX CLI
 

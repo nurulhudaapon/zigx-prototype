@@ -112,10 +112,12 @@ const zx = @import("zx");
     - [x] `init` Project Template
     - [x] `transpile` Transpile .zx files to Zig source code
     - [x] `serve` Serve the project
-    - [ ] `dev` HMR or Rebuild on Change
+    - [x] `dev` HMR or Rebuild on Change
     - [x] `fmt` Format the ZX source code (_Alpha_)
     - [x] `export` Generate static site assets
     - [x] `version` Show the version of the ZX CLI
+    - [x] `update` Update the version of ZX dependency
+    - [x] `upgrade` Upgrade the version of ZX CLI
 
 #### Editor Support
 
