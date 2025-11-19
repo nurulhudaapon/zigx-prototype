@@ -9,6 +9,14 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     return cmd;
 }
 
+const outdir_flag = zli.Flag{
+    .name = "outdir",
+    .shortcut = "o",
+    .description = "Output directory",
+    .type = .String,
+    .default_value = .{ .String = "dist" },
+};
+
 fn @"export"(ctx: zli.CommandContext) !void {
     const outdir = ctx.flag("outdir", []const u8);
     var system = std.process.Child.init(&.{ "zig", "build", "export", "--", "--outdir", outdir }, ctx.allocator);
@@ -19,14 +27,6 @@ fn @"export"(ctx: zli.CommandContext) !void {
     const term = try system.wait();
     _ = term;
 }
-
-const outdir_flag = zli.Flag{
-    .name = "outdir",
-    .shortcut = "o",
-    .description = "Output directory",
-    .type = .String,
-    .default_value = .{ .String = "dist" },
-};
 
 const std = @import("std");
 const zli = @import("zli");

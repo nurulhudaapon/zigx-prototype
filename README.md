@@ -115,6 +115,7 @@ const zx = @import("zx");
     - [x] `dev` HMR or Rebuild on Change
     - [x] `fmt` Format the ZX source code (_Alpha_)
     - [x] `export` Generate static site assets
+    - [ ] `bundle` Bundle the ZX executable with public/assets and exe
     - [x] `version` Show the version of the ZX CLI
     - [x] `update` Update the version of ZX dependency
     - [x] `upgrade` Upgrade the version of ZX CLI
