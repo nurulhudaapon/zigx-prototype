@@ -51,7 +51,8 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(zxls_exe);
+    _ = zxls_exe;
+    // b.installArtifact(zxls_exe);
 
     // --- ZX Site (Docs, Example, sample) ---
     const site_exe = b.addExecutable(.{

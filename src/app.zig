@@ -369,7 +369,7 @@ pub const App = struct {
         return false;
     }
 
-    const SerilizableAppMeta = struct {
+    pub const SerilizableAppMeta = struct {
         const Route = struct {
             path: []const u8,
         };

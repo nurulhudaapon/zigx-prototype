@@ -7,38 +7,104 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     return cmd;
 }
 
+const RESTART_INTERVAL = std.time.ns_per_s * 2;
+const BIN_DIR = "zig-out/bin";
+
 fn dev(ctx: zli.CommandContext) !void {
-    var builder = std.process.Child.init(&.{ "zig", "build", "--watch" }, ctx.allocator);
-    try builder.spawn();
+    const allocator = ctx.allocator;
 
-    var runner = std.process.Child.init(&.{ "zig", "build", "serve" }, ctx.allocator);
+    // var builder = std.process.Child.init(&.{ "zig", "build", "--watch" }, allocator);
+    // try builder.spawn();
+
+    std.debug.print("Starting builder thread\n", .{});
+    _ = try std.Thread.spawn(.{}, builderThread, .{allocator});
+
+    std.debug.print("Finding app\n", .{});
+    const program_path = try findprogram(allocator, BIN_DIR);
+    std.debug.print("Starting app\n", .{});
+    var runner = std.process.Child.init(&.{program_path}, allocator);
     try runner.spawn();
+    // _ = try std.Thread.spawn(.{}, runnerThread, .{ allocator, program_path });
 
-    var bin_dir = try std.fs.cwd().openDir("zig-out/bin", .{});
-    defer bin_dir.close();
     var bin_mtime: i128 = 0;
 
     while (true) {
-        std.Thread.sleep(std.time.ms_per_s * 2);
-        const stat = try bin_dir.stat();
+        std.Thread.sleep(RESTART_INTERVAL);
+        const stat = try std.fs.cwd().statFile(program_path);
+        std.debug.print("{s}: mtime: {} -> {}\n", .{ program_path, bin_mtime, stat.mtime });
 
-        if (stat.mtime != bin_mtime) {
-            std.debug.print("Change detected, restarting server...\n", .{});
-            bin_mtime = stat.mtime;
+        const should_restart = stat.mtime != bin_mtime and bin_mtime != 0;
+        if (should_restart) {
+            std.debug.print("\x1b[32mChange detected, restarting server...\x1b[0m\n", .{});
+
             _ = try runner.kill();
-
             try runner.spawn();
-            bin_mtime = stat.mtime;
         }
-
-        std.debug.print("Old Mtim: {any}\n New mtime {any}\n", .{ bin_mtime, stat.mtime });
+        if (should_restart or bin_mtime == 0) bin_mtime = stat.mtime;
     }
 
     defer {
         _ = runner.kill() catch unreachable;
-        _ = builder.kill() catch unreachable;
+        // _ = builder.kill() catch unreachable;
     }
+}
+
+fn runnerThread(allocator: std.mem.Allocator, program_path: []const u8) !void {
+    var runner = std.process.Child.init(&.{program_path}, allocator);
+    try runner.spawn();
+}
+
+fn builderThread(allocator: std.mem.Allocator) !void {
+    var builder = std.process.Child.init(&.{ "zig", "build", "--watch" }, allocator);
+    // builder.stdout_behavior = .Pipe;
+    // builder.stderr_behavior = .Pipe;
+    try builder.spawn();
+
+    // if (builder.stdout) |f| {
+    //     const source = try f.readToEndAlloc(allocator, 8192);
+    //     std.debug.print("Output: {s}\n", .{source});
+    // }
+    // if (builder.stderr) |f| {
+    //     const source = try f.readToEndAlloc(allocator, 8192);
+    //     std.debug.print("Error: {s}\n", .{source});
+    // }
+}
+
+/// Find the ZX executable from the bin directory
+fn findprogram(allocator: std.mem.Allocator, bindir: []const u8) ![]const u8 {
+    var files = try std.fs.cwd().openDir(bindir, .{ .iterate = true });
+    defer files.close();
+
+    var it = files.iterate();
+    while (try it.next()) |entry| {
+        const full_path = try std.fs.path.join(allocator, &.{ bindir, entry.name });
+        // defer allocator.free(full_path);
+
+        const stat = try std.fs.cwd().statFile(full_path);
+        if (stat.kind == .file and std.mem.startsWith(u8, entry.name, "zx_")) {
+            std.debug.print("Checking exe: {s}\n", .{full_path});
+
+            var exe = std.process.Child.init(&.{ full_path, "--introspect" }, allocator);
+            exe.stdout_behavior = .Pipe;
+            try exe.spawn();
+
+            if (exe.stdout) |f| {
+                const source = try f.readToEndAlloc(allocator, 8192);
+                const source_z = try allocator.dupeZ(u8, source);
+
+                const app_meta = try std.zon.parse.fromSlice(zx.App.SerilizableAppMeta, allocator, source_z, null, .{});
+                defer std.zon.parse.free(allocator, app_meta);
+
+                std.debug.print("Found app: {s}\n", .{app_meta.version});
+
+                return full_path;
+            }
+            _ = try exe.kill();
+        }
+    }
+    return error.ProgramNotFound;
 }
 
 const std = @import("std");
 const zli = @import("zli");
+const zx = @import("zx");
