@@ -350,7 +350,7 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     }
     defer allocator.free(json_str);
 
-    const main_csr_react = @embedFile("./transpile/main_csr_react.tsx");
+    const main_csr_react = @embedFile("./transpile/template/main_csr_react.tsx");
     const placeholder = "`{[ZX_COMPONENTS]s}`";
     const placeholder_index = std.mem.indexOf(u8, main_csr_react, placeholder) orelse {
         @panic("Placeholder {ZX_COMPONENTS} not found in main_csr_react.tsx");
@@ -465,7 +465,7 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
     const arena = aa.allocator();
 
     const main_zig_path = try std.fs.path.join(arena, &.{ output_dir, "main.zig" });
-    const main_export_file_content = @embedFile("./transpile/main_export.zig");
+    const main_export_file_content = @embedFile("./transpile/template/main_controlled.zig");
 
     try std.fs.cwd().writeFile(.{
         .sub_path = main_zig_path,

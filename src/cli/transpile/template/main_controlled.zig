@@ -4,7 +4,7 @@ const zx = @import("zx");
 
 const config = zx.App.Config{
     .server = .{
-        .port = 49152, // uncommon but valid port (highest dynamic/private port)
+        .port = 3000,
         .address = "0.0.0.0",
         .request = .{
             .max_form_count = 100,
@@ -20,13 +20,7 @@ pub fn main() !void {
 
     const app = try zx.App.init(allocator, config);
     defer app.deinit();
-    errdefer app.deinit();
 
-    try app.build(.{ .type = .static });
+    std.debug.print("{s}\n  - Local: http://localhost:{d}\n", .{ zx.App.info, config.server.port.? });
+    try app.start();
 }
-
-pub const std_options = std.Options{
-    .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .websocket, .level = .err },
-    },
-};

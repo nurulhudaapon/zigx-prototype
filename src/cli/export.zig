@@ -36,13 +36,9 @@ fn @"export"(ctx: zli.CommandContext) !void {
     app_child.stdout_behavior = .Ignore;
     app_child.stderr_behavior = .Ignore;
     try app_child.spawn();
-    defer _ = if (app_child.id != 0) app_child.kill() catch unreachable;
-    errdefer _ = if (app_child.id != 0) app_child.kill() catch unreachable;
-    // const term = try system.wait();
-    // _ = term;
+    defer _ = app_child.kill() catch {};
+    errdefer _ = app_child.kill() catch {};
 
-    // std.Thread.sleep(std.time.ns_per_s * 3);
-    log.debug("Waiting for server to start...", .{});
     std.debug.print("\x1b[1m○ Building static ZX site!\x1b[0m\n\n", .{});
     std.debug.print("  - \x1b[90m{s}\x1b[0m\n", .{outdir});
 
@@ -51,7 +47,7 @@ fn @"export"(ctx: zli.CommandContext) !void {
     try app_meta.serialize(&aw.writer);
     log.debug("Building static ZX site! {s}", .{aw.written()});
 
-    var printer = Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
+    var printer = zx.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
 
     const port = app_meta.config.server.port.?;
@@ -89,7 +85,7 @@ fn copydirs(
     base_dir: []const u8,
     source_dirs: []const []const u8,
     dest_dir: []const u8,
-    printer: *Printer,
+    printer: *zx.Printer,
 ) !void {
     for (source_dirs) |source_dir| {
         const source_path = try std.fs.path.join(allocator, &.{ base_dir, source_dir });
@@ -154,7 +150,14 @@ fn copydirs(
     }
 }
 
-fn processRoute(allocator: std.mem.Allocator, host: []const u8, port: u16, route: zx.App.SerilizableAppMeta.Route, outdir: []const u8, printer: *Printer) !void {
+fn processRoute(
+    allocator: std.mem.Allocator,
+    host: []const u8,
+    port: u16,
+    route: zx.App.SerilizableAppMeta.Route,
+    outdir: []const u8,
+    printer: *zx.Printer,
+) !void {
     // Fetch the route's HTML content
     var client = std.http.Client{ .allocator = allocator };
     defer client.deinit();
@@ -220,5 +223,4 @@ const zli = @import("zli");
 const util = @import("shared/util.zig");
 const flag = @import("shared/flag.zig");
 const zx = @import("zx");
-const Printer = zx.Printer;
 const log = std.log.scoped(.cli);
