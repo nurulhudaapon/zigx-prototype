@@ -4,21 +4,13 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
         .description = "Start the app in development mode with rebuild on change",
     }, dev);
 
-    try cmd.addFlag(binpath_flag);
+    try cmd.addFlag(flag.binpath_flag);
 
     return cmd;
 }
 
 const RESTART_INTERVAL = std.time.ns_per_s * 2;
 const BIN_DIR = "zig-out/bin";
-
-const binpath_flag = zli.Flag{
-    .name = "binpath",
-    .shortcut = "b",
-    .description = "Binpath of the app in case if you have multiple exe artificats or using custom zig-out directory",
-    .type = .String,
-    .default_value = .{ .String = "" },
-};
 
 fn dev(ctx: zli.CommandContext) !void {
     const allocator = ctx.allocator;
@@ -28,7 +20,12 @@ fn dev(ctx: zli.CommandContext) !void {
     try builder.spawn();
     defer _ = builder.kill() catch unreachable;
 
-    const program_path = util.findprogram(allocator, binpath) catch {
+    const program_meta = util.findprogram(allocator, binpath) catch {
+        try ctx.writer.print("Error finding ZX executable!\n", .{});
+        return;
+    };
+
+    const program_path = program_meta.binpath orelse {
         try ctx.writer.print("Error finding ZX executable!\n", .{});
         return;
     };
@@ -60,5 +57,6 @@ fn dev(ctx: zli.CommandContext) !void {
 
 const std = @import("std");
 const zli = @import("zli");
-const util = @import("util/util.zig");
+const util = @import("shared/util.zig");
+const flag = @import("shared/flag.zig");
 const log = std.log.scoped(.cli);

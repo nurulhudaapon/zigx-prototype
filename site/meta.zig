@@ -29,7 +29,7 @@ pub const routes = [_]zx.App.Meta.Route{
 
 pub const meta = zx.App.Meta{
     .routes = &routes,
-    .outdir = "site/.zx",
+    .rootdir = "site/.zx",
 };
 
 const zx = @import("zx");

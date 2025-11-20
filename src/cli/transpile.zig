@@ -436,7 +436,7 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
 
     try writer.writeAll("pub const meta = zx.App.Meta{\n");
     try writer.writeAll("    .routes = &routes,\n");
-    try writer.print("    .outdir = \"{s}\",\n", .{output_dir});
+    try writer.print("    .rootdir = \"{s}\",\n", .{output_dir});
     try writer.writeAll("};\n\n");
     try writer.writeAll("const zx = @import(\"zx\");\n");
 

@@ -1,12 +1,13 @@
 const BIN_DIR = "zig-out/bin";
 
 /// Find the ZX executable from the bin directory
-pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) ![]const u8 {
+pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App.SerilizableAppMeta {
     if (!std.mem.eql(u8, binpath, "")) {
-        const app_meta = try inspectProgram(allocator, binpath);
-        defer std.zon.parse.free(allocator, app_meta);
-        errdefer std.zon.parse.free(allocator, app_meta);
-        return binpath;
+        var app_meta = try inspectProgram(allocator, binpath);
+        // defer std.zon.parse.free(allocator, app_meta);
+        // errdefer std.zon.parse.free(allocator, app_meta);
+        app_meta.binpath = binpath;
+        return app_meta;
     }
 
     var files = try std.fs.cwd().openDir(BIN_DIR, .{ .iterate = true });
@@ -20,14 +21,16 @@ pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) ![]const u
         if (stat.kind == .file) {
             log.debug("Inspecting exe: {s}", .{full_path});
 
-            const app_meta = try inspectProgram(allocator, full_path);
-            defer std.zon.parse.free(allocator, app_meta);
+            var app_meta = try inspectProgram(allocator, full_path);
+            // defer std.zon.parse.free(allocator, app_meta);
 
             log.debug("Found app: {s} in {s}", .{ app_meta.version, full_path });
 
-            return full_path;
+            app_meta.binpath = full_path;
+            return app_meta;
         }
     }
+
     return error.ProgramNotFound;
 }
 
