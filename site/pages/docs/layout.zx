@@ -1,0 +1,56 @@
+pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
+
+
+    const js_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.js?v={s}", .{zx.info.version_string}) catch unreachable;
+    const css_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.css?v={s}", .{zx.info.version_string}) catch unreachable;
+
+    return (
+        <div  @allocator={ctx.arena}>
+                    
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
+            <link rel="stylesheet" href={css_version}>
+        
+            <div class="container">
+        
+                <nav class="sidebar">
+                    <div class="nav-header">
+                        <div class="nav-header-top">
+                            <h1>ZX</h1>
+                        </div>
+                        <p class="nav-subtitle">HTML within Zig</p>
+                        <code>v{zx.info.version_string}</code>
+                    </div>
+                    <ul class="nav-menu">
+                        <li><a href="/docs#introduction">Introduction</a></li>
+                        <li class="nav-item-with-submenu">
+                            <a href="/docs#getting-started" class="nav-parent">Getting Started <span
+                                    class="submenu-arrow">▼</span></a>
+                            <ul class="nav-submenu">
+                                <li><a href="/docs#getting-started">Quick Start</a></li>
+                                <li><a href="/docs#editor-setup">Editor Setup</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="/docs#expressions">Expressions</a></li>
+                        <li><a href="/docs#control-flow">Control Flow</a></li>
+                        <li><a href="/docs#components">Components</a></li>
+                        <li><a href="/docs#routing">Routing</a></li>
+                        <li><a href="/docs#builtin-attributes">Builtin Attributes</a></li>
+                        <li><a href="/docs/cli">CLI</a></li>
+                        <li><a href="/docs#examples">Examples</a></li>
+                    </ul>
+                </nav>
+
+                {(children)}
+
+
+                <script async type="module" src={js_version}></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js"/>
+            </div>
+        </div>
+        
+    );
+}
+
+const zx = @import("zx");
+const std = @import("std");

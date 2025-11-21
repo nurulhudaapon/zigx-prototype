@@ -27,7 +27,7 @@ winget install -e --id zig.zig # Windows
 
 ## Quick Example
 
-```tsx site/pages/doc/example/overview.zx
+```tsx site/pages/docs/example/overview.zx
 pub fn QuickExample(allocator: zx.Allocator) zx.Component {
     const is_loading = true;
     const chars = "Hello, ZX Dev!";
