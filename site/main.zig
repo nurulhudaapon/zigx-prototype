@@ -2,16 +2,7 @@ const Metadata = @import("meta.zig");
 const std = @import("std");
 const zx = @import("zx");
 
-const config = zx.App.Config{
-    .server = .{
-        .port = 5588,
-        .address = "0.0.0.0",
-        .request = .{
-            .max_form_count = 100,
-        },
-    },
-    .meta = &Metadata.meta,
-};
+const config = zx.App.Config{ .meta = &Metadata.meta, .server = .{} };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -20,8 +11,7 @@ pub fn main() !void {
 
     const app = try zx.App.init(allocator, config);
     defer app.deinit();
-    // errdefer app.deinit();
 
-    std.debug.print("{s}\n  - Local: http://localhost:{d}\n", .{ zx.App.info, config.server.port.? });
+    std.debug.print("{s}\n  - Local: http://localhost:{d}\n", .{ zx.App.info, app.server.config.port.? });
     try app.start();
 }

@@ -126,9 +126,22 @@ pub const App = struct {
         // --- Flags --- //
         // --introspect: Print the metadata to stdout and exit
         var is_introspect = false;
+        var port = self.server.config.port orelse Constant.default_port;
+        var address = self.server.config.address orelse Constant.default_address;
 
         while (args.next()) |arg| {
+            // --introspect: Print the metadata to stdout and exit
             if (std.mem.eql(u8, arg, "--introspect")) is_introspect = true;
+
+            // --port: Override the configured/default port
+            if (std.mem.eql(u8, arg, "--port")) {
+                const port_str = args.next() orelse return error.MissingPort;
+                const port_int = std.fmt.parseInt(u16, port_str, 10) catch return error.InvalidPort;
+                port = port_int;
+            }
+
+            // --address: Override the configured/default address
+            if (std.mem.eql(u8, arg, "--address")) address = args.next() orelse return error.MissingAddress;
         }
 
         var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
@@ -145,6 +158,11 @@ pub const App = struct {
             try stdout.print("{s}\n", .{aw.written()});
             std.process.exit(0);
         }
+
+        // Overriding or setting default configs
+        self.server.config.port = port;
+        self.server.config.address = address;
+        self.server.config.request.max_form_count = self.server.config.request.max_form_count orelse Constant.default_max_form_count;
 
         try stdout.flush();
     }
@@ -325,3 +343,4 @@ const zx = @import("root.zig");
 const Allocator = std.mem.Allocator;
 const Component = zx.Component;
 const Printer = zx.Printer;
+const Constant = @import("./constant.zig");
