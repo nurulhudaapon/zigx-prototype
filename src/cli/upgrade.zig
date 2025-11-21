@@ -20,8 +20,9 @@ fn upgrade(ctx: zli.CommandContext) !void {
             if (std.mem.eql(u8, version, "latest")) {
                 break :blk [_][:0]const u8{ "powershell", "-c", "irm ziex.dev/install.ps1 | iex" };
             } else {
-                // TODO: support version for windows
-                break :blk [_][:0]const u8{ "powershell", "-c", "irm ziex.dev/install.ps1 | iex" };
+                const prefix = if (std.mem.startsWith(u8, version, "v")) "" else "v";
+                maybe_cmd_str = try std.fmt.allocPrintSentinel(ctx.allocator, "& ([scriptblock]::Create((irm ziex.dev/install.ps1))) -Version '{s}{s}'", .{ prefix, version }, 0);
+                break :blk [_][:0]const u8{ "powershell", "-c", maybe_cmd_str.? };
             }
         },
         .linux, .macos => blk: {
@@ -42,7 +43,7 @@ fn upgrade(ctx: zli.CommandContext) !void {
     const term = try system.wait();
     _ = term;
 
-    try ctx.writer.print("Upgraded version to: ", .{});
+    try ctx.writer.print("Upgraded to: ", .{});
     var zx_version = std.process.Child.init(&.{ "zx", "version" }, ctx.allocator);
     try zx_version.spawn();
     _ = try zx_version.wait();
