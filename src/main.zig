@@ -31,9 +31,9 @@ pub const std_options = std.Options{
         .{ .scope = .@"html/ast", .level = .info },
         .{ .scope = .@"html/tokenizer", .level = .info },
         .{ .scope = .@"html/ast/fmt", .level = .info },
-        // .{ .scope = .zx_transpiler, .level = .info },
-        // .{ .scope = .transpile, .level = .info },
-        // .{ .scope = .cli, .level = .info },
-        // .{ .scope = .util, .level = .info },
+        .{ .scope = .zx_transpiler, .level = .info },
+        .{ .scope = .transpile, .level = .info },
+        .{ .scope = .cli, .level = .info },
+        .{ .scope = .util, .level = .info },
     },
 };
