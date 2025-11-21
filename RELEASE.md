@@ -12,9 +12,7 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
 ```
 
 ## Changelog
-- feat: `zx init` added react template
-- fix: `zx dev` first time building will run `zig build` first
-- fix: layout is being applied twice for root page
+- feat: custom --port and --address flags for `zig build serve`
 
 ## Feature Checklist
 
