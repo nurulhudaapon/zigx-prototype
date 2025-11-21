@@ -1,10 +1,10 @@
 pub fn Page(ctx: zx.PageContext) zx.Component {
-    ctx.response.header("Location", "/doc");
+    ctx.response.header("Location", "/docs");
     ctx.response.setStatus(.temporary_redirect);
 
     return (
         <span @allocator={ctx.arena}>
-            Redirecting to /doc...
+            Redirecting to /docs...
         </span>
     );
 }

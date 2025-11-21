@@ -16,7 +16,8 @@ RUN /opt/zig/zig build site -Doptimize=ReleaseFast -Dcpu=baseline
 # Run the app
 FROM alpine:3.22.2
 COPY --from=build /build/zig-out/bin/zx_site /server
-COPY --from=build /build/site/public /site/public
+COPY --from=build /build/site/.zx/public /site/.zx/public
+COPY --from=build /build/site/.zx/assets /site/.zx/assets
 
 ENTRYPOINT ["/server"]
 
