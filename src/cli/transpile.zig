@@ -330,23 +330,45 @@ fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientCom
     var aw = std.io.Writer.Allocating.init(allocator);
     defer aw.deinit();
 
-    // for (components, 0..) |component, i| {
-    //     if (i > 0) try writer.writeAll(",\n");
-    //     try writer.writeAll("    .{\n");
-    //     try writer.print("        .type = {s},\n", .{@tagName(component.type)});
-    //     try writer.print("        .id = \"{s}\",\n", .{component.id});
-    //     try writer.print("        .name = \"{s}\",\n", .{component.name});
-    //     try writer.print("        .path = \"{s}\",\n", .{component.path});
-    //     // Handle import string - remove the @ markers if present
-    //     var import_str = component.import;
-    //     if (std.mem.startsWith(u8, import_str, "@") and std.mem.endsWith(u8, import_str, "@")) {
-    //         import_str = import_str[1 .. import_str.len - 1];
-    //     }
-    //     try writer.print("        .import = \"{s}\",\n", .{import_str});
-    //     try writer.writeAll("    }");
-    // }
-
     std.zon.stringify.serialize(components, .{ .whitespace = true }, &aw.writer) catch @panic("OOM");
+
+    var zon_str = try allocator.dupe(u8, aw.written());
+    defer allocator.free(zon_str);
+
+    // Replace all instances of "@ and @" with empty string (similar to JSON handling)
+    const placeHolder_start = "\"@";
+    const placeHolder_end = "@\"";
+
+    while (std.mem.indexOf(u8, zon_str, placeHolder_start)) |index| {
+        const old_zon_str = zon_str;
+        const before = zon_str[0..index];
+        const after = zon_str[index + placeHolder_start.len ..];
+        zon_str = try std.mem.concat(allocator, u8, &.{ before, "", after });
+        allocator.free(old_zon_str);
+    }
+    while (std.mem.indexOf(u8, zon_str, placeHolder_end)) |index| {
+        const old_zon_str = zon_str;
+        const before = zon_str[0..index];
+        const after = zon_str[index + placeHolder_end.len ..];
+        zon_str = try std.mem.concat(allocator, u8, &.{ before, "", after });
+        allocator.free(old_zon_str);
+    }
+
+    // Replace @@ placeholders with double quotes (for quotes inside @import())
+    while (std.mem.indexOf(u8, zon_str, "@@")) |index| {
+        const old_zon_str = zon_str;
+        const before = zon_str[0..index];
+        const after = zon_str[index + 2 ..]; // Skip "@@"
+        zon_str = try std.mem.concat(allocator, u8, &.{ before, "\"", after });
+        allocator.free(old_zon_str);
+    }
+
+    // Remove any trailing standalone @ that might be left (from the end marker)
+    if (zon_str.len > 0 and zon_str[zon_str.len - 1] == '@') {
+        const old_zon_str = zon_str;
+        zon_str = try allocator.dupe(u8, zon_str[0 .. zon_str.len - 1]);
+        allocator.free(old_zon_str);
+    }
 
     const main_csz = @embedFile("./transpile/template/main_csz.zig");
     const placeholder = "    // PLACEHOLDER_ZX_COMPONENTS\n";
@@ -357,7 +379,7 @@ fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientCom
     const before = main_csz[0..placeholder_index];
     const after = main_csz[placeholder_index + placeholder.len ..];
 
-    const main_csz_z = try std.mem.concat(allocator, u8, &.{ before, aw.written(), after });
+    const main_csz_z = try std.mem.concat(allocator, u8, &.{ before, zon_str, after });
     defer allocator.free(main_csz_z);
 
     const main_csz_path = try std.fs.path.join(allocator, &.{ output_dir, "main_wasm.zig" });
@@ -654,6 +676,7 @@ fn transpileFile(
     source_path: []const u8,
     output_path: []const u8,
     input_root: []const u8,
+    output_dir: []const u8,
     global_components: *std.array_list.Managed(ClientComponentSerializable),
     verbose: bool,
 ) !void {
@@ -672,26 +695,47 @@ fn transpileFile(
 
     // Append components from this file to the global list
     for (result.client_components.items) |component| {
-        const source_dir = std.fs.path.dirname(source_path) orelse ".";
-        const resolved_component_path = try resolvePath(allocator, source_dir, component.path);
-        defer allocator.free(resolved_component_path);
-
-        // Calculate relative path from input root to component
-        // This path will be the same in the output directory structure
-        const component_rel_to_input = try relativePath(allocator, input_root, resolved_component_path);
-        defer allocator.free(component_rel_to_input);
-
-        // main.tsx is now in output_dir/, so import path is relative to output_dir
-        const import_path = try std.fmt.allocPrint(allocator, "./{s}", .{component_rel_to_input});
-        defer allocator.free(import_path);
-
-        const import_str = try std.fmt.allocPrint(allocator, "@async () => (await import('{s}')).default@", .{import_path});
-        defer allocator.free(import_str);
-
         const cloned_id = try allocator.dupe(u8, component.id);
         const cloned_name = try allocator.dupe(u8, component.name);
-        const cloned_path = try allocator.dupe(u8, component_rel_to_input);
-        const cloned_import = try allocator.dupe(u8, import_str);
+
+        var cloned_path: []const u8 = undefined;
+        var cloned_import: []const u8 = undefined;
+
+        if (component.type == .csz) {
+            // For .csz components, use the output .zig file path (relative to output_dir)
+            const output_rel_to_dir = try relativePath(allocator, output_dir, output_path);
+            defer allocator.free(output_rel_to_dir);
+
+            // Remove leading "./" if present
+            const clean_path = if (std.mem.startsWith(u8, output_rel_to_dir, "./"))
+                output_rel_to_dir[2..]
+            else
+                output_rel_to_dir;
+
+            cloned_path = try allocator.dupe(u8, clean_path);
+
+            // Generate Zig import: use @@ as placeholder for quotes inside, @ markers on outside
+            const import_str = try std.fmt.allocPrint(allocator, "@@import(@@{s}@@).{s}@", .{ clean_path, component.name });
+            cloned_import = import_str;
+        } else {
+            // For .csr components, use the original component path logic
+            const source_dir = std.fs.path.dirname(source_path) orelse ".";
+            const resolved_component_path = try resolvePath(allocator, source_dir, component.path);
+            defer allocator.free(resolved_component_path);
+
+            // Calculate relative path from input root to component
+            // This path will be the same in the output directory structure
+            const component_rel_to_input = try relativePath(allocator, input_root, resolved_component_path);
+            defer allocator.free(component_rel_to_input);
+
+            // main.tsx is now in output_dir/, so import path is relative to output_dir
+            const import_path = try std.fmt.allocPrint(allocator, "./{s}", .{component_rel_to_input});
+            defer allocator.free(import_path);
+
+            const import_str = try std.fmt.allocPrint(allocator, "@async () => (await import('{s}')).default@", .{import_path});
+            cloned_path = try allocator.dupe(u8, component_rel_to_input);
+            cloned_import = import_str;
+        }
 
         try global_components.append(.{
             .type = component.type,
@@ -774,7 +818,7 @@ fn transpileDirectory(
             const output_path = try std.fs.path.join(allocator, &.{ output_dir, output_rel_path });
             defer allocator.free(output_path);
 
-            transpileFile(allocator, input_path, output_path, dir_path, global_components, verbose) catch |err| {
+            transpileFile(allocator, input_path, output_path, dir_path, output_dir, global_components, verbose) catch |err| {
                 std.debug.print("Error transpiling {s}: {}\n", .{ input_path, err });
                 continue;
             };
@@ -859,7 +903,7 @@ fn transpileCommand(
         defer allocator.free(output_path);
 
         const input_root = if (std.fs.path.dirname(path)) |dir| dir else ".";
-        try transpileFile(allocator, path, output_path, input_root, &client_components, verbose);
+        try transpileFile(allocator, path, output_path, input_root, output_dir, &client_components, verbose);
 
         copySpecifiedDirectories(allocator, path, output_dir, copy_dirs, verbose) catch |err| {
             std.debug.print("Warning: Failed to copy specified directories: {}\n", .{err});

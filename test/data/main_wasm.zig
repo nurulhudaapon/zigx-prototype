@@ -3,6 +3,11 @@
 
 const std = @import("std");
 const zx = @import("zx");
+const CounterComponent = @import("component/csr_zig.zig").CounterComponent;
+
+pub fn main() void {
+    std.debug.print("I need to render all the components to find the root id in the dom using zig-js and if I find it, I need to render the component there!\n", .{});
+}
 
 pub const ComponentMetadata = struct {
     type: zx.Ast.ClientComponentMetadata.Type,
