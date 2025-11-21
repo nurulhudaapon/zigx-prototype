@@ -1,10 +1,5 @@
 This is a developer preview of ZX, some features are work in progress.
 
-## Changelog
-- `zx dev` with auto restart on change
-- `zx update` to update the version of ZX dependency
-- `zx upgrade` to upgrade the version of ZX CLI
-
 ## Installation
 
 ##### Linux/macOS
@@ -15,6 +10,11 @@ curl -fsSL https://ziex.dev/install | bash
 ```powershell
 powershell -c "irm ziex.dev/install.ps1 | iex"
 ```
+
+## Changelog
+- feat: `zx init` added react template
+- fix: `zx dev` first time building will run `zig build` first
+- fix: layout is being applied twice for root page
 
 ## Feature Checklist
 
@@ -57,6 +57,7 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
     - [x] `dev` HMR or Rebuild on Change
     - [x] `fmt` Format the ZX source code (_Alpha_)
     - [x] `export` Generate static site assets
+    - [ ] `bundle` Bundle the ZX executable with public/assets and exe
     - [x] `version` Show the version of the ZX CLI
     - [x] `update` Update the version of ZX dependency
     - [x] `upgrade` Upgrade the version of ZX CLI
