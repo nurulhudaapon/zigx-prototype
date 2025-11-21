@@ -7,6 +7,12 @@ const Tokenizer = std.zig.Tokenizer;
 const log = std.log.scoped(.zx_transpiler);
 
 pub const ClientComponentMetadata = struct {
+    pub const Type = enum {
+        csr, // Client-side React.js
+        csz, // Client-side Zig
+    };
+
+    type: Type,
     name: []const u8,
     path: []const u8,
     id: []const u8,
@@ -31,12 +37,31 @@ pub const ClientComponentMetadata = struct {
         return try allocator.dupe(u8, id_buf[0..35]);
     }
 
-    fn init(allocator: std.mem.Allocator, name: []const u8, path: []const u8) !ClientComponentMetadata {
+    fn init(allocator: std.mem.Allocator, name: []const u8, path: []const u8, component_type: Type) !ClientComponentMetadata {
         return .{
+            .type = component_type,
             .name = name,
             .path = path,
             .id = try generateClientComponentId(allocator, path, name),
         };
+    }
+
+    /// Parse rendering expression (e.g., ".csr" or ".csz") to determine type
+    fn parseRenderingType(rendering_expr: []const u8) Type {
+        // Remove leading '.' if present
+        const expr = if (std.mem.startsWith(u8, rendering_expr, "."))
+            rendering_expr[1..]
+        else
+            rendering_expr;
+
+        if (std.mem.eql(u8, expr, "csr")) {
+            return .csr;
+        } else if (std.mem.eql(u8, expr, "csz")) {
+            return .csz;
+        } else {
+            // Default to csr for backward compatibility
+            return .csr;
+        }
     }
 };
 
@@ -1744,7 +1769,10 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // Check if this component has @rendering attribute (client-side rendering)
-        if (elem.builtin_rendering) |_| {
+        if (elem.builtin_rendering) |rendering_expr| {
+            // Parse the rendering type from the expression (e.g., ".csr" or ".csz")
+            const component_type = ClientComponentMetadata.parseRenderingType(rendering_expr);
+
             // For client components, use _zx.client()
             // Get the path from js_imports
             var component_path = js_imports.get(elem.tag);
@@ -1762,7 +1790,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             const final_path = component_path.?;
             const owned_name = try allocator.dupe(u8, elem.tag);
             const owned_path = try allocator.dupe(u8, final_path);
-            const metadata = try ClientComponentMetadata.init(allocator, owned_name, owned_path);
+            const metadata = try ClientComponentMetadata.init(allocator, owned_name, owned_path, component_type);
             try client_components.append(allocator, metadata);
 
             // Use _zx.client() instead of _zx.lazy()
@@ -2421,7 +2449,10 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         // Check if this is a custom component
                         if (isCustomComponent(child_elem.tag)) {
                             // Check if this component has @rendering attribute (client-side rendering)
-                            if (child_elem.builtin_rendering) |_| {
+                            if (child_elem.builtin_rendering) |rendering_expr| {
+                                // Parse the rendering type from the expression (e.g., ".csr" or ".csz")
+                                const component_type = ClientComponentMetadata.parseRenderingType(rendering_expr);
+
                                 // For client components, use _zx.client()
                                 // Get the path from js_imports (or use default)
                                 var component_path = js_imports.get(child_elem.tag);
@@ -2439,7 +2470,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                 const final_path = component_path.?;
                                 const owned_name = try allocator.dupe(u8, child_elem.tag);
                                 const owned_path = try allocator.dupe(u8, final_path);
-                                const metadata = try ClientComponentMetadata.init(allocator, owned_name, owned_path);
+                                const metadata = try ClientComponentMetadata.init(allocator, owned_name, owned_path, component_type);
                                 try client_components.append(allocator, metadata);
 
                                 // Use _zx.client() instead of _zx.lazy()

@@ -317,14 +317,59 @@ fn copySpecifiedDirectories(
 // Client Component Handling
 // ============================================================================
 
-const ClientComponentJson = struct {
+const ClientComponentSerializable = struct {
+    type: zx.Ast.ClientComponentMetadata.Type,
     id: []const u8,
     name: []const u8,
     path: []const u8,
     import: []const u8,
 };
 
-fn genClientMain(allocator: std.mem.Allocator, components: []const ClientComponentJson, output_dir: []const u8) !void {
+fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8) !void {
+    // Generate Zig array literal contents (without outer array declaration)
+    var aw = std.io.Writer.Allocating.init(allocator);
+    defer aw.deinit();
+
+    // for (components, 0..) |component, i| {
+    //     if (i > 0) try writer.writeAll(",\n");
+    //     try writer.writeAll("    .{\n");
+    //     try writer.print("        .type = {s},\n", .{@tagName(component.type)});
+    //     try writer.print("        .id = \"{s}\",\n", .{component.id});
+    //     try writer.print("        .name = \"{s}\",\n", .{component.name});
+    //     try writer.print("        .path = \"{s}\",\n", .{component.path});
+    //     // Handle import string - remove the @ markers if present
+    //     var import_str = component.import;
+    //     if (std.mem.startsWith(u8, import_str, "@") and std.mem.endsWith(u8, import_str, "@")) {
+    //         import_str = import_str[1 .. import_str.len - 1];
+    //     }
+    //     try writer.print("        .import = \"{s}\",\n", .{import_str});
+    //     try writer.writeAll("    }");
+    // }
+
+    std.zon.stringify.serialize(components, .{ .whitespace = true }, &aw.writer) catch @panic("OOM");
+
+    const main_csz = @embedFile("./transpile/template/main_csz.zig");
+    const placeholder = "    // PLACEHOLDER_ZX_COMPONENTS\n";
+    const placeholder_index = std.mem.indexOf(u8, main_csz, placeholder) orelse {
+        @panic("Placeholder PLACEHOLDER_ZX_COMPONENTS not found in main_csz.zig");
+    };
+
+    const before = main_csz[0..placeholder_index];
+    const after = main_csz[placeholder_index + placeholder.len ..];
+
+    const main_csz_z = try std.mem.concat(allocator, u8, &.{ before, aw.written(), after });
+    defer allocator.free(main_csz_z);
+
+    const main_csz_path = try std.fs.path.join(allocator, &.{ output_dir, "main_wasm.zig" });
+    defer allocator.free(main_csz_path);
+
+    try std.fs.cwd().writeFile(.{
+        .sub_path = main_csz_path,
+        .data = main_csz_z,
+    });
+}
+
+fn genClientMain(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8) !void {
     var json_str = std.json.Stringify.valueAlloc(allocator, components, .{
         .whitespace = .indent_2,
     }) catch @panic("OOM");
@@ -609,7 +654,7 @@ fn transpileFile(
     source_path: []const u8,
     output_path: []const u8,
     input_root: []const u8,
-    global_components: *std.array_list.Managed(ClientComponentJson),
+    global_components: *std.array_list.Managed(ClientComponentSerializable),
     verbose: bool,
 ) !void {
     const source = try std.fs.cwd().readFileAlloc(
@@ -649,6 +694,7 @@ fn transpileFile(
         const cloned_import = try allocator.dupe(u8, import_str);
 
         try global_components.append(.{
+            .type = component.type,
             .id = cloned_id,
             .name = cloned_name,
             .path = cloned_path,
@@ -678,7 +724,7 @@ fn transpileDirectory(
     dir_path: []const u8,
     output_dir: []const u8,
     copy_dirs: []const []const u8,
-    global_components: *std.array_list.Managed(ClientComponentJson),
+    global_components: *std.array_list.Managed(ClientComponentSerializable),
     verbose: bool,
 ) !void {
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
@@ -765,7 +811,7 @@ fn transpileCommand(
     copy_dirs: []const []const u8,
     verbose: bool,
 ) !void {
-    var client_components = std.array_list.Managed(ClientComponentJson).init(allocator);
+    var client_components = std.array_list.Managed(ClientComponentSerializable).init(allocator);
     defer {
         for (client_components.items) |*component| {
             allocator.free(component.id);
@@ -831,9 +877,29 @@ fn transpileCommand(
         return error.InvalidPath;
     }
 
-    if (client_components.items.len > 0) {
-        genClientMain(allocator, client_components.items, output_dir) catch |err| {
+    // Filter components by type and generate appropriate files
+    var csr_components = std.array_list.Managed(ClientComponentSerializable).init(allocator);
+    defer csr_components.deinit();
+    var csz_components = std.array_list.Managed(ClientComponentSerializable).init(allocator);
+    defer csz_components.deinit();
+
+    for (client_components.items) |component| {
+        if (component.type == .csr) {
+            try csr_components.append(component);
+        } else if (component.type == .csz) {
+            try csz_components.append(component);
+        }
+    }
+
+    if (csr_components.items.len > 0) {
+        genClientMain(allocator, csr_components.items, output_dir) catch |err| {
             std.debug.print("Warning: Failed to generate main.tsx: {}\n", .{err});
+        };
+    }
+
+    if (csz_components.items.len > 0) {
+        genClientMainWasm(allocator, csz_components.items, output_dir) catch |err| {
+            std.debug.print("Warning: Failed to generate main_wasm.zig: {}\n", .{err});
         };
     }
 }
