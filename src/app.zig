@@ -305,6 +305,10 @@ pub const App = struct {
                 allocator.free(route.path);
             }
             allocator.free(self.routes);
+
+            allocator.free(self.version);
+            if (self.rootdir) |rootdir| allocator.free(rootdir);
+            if (self.binpath) |binpath| allocator.free(binpath);
         }
 
         pub fn serialize(self: *const SerilizableAppMeta, writer: anytype) !void {

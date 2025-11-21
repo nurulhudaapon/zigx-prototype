@@ -20,14 +20,19 @@ pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App.Se
             exe_count += 1;
 
             const full_path = try std.fs.path.join(allocator, &.{ BIN_DIR, entry.name });
+            defer allocator.free(full_path);
+
             log.debug("Inspecting exe: {s}", .{full_path});
 
-            var app_meta = try inspectProgram(allocator, full_path);
+            var app_meta = inspectProgram(allocator, full_path) catch |err| switch (err) {
+                error.ProgramNotFound, error.ParseZon => continue,
+                else => return err,
+            };
             // defer std.zon.parse.free(allocator, app_meta);
 
             log.debug("Found app: {s} in {s}", .{ app_meta.version, full_path });
 
-            app_meta.binpath = full_path;
+            app_meta.binpath = try allocator.dupe(u8, full_path);
             return app_meta;
         }
     }

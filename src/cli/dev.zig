@@ -20,7 +20,7 @@ fn dev(ctx: zli.CommandContext) !void {
     try builder.spawn();
     defer _ = builder.kill() catch unreachable;
 
-    const program_meta = util.findprogram(allocator, binpath) catch |err| blk: switch (err) {
+    var program_meta = util.findprogram(allocator, binpath) catch |err| blk: switch (err) {
         error.EmptyBinDir, error.FileNotFound => {
             log.debug("First time building, we will run zig build first", .{});
             var build_builder = std.process.Child.init(&.{ "zig", "build" }, allocator);
@@ -35,6 +35,7 @@ fn dev(ctx: zli.CommandContext) !void {
             return;
         },
     };
+    defer program_meta.deinit(allocator);
 
     const program_path = program_meta.binpath orelse {
         try ctx.writer.print("Error finding ZX executable!\n", .{});

@@ -66,8 +66,8 @@ fn @"export"(ctx: zli.CommandContext) !void {
                     continue :process_block;
                 }
             };
-            break :process_block;
         }
+        break;
     }
 
     log.debug("Copying public directory! {s}", .{appoutdir});
