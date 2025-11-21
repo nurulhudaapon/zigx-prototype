@@ -1,3 +1,10 @@
+# Zig
 .zig-cache
 zig-out
+
+# ZX
 dist
+bundle
+
+# Node.js
+node_modules

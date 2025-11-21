@@ -105,6 +105,8 @@ const templates = [_]TemplateFile{
     // React
     .{ .name = .react, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page+react.zx") },
     .{ .name = .react, .path = "site/pages/client.tsx", .content = @embedFile(template_dir ++ "/site/pages/client.tsx") },
+    .{ .name = .react, .path = "package.json", .content = @embedFile(template_dir ++ "/package.json") },
+    .{ .name = .react, .path = "tsconfig.json", .content = @embedFile(template_dir ++ "/tsconfig.json") },
 };
 
 const std = @import("std");
