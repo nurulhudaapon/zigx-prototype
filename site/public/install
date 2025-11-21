@@ -32,6 +32,7 @@ if [[ -t 1 ]]; then
 
     # Bold
     Bold_Green='\033[1;32m' # Bold Green
+    Bold_White='\033[1m'    # Bold White
 fi
 
 error() {
@@ -41,6 +42,10 @@ error() {
 
 info() {
     echo -e "${Dim}$@ ${Color_Off}"
+}
+
+info_bold() {
+    echo -e "${Bold_White}$@ ${Color_Off}"
 }
 
 success() {
@@ -137,6 +142,7 @@ else
 fi
 
 install_env=ZX_INSTALL
+bin_env=\$$install_env/bin
 install_dir=${!install_env:-$HOME/.zx}
 bin_dir=$install_dir/bin
 exe=$bin_dir/zx
@@ -196,5 +202,152 @@ if [[ -n "$extracted_dir" && -d "$extracted_dir" ]]; then
 fi
 rm -f "$archive_file"
 
-success "zx was installed successfully to $Bold_Green$exe"
-echo "Run 'zx --help' to get started"
+tildify() {
+    if [[ $1 = $HOME/* ]]; then
+        local replacement=\~/
+
+        echo "${1/$HOME\//$replacement}"
+    else
+        echo "$1"
+    fi
+}
+
+success "zx was installed successfully to $Bold_Green$(tildify "$exe")"
+
+if command -v zx >/dev/null; then
+    info_bold "Run 'zx --help' to get started"
+    exit
+fi
+
+refresh_command=''
+
+tilde_bin_dir=$(tildify "$bin_dir")
+quoted_install_dir=\"${install_dir//\"/\\\"}\"
+
+if [[ $quoted_install_dir = \"$HOME/* ]]; then
+    quoted_install_dir=${quoted_install_dir/$HOME\//\$HOME/}
+fi
+
+echo
+
+case $(basename "$SHELL") in
+fish)
+    commands=(
+        "set --export $install_env $quoted_install_dir"
+        "set --export PATH $bin_env \$PATH"
+    )
+
+    fish_config=$HOME/.config/fish/config.fish
+    tilde_fish_config=$(tildify "$fish_config")
+
+    if [[ -w $fish_config ]]; then
+        if ! grep -q "$install_env" "$fish_config"; then
+            {
+                echo -e '\n# zx'
+
+                for command in "${commands[@]}"; do
+                    echo "$command"
+                done
+            } >>"$fish_config"
+        fi
+
+        refresh_command="source $tilde_fish_config"
+    else
+        echo "Manually add the directory to $tilde_fish_config (or similar):"
+
+        for command in "${commands[@]}"; do
+            info_bold "  $command"
+        done
+    fi
+    ;;
+zsh)
+    commands=(
+        "export $install_env=$quoted_install_dir"
+        "export PATH=\"$bin_env:\$PATH\""
+    )
+
+    zsh_config=$HOME/.zshrc
+    tilde_zsh_config=$(tildify "$zsh_config")
+
+    if [[ -w $zsh_config ]]; then
+        if ! grep -q "$install_env" "$zsh_config"; then
+            {
+                echo -e '\n# zx'
+
+                for command in "${commands[@]}"; do
+                    echo "$command"
+                done
+            } >>"$zsh_config"
+        fi
+
+        refresh_command="exec $SHELL"
+    else
+        echo "Manually add the directory to $tilde_zsh_config (or similar):"
+
+        for command in "${commands[@]}"; do
+            info_bold "  $command"
+        done
+    fi
+    ;;
+bash)
+    commands=(
+        "export $install_env=$quoted_install_dir"
+        "export PATH=\"$bin_env:\$PATH\""
+    )
+
+    bash_configs=(
+        "$HOME/.bash_profile"
+        "$HOME/.bashrc"
+    )
+
+    if [[ ${XDG_CONFIG_HOME:-} ]]; then
+        bash_configs+=(
+            "$XDG_CONFIG_HOME/.bash_profile"
+            "$XDG_CONFIG_HOME/.bashrc"
+            "$XDG_CONFIG_HOME/bash_profile"
+            "$XDG_CONFIG_HOME/bashrc"
+        )
+    fi
+
+    set_manually=true
+    for bash_config in "${bash_configs[@]}"; do
+        tilde_bash_config=$(tildify "$bash_config")
+
+        if [[ -w $bash_config ]]; then
+            if ! grep -q "$install_env" "$bash_config"; then
+                {
+                    echo -e '\n# zx'
+
+                    for command in "${commands[@]}"; do
+                        echo "$command"
+                    done
+                } >>"$bash_config"
+            fi
+
+            refresh_command="source $bash_config"
+            set_manually=false
+            break
+        fi
+    done
+
+    if [[ $set_manually = true ]]; then
+        echo "Manually add the directory to $tilde_bash_config (or similar):"
+
+        for command in "${commands[@]}"; do
+            info_bold "  $command"
+        done
+    fi
+    ;;
+*)
+    echo 'Manually add the directory to ~/.bashrc (or similar):'
+    info_bold "  export $install_env=$quoted_install_dir"
+    info_bold "  export PATH=\"$bin_env:\$PATH\""
+    ;;
+esac
+
+if [[ $refresh_command ]]; then
+    echo "Run to get started:"
+    echo
+    info "$refresh_command"
+    info "zx --help"
+fi
