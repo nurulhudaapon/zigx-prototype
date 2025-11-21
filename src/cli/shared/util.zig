@@ -13,12 +13,13 @@ pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App.Se
     var files = try std.fs.cwd().openDir(BIN_DIR, .{ .iterate = true });
     defer files.close();
 
+    var exe_count: usize = 0;
     var it = files.iterate();
     while (try it.next()) |entry| {
-        const full_path = try std.fs.path.join(allocator, &.{ BIN_DIR, entry.name });
+        if (entry.kind == .file) {
+            exe_count += 1;
 
-        const stat = try std.fs.cwd().statFile(full_path);
-        if (stat.kind == .file) {
+            const full_path = try std.fs.path.join(allocator, &.{ BIN_DIR, entry.name });
             log.debug("Inspecting exe: {s}", .{full_path});
 
             var app_meta = try inspectProgram(allocator, full_path);
@@ -31,6 +32,7 @@ pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App.Se
         }
     }
 
+    if (exe_count == 0) return error.EmptyBinDir;
     return error.ProgramNotFound;
 }
 

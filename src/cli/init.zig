@@ -9,17 +9,29 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     return cmd;
 }
 
+const template_flag = zli.Flag{
+    .name = "template",
+    .shortcut = "t",
+    .description = "Template to use (default, react)",
+    .type = .String,
+    .default_value = .{ .String = "default" },
+};
+
 fn init(ctx: zli.CommandContext) !void {
     const t_val = ctx.flag("template", []const u8); // type-safe flag access
 
-    std.debug.print("○ Initializing ZX project!", .{});
+    const template_name = if (std.meta.stringToEnum(TemplateFile.Name, t_val)) |name| name else {
+        std.debug.print("\x1b[33mUnknown template:\x1b[0m {s}\n\nTemplates:\n", .{t_val});
 
-    if (!std.mem.eql(u8, t_val, "default")) {
-        std.debug.print("Unknown template: {s}, only 'default' is available.\n", .{t_val});
+        for (std.enums.values(TemplateFile.Name)) |name| {
+            std.debug.print("  - \x1b[34m{s}\x1b[0m\n", .{@tagName(name)});
+        }
+        std.debug.print("\n", .{});
         return;
-    }
+    };
 
-    std.debug.print(" Template: \x1b[90m{s}\x1b[0m\n\n", .{t_val});
+    std.debug.print("○ Initializing ZX project!", .{});
+    std.debug.print(" Template: \x1b[90m{s}\x1b[0m\n\n", .{@tagName(template_name)});
 
     const output_dir = ".";
 
@@ -43,6 +55,8 @@ fn init(ctx: zli.CommandContext) !void {
     }
 
     for (templates) |template| {
+        if (template.name != null and template.name.? != template_name) continue;
+
         const output_path = try std.fs.path.join(ctx.allocator, &.{ output_dir, template.path });
         defer ctx.allocator.free(output_path);
 
@@ -61,13 +75,18 @@ fn init(ctx: zli.CommandContext) !void {
 }
 
 const TemplateFile = struct {
+    const Name = enum { default, react };
+
+    name: ?Name = null,
     path: []const u8,
     content: []const u8,
+    description: ?[]const u8 = "",
 };
 
 const template_dir = "init/template";
 
 const templates = [_]TemplateFile{
+    // Shared
     .{ .path = ".vscode/extensions.json", .content = @embedFile(template_dir ++ "/.vscode/extensions.json") },
     .{ .path = "build.zig.zon", .content = @embedFile(template_dir ++ "/build.zig.zon") },
     .{ .path = "build.zig", .content = @embedFile(template_dir ++ "/build.zig") },
@@ -77,17 +96,15 @@ const templates = [_]TemplateFile{
     .{ .path = "site/main.zig", .content = @embedFile(template_dir ++ "/site/main.zig") },
     .{ .path = "site/pages/about/page.zx", .content = @embedFile(template_dir ++ "/site/pages/about/page.zx") },
     .{ .path = "site/pages/layout.zx", .content = @embedFile(template_dir ++ "/site/pages/layout.zx") },
-    .{ .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page.zx") },
     .{ .path = "src/root.zig", .content = @embedFile(template_dir ++ "/src/root.zig") },
     .{ .path = ".gitignore", .content = @embedFile(template_dir ++ "/.gitignore") },
-};
 
-const template_flag = zli.Flag{
-    .name = "template",
-    .shortcut = "t",
-    .description = "Template to use (currently only one template is available)",
-    .type = .String,
-    .default_value = .{ .String = "default" },
+    // Default
+    .{ .name = .default, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page.zx") },
+
+    // React
+    .{ .name = .react, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page+react.zx") },
+    .{ .name = .react, .path = "site/pages/client.tsx", .content = @embedFile(template_dir ++ "/site/pages/client.tsx") },
 };
 
 const std = @import("std");

@@ -18,3 +18,20 @@ a {
     font-size: 1rem;
     text-decoration: none;
 }
+
+button {
+    padding: 2px;
+    min-width: 100px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    margin: 3px;
+    border: 1px solid #ffffff;
+    background-color: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    &:hover {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}

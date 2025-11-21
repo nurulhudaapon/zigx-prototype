@@ -20,9 +20,20 @@ fn dev(ctx: zli.CommandContext) !void {
     try builder.spawn();
     defer _ = builder.kill() catch unreachable;
 
-    const program_meta = util.findprogram(allocator, binpath) catch {
-        try ctx.writer.print("Error finding ZX executable!\n", .{});
-        return;
+    const program_meta = util.findprogram(allocator, binpath) catch |err| blk: switch (err) {
+        error.EmptyBinDir, error.FileNotFound => {
+            log.debug("First time building, we will run zig build first", .{});
+            var build_builder = std.process.Child.init(&.{ "zig", "build" }, allocator);
+            try build_builder.spawn();
+            _ = try build_builder.wait();
+
+            log.debug("Building complete, finding ZX executable", .{});
+            break :blk try util.findprogram(allocator, binpath);
+        },
+        else => {
+            try ctx.writer.print("Error finding ZX executable! {any}\n", .{err});
+            return;
+        },
     };
 
     const program_path = program_meta.binpath orelse {

@@ -186,16 +186,21 @@ pub const App = struct {
             }
 
             // First check root path "/"
-            for (all_routes) |parent_route| {
-                const normalized_parent = normalizePath(pagectx.arena, parent_route.path) catch continue;
-                if (std.mem.eql(u8, normalized_parent, "/")) {
-                    if (parent_route.layout) |layout_fn| {
-                        if (layouts_count < layouts_to_apply.len) {
-                            layouts_to_apply[layouts_count] = layout_fn;
-                            layouts_count += 1;
+            // Only add root layout if current route is NOT the root route
+            // (root route's layout will be applied later as route.layout)
+            const is_root_route = std.mem.eql(u8, normalized_route_path, "/");
+            if (!is_root_route) {
+                for (all_routes) |parent_route| {
+                    const normalized_parent = normalizePath(pagectx.arena, parent_route.path) catch continue;
+                    if (std.mem.eql(u8, normalized_parent, "/")) {
+                        if (parent_route.layout) |layout_fn| {
+                            if (layouts_count < layouts_to_apply.len) {
+                                layouts_to_apply[layouts_count] = layout_fn;
+                                layouts_count += 1;
+                            }
                         }
+                        break;
                     }
-                    break;
                 }
             }
 
@@ -218,6 +223,10 @@ pub const App = struct {
                     const parent_path = path_buf[0 .. path_stream.getPos() catch break];
 
                     // Find route with matching path
+                    // Skip if this parent path matches the current route (avoid double application)
+                    if (std.mem.eql(u8, parent_path, normalized_route_path)) {
+                        continue;
+                    }
                     for (all_routes) |parent_route| {
                         const normalized_parent = normalizePath(pagectx.arena, parent_route.path) catch continue;
                         if (std.mem.eql(u8, normalized_parent, parent_path)) {

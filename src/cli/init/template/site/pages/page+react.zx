@@ -1,0 +1,28 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const query = ctx.request.query() catch unreachable;
+
+    if (query.get("reset")) |_| counter = 0
+    else if (query.get("increment")) |_| counter += 1
+    else if (query.get("decrement")) |_| counter -= 1
+    else counter += 1;
+
+    return (
+        <main @allocator={ctx.arena}>
+            <p>ZX is a framework for building web applications with Zig.</p>
+            <a href="https://ziex.dev" target="_blank">See ZX Docs →</a>
+            <br>
+            <div style="height: 150px; margin: 10px;">
+                <CounterComponent @rendering={.csr} counter={counter} />
+            </div>
+            <h4>ZX + React</h4>
+            <hr>
+            <a href="/about">Navigate to About Page</a>
+
+            <script src="/assets/main.js" />
+        </main>
+    );
+}
+var counter: i128 = 0;
+
+const zx = @import("zx");
+const CounterComponent = @jsImport("./client.tsx");
