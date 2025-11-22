@@ -8,6 +8,7 @@ const importObject = {
 };
 
 const url = new URL("main.wasm", import.meta.url);
+
 fetch(url.href)
   .then((response) => response.arrayBuffer())
   .then((bytes) => WebAssembly.instantiate(bytes, importObject))

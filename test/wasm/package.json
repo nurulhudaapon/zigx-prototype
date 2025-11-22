@@ -1,7 +1,6 @@
 {
   "scripts": {
-    "start": "bun index.html",
-    "build": "bun build index.html --outdir dist"
+    "dev": "bun build src/index.html --outdir dist --watch & bunx serve dist"
   },
   "dependencies": {
     "jsz": "github:mitchellh/zig-js"
