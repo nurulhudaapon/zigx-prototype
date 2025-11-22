@@ -14,11 +14,25 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 pub fn CounterComponent(allocator: zx.Allocator, count: i32) zx.Component {
     var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
-        .button,
+        .div,
         .{
             .allocator = allocator,
+            .attributes = &.{},
             .children = &.{
-                _zx.txt(std.fmt.allocPrint(allocator, "Counter: {d}", .{count}) catch @panic("OOM")),
+                _zx.zx(.h1, .{
+                    .children = &.{
+                        _zx.txt(std.fmt.allocPrint(allocator, "Counter: {d}", .{count}) catch @panic("OOM")),
+                    },
+                }),
+                _zx.zx(.br, .{}),
+                _zx.zx(.button, .{
+                    .children = &.{
+                        _zx.txt("Increment"),
+                    },
+                    .attributes = &.{
+                        .{ .name = "onclick", .value = "window.zx.onclick(1)" },
+                    },
+                }),
             },
         },
     );

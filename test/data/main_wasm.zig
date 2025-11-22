@@ -1,6 +1,11 @@
 pub const components = [_]ComponentMetadata{
-    // PLACEHOLDER_ZX_COMPONENTS
-};
+.{.{
+    .type = .csz,
+    .id = "zx-3badae80b344e955a3048888ed2aae42",
+    .name = "CounterComponent",
+    .path = "component/csr_zig.zig",
+    .import = @import("component/csr_zig.zig").CounterComponent,
+}}};
 
 export fn main() void {
     const allocator = std.heap.wasm_allocator;
