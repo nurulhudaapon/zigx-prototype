@@ -379,7 +379,7 @@ fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientCom
     const before = main_csz[0..placeholder_index];
     const after = main_csz[placeholder_index + placeholder.len ..];
 
-    const main_csz_z = try std.mem.concat(allocator, u8, &.{ before, zon_str, after });
+    const main_csz_z = try std.mem.concat(allocator, u8, &.{ before, zon_str[2..(zon_str.len - 1)], after });
     defer allocator.free(main_csz_z);
 
     const main_csz_path = try std.fs.path.join(allocator, &.{ output_dir, "main_wasm.zig" });

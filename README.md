@@ -78,7 +78,7 @@ const zx = @import("zx");
 
 - [x] Server Side Rendering (SSR)
 - [x] Static Site Generation (SSG)
-- [ ] Client Side Rendering (CSR) via WebAssembly
+- [ ] Client Side Rendering (CSR) via WebAssembly (_WIP_)
 - [x] Client Side Rendering (CSR) via React
 - [x] Type Safety
 - [x] Routing
