@@ -6,3 +6,4 @@ dist
 site/public/index.js
 test/data/assets/main.js
 test/data/assets/main.wasm
+node_modules

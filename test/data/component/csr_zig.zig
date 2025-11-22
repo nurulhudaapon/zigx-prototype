@@ -11,17 +11,18 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     );
 }
 
-pub fn CounterComponent(allocator: zx.Allocator) zx.Component {
+pub fn CounterComponent(allocator: zx.Allocator, count: i32) zx.Component {
     var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .button,
         .{
             .allocator = allocator,
             .children = &.{
-                _zx.txt("Counter"),
+                _zx.txt(std.fmt.allocPrint(allocator, "Counter: {d}", .{count}) catch @panic("OOM")),
             },
         },
     );
 }
 
 const zx = @import("zx");
+const std = @import("std");

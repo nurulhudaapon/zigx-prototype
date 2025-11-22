@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "start": "bun index.html",
+    "build": "bun build index.html --outdir dist"
+  },
+  "dependencies": {
+    "jsz": "github:mitchellh/zig-js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

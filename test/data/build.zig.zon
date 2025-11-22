@@ -8,6 +8,10 @@
             .url = "git+https://github.com/nurulhudaapon/zx#4e687c142d230b95c394c6eab8e31b204b2bbd2f",
             .hash = "zx-0.0.1-dev.160-8okzKvLyCgDS6ZbAjBylNMoVk0RPrTOC9p8Xgohb3tDO",
         },
+        .zig_js = .{
+            .url = "git+https://github.com/mitchellh/zig-js.git#04db83c617da1956ac5adc1cb9ba1e434c1cb6fd",
+            .hash = "zig_js-0.0.0-rjCAV-6GAADxFug7rDmPH-uM_XcnJ5NmuAMJCAscMjhi",
+        },
     },
     .paths = .{
         "build.zig",
