@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 export default function Page(props: { counter: number }) {
     const [count, setCount] = useState(props.counter);

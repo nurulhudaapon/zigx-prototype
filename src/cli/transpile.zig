@@ -417,7 +417,7 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     }
     defer allocator.free(json_str);
 
-    const main_csr_react = @embedFile("./transpile/template/main_csr_react.tsx");
+    const main_csr_react = @embedFile("./transpile/template/components.ts");
     const placeholder = "`{[ZX_COMPONENTS]s}`";
     const placeholder_index = std.mem.indexOf(u8, main_csr_react, placeholder) orelse {
         @panic("Placeholder {ZX_COMPONENTS} not found in main_csr_react.tsx");
@@ -429,7 +429,20 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     const main_csr_react_z = try std.mem.concat(allocator, u8, &.{ before, json_str, after });
     defer allocator.free(main_csr_react_z);
 
-    const main_csr_react_path = try std.fs.path.join(allocator, &.{ output_dir, "main.tsx" });
+    _ = output_dir;
+    log.debug("node_modules path: {s}", .{"node_modules"});
+    log.debug("ziex path: {s}", .{"ziex"});
+    log.debug("components.ts path: {s}", .{"components.ts"});
+
+    // Create the node_modules/ziex/ if it doesn't exist
+    const ziex_dir = try std.fs.path.join(allocator, &.{ "node_modules", "@ziex/components" });
+    defer allocator.free(ziex_dir);
+    std.fs.cwd().makePath(ziex_dir) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+
+    const main_csr_react_path = try std.fs.path.join(allocator, &.{ ziex_dir, "index.ts" });
     defer allocator.free(main_csr_react_path);
 
     try std.fs.cwd().writeFile(.{
@@ -438,13 +451,13 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     });
 
     // Now using system command to compile the main.tsx file
-    const outdir = try std.fs.path.join(allocator, &.{ output_dir, "assets" });
-    defer allocator.free(outdir);
-    var system = std.process.Child.init(&.{ "bun", "build", main_csr_react_path, "--outdir", outdir }, allocator);
-    _ = system.spawnAndWait() catch |err| {
-        std.debug.print("You need to install bun to compile the main.tsx file: https://bun.sh/docs/installation\n", .{});
-        return err;
-    };
+    // const outdir = try std.fs.path.join(allocator, &.{ output_dir, "assets" });
+    // defer allocator.free(outdir);
+    // var system = std.process.Child.init(&.{ "bun", "build", main_csr_react_path, "--outdir", outdir }, allocator);
+    // _ = system.spawnAndWait() catch |err| {
+    //     std.debug.print("You need to install bun to compile the main.tsx file: https://bun.sh/docs/installation\n", .{});
+    //     return err;
+    // };
 }
 
 // ============================================================================
@@ -728,8 +741,8 @@ fn transpileFile(
             const component_rel_to_input = try relativePath(allocator, input_root, resolved_component_path);
             defer allocator.free(component_rel_to_input);
 
-            // main.tsx is now in output_dir/, so import path is relative to output_dir
-            const import_path = try std.fmt.allocPrint(allocator, "./{s}", .{component_rel_to_input});
+            // copmonent.ts is inside node_modules/@ziex/components/index.ts so we are moving up to the root directory
+            const import_path = try std.fmt.allocPrint(allocator, "./../../../site/{s}", .{component_rel_to_input});
             defer allocator.free(import_path);
 
             const import_str = try std.fmt.allocPrint(allocator, "@async () => (await import('{s}')).default@", .{import_path});

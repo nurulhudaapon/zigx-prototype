@@ -75,7 +75,7 @@ fn init(ctx: zli.CommandContext) !void {
 }
 
 const TemplateFile = struct {
-    const Name = enum { default, react };
+    const Name = enum { default, react, wasm };
 
     name: ?Name = null,
     path: []const u8,
@@ -103,6 +103,7 @@ const templates = [_]TemplateFile{
     .{ .name = .default, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page.zx") },
 
     // React
+    .{ .name = .react, .path = "site/main.tsx", .content = @embedFile(template_dir ++ "/site/main.tsx") },
     .{ .name = .react, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page+react.zx") },
     .{ .name = .react, .path = "site/pages/client.tsx", .content = @embedFile(template_dir ++ "/site/pages/client.tsx") },
     .{ .name = .react, .path = "package.json", .content = @embedFile(template_dir ++ "/package.json") },

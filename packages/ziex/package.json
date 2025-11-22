@@ -1,0 +1,55 @@
+{
+  "name": "ziex",
+  "private": true,
+  "description": "ZX is a framework for building web applications with Zig.",
+  "main": "src/index.ts",
+  "type": "module",
+  "homepage": "https://github.com/nurulhudaapon/zx",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nurulhudaapon/zx.git"
+  },
+  "keywords": [
+    "zx",
+    "zig",
+    "web framework",
+    "jsx",
+    "react",
+    "server components",
+    "client components",
+    "server actions",
+    "client actions",
+    "server actions"
+  ],
+  "author": "Nurul Huda (Apon) <me@nurulhudaapon.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "bun test",
+    "build": "bun run script/build.ts",
+    "publish": "bun run build && cd dist && bun publish",
+    "fmt": "prettier --write . '!test/files/**' '!README.md'",
+    "check": "tsc",
+    "bench": "BENCH=true bun test --test-name-pattern 'Performance JSON/ZON' && bun run script/bench.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "esbuild": "^0.27.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "release": {
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": true,
+          "pkgRoot": "dist"
+        }
+      ],
+      "@semantic-release/github"
+    ]
+  }
+}
