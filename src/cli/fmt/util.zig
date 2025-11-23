@@ -1,7 +1,7 @@
 const std = @import("std");
 const htmlz = @import("htmlz");
 const expr = @import("expr.zig");
-const fmtlog = std.log.scoped(.fmt_util);
+const fmtlog = std.log.scoped(.cli);
 
 const stderr_buffer_size = 4096;
 var stderr_buffer: [stderr_buffer_size]u8 = undefined;

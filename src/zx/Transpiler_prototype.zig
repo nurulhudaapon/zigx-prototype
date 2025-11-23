@@ -4,7 +4,7 @@ const Ast = std.zig.Ast;
 const Token = std.zig.Token;
 const Tokenizer = std.zig.Tokenizer;
 
-const log = std.log.scoped(.zx_transpiler);
+const log = std.log.scoped(.ast);
 
 pub const ClientComponentMetadata = struct {
     pub const Type = enum {

@@ -1,4 +1,5 @@
 {
+  "main": "site/main.tsx",
   "devDependencies": {
     "@types/react": "^19.2.6",
     "@types/react-dom": "^19.2.3",
@@ -7,6 +8,6 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "ziex": "^0.0.1-dev.1"
+    "ziex": "0.0.1-dev.1"
   }
 }

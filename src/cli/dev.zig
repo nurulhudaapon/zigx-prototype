@@ -16,7 +16,7 @@ fn dev(ctx: zli.CommandContext) !void {
     const allocator = ctx.allocator;
     const binpath = ctx.flag("binpath", []const u8);
 
-    buildjs(ctx, binpath) catch |err| {
+    jsutil.buildjs(ctx, binpath, false) catch |err| {
         log.debug("Error building TS! {any}", .{err});
     };
 
@@ -42,7 +42,7 @@ fn dev(ctx: zli.CommandContext) !void {
         return;
     };
 
-    buildjs(ctx, binpath) catch |err| {
+    jsutil.buildjs(ctx, binpath, true) catch |err| {
         log.debug("Error building TS! {any}", .{err});
     };
 
@@ -64,7 +64,7 @@ fn dev(ctx: zli.CommandContext) !void {
 
             std.debug.print("\n", .{});
 
-            buildjs(ctx, binpath) catch |err| {
+            jsutil.buildjs(ctx, binpath, true) catch |err| {
                 log.debug("Error watching TS! {any}", .{err});
             };
         }
@@ -77,116 +77,10 @@ fn dev(ctx: zli.CommandContext) !void {
     }
 }
 
-const PackageJson = struct {
-    name: ?[]const u8 = null,
-    version: ?[]const u8 = null,
-    dependencies: ?std.json.Value = null,
-    devDependencies: ?std.json.Value = null,
-    scripts: ?std.json.Value = null,
-    packageManager: ?PM = null,
-
-    const PM = enum {
-        npm,
-        pnpm,
-        yarn,
-        bun,
-    };
-
-    fn parse(allocator: std.mem.Allocator) !std.json.Parsed(PackageJson) {
-        log.debug("Parsing package.json", .{});
-        const package_json_str = std.fs.cwd().readFileAlloc(allocator, "package.json", std.math.maxInt(usize)) catch |err| switch (err) {
-            error.FileNotFound => {
-                log.debug("Package.json not found", .{});
-                return error.PackageJsonNotFound;
-            },
-            else => return err,
-        };
-        defer allocator.free(package_json_str);
-
-        log.debug("Found package.json: {s}", .{package_json_str});
-        const package_json_parsed: std.json.Parsed(PackageJson) = std.json.parseFromSlice(
-            PackageJson,
-            allocator,
-            package_json_str,
-            .{},
-        ) catch |err| switch (err) {
-            else => return error.InvalidPackageJson,
-        };
-        log.debug("Parsed package.json: {any}", .{package_json_parsed.value});
-
-        return package_json_parsed;
-    }
-
-    fn getPackageManager(self: *PackageJson) PM {
-        if (self.packageManager) |pm| return pm;
-        if (self.dependencies) |deps| {
-            switch (deps) {
-                .object => |obj| {
-                    if (obj.get("bun")) |_| return .bun;
-                    if (obj.get("pnpm")) |_| return .pnpm;
-                    if (obj.get("yarn")) |_| return .yarn;
-                    if (obj.get("npm")) |_| return .npm;
-                },
-                else => {},
-            }
-        }
-
-        // Check for package-lock.json
-        if (std.fs.cwd().statFile("package-lock.json") catch null) |_| return .npm;
-        if (std.fs.cwd().statFile("pnpm-lock.yaml") catch null) |_| return .pnpm;
-        if (std.fs.cwd().statFile("yarn.lock") catch null) |_| return .yarn;
-        if (std.fs.cwd().statFile("bun.lock") catch null) |_| return .bun;
-        if (std.fs.cwd().statFile("bun.lockb") catch null) |_| return .bun;
-
-        return .npm;
-    }
-};
-
-fn buildjs(ctx: zli.CommandContext, binpath: []const u8) !void {
-    var program_meta = try util.findprogram(ctx.allocator, binpath);
-    defer program_meta.deinit(ctx.allocator);
-
-    const rootdir = program_meta.rootdir orelse return error.RootdirNotFound;
-
-    var package_json_parsed = try PackageJson.parse(ctx.allocator);
-    defer package_json_parsed.deinit();
-
-    var package_json = package_json_parsed.value;
-
-    const pm = package_json.getPackageManager();
-    log.debug("Package manager: {s}", .{@tagName(pm)});
-
-    const has_esbuild_bin = if (std.fs.cwd().statFile("node_modules/.bin/esbuild") catch null) |_| true else false;
-    if (!has_esbuild_bin) {
-        log.debug("Installing dependencies for JavaScript", .{});
-        var installer = std.process.Child.init(&.{ @tagName(pm), "install" }, ctx.allocator);
-        try installer.spawn();
-        _ = try installer.wait();
-
-        log.debug("Dependencies installed", .{});
-    } else {
-        log.debug("Esbuild binary found", .{});
-    }
-
-    const outfile_arg = try std.fmt.allocPrintSentinel(ctx.allocator, "--outfile={s}/assets/main.js", .{rootdir}, 0);
-    defer ctx.allocator.free(outfile_arg);
-    const esbuild_args = [_][:0]const u8{
-        "node_modules/.bin/esbuild",
-        "main.tsx",
-        "--bundle",
-        "--minify",
-        outfile_arg,
-        // "--define:process.env.NODE_ENV=\\\"production\\\"",
-        // "--define:__DEV__=false",
-    };
-    var esbuild_cmd = std.process.Child.init(&esbuild_args, ctx.allocator);
-    try esbuild_cmd.spawn();
-    _ = try esbuild_cmd.wait();
-}
-
 const std = @import("std");
 const zli = @import("zli");
 const util = @import("shared/util.zig");
 const flag = @import("shared/flag.zig");
 const log = std.log.scoped(.cli);
 const zx = @import("zx");
+const jsutil = @import("shared/js.zig");

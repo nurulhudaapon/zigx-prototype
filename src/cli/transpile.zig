@@ -1,7 +1,7 @@
 const std = @import("std");
 const zli = @import("zli");
 const zx = @import("zx");
-const log = std.log.scoped(.transpile);
+const log = std.log.scoped(.cli);
 
 // ============================================================================
 // Command Registration

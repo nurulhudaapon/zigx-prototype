@@ -1,5 +1,5 @@
 const std = @import("std");
-const fmtlog = std.log.scoped(.fmt_expr);
+const fmtlog = std.log.scoped(.cli);
 const Writer = std.Io.Writer;
 
 /// AST node for control flow expressions

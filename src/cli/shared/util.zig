@@ -70,4 +70,4 @@ pub fn inspectProgram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App
 
 const std = @import("std");
 const zx = @import("zx");
-const log = std.log.scoped(.util);
+const log = std.log.scoped(.cli);

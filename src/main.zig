@@ -25,15 +25,14 @@ pub fn main() !void {
 
 const std = @import("std");
 const cli = @import("cli/root.zig");
+const builtin = @import("builtin");
 
 pub const std_options = std.Options{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .@"html/ast", .level = .info },
         .{ .scope = .@"html/tokenizer", .level = .info },
         .{ .scope = .@"html/ast/fmt", .level = .info },
-        .{ .scope = .zx_transpiler, .level = .info },
-        .{ .scope = .transpile, .level = .info },
-        .{ .scope = .cli, .level = .info },
-        .{ .scope = .util, .level = .info },
+        .{ .scope = .ast, .level = if (builtin.mode == .Debug) .debug else .info },
+        .{ .scope = .cli, .level = if (builtin.mode == .Debug) .debug else .info },
     },
 };

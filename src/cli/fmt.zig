@@ -1,7 +1,7 @@
 const std = @import("std");
 const zli = @import("zli");
 const util = @import("fmt/util.zig");
-const log = std.log.scoped(.fmt);
+const log = std.log.scoped(.cli);
 
 const stdio_flag = zli.Flag{
     .name = "stdio",
