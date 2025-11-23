@@ -1,2 +1,2 @@
 export type { ComponentMetadata } from "./types";
-export { prepareComponent } from "./dom";
+export { prepareComponent, type PreparedComponent } from "./dom";
