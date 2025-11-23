@@ -23,15 +23,15 @@ jobs:
       with:
         version: 0.15.2
         
-    - name: Cache Zig build artifacts
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/zig
-          zig-out
-        key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
-        restore-keys: |
-          ${{ runner.os }}-zig-
+    # - name: Cache Zig build artifacts
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: |
+    #       ~/.cache/zig
+    #       zig-out
+    #     key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-zig-
           
     - name: Build project
       run: zig build
@@ -58,15 +58,15 @@ jobs:
       with:
         version: 0.15.2
         
-    - name: Cache Zig build artifacts
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/zig
-          zig-out
-        key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
-        restore-keys: |
-          ${{ runner.os }}-zig-
+    # - name: Cache Zig build artifacts
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: |
+    #       ~/.cache/zig
+    #       zig-out
+    #     key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig', '**/build.zig.zon', '**/*.zig') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-zig-
           
     - name: Run tests
       run: zig build test
