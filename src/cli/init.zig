@@ -103,7 +103,7 @@ const templates = [_]TemplateFile{
     .{ .name = .default, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page.zx") },
 
     // React
-    .{ .name = .react, .path = "site/main.tsx", .content = @embedFile(template_dir ++ "/site/main.tsx") },
+    .{ .name = .react, .path = "main.tsx", .content = @embedFile(template_dir ++ "/main.tsx") },
     .{ .name = .react, .path = "site/pages/page.zx", .content = @embedFile(template_dir ++ "/site/pages/page+react.zx") },
     .{ .name = .react, .path = "site/pages/client.tsx", .content = @embedFile(template_dir ++ "/site/pages/client.tsx") },
     .{ .name = .react, .path = "package.json", .content = @embedFile(template_dir ++ "/package.json") },

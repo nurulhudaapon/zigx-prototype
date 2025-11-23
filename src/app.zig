@@ -147,6 +147,11 @@ pub const App = struct {
         var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
         var stdout = &stdout_writer.interface;
 
+        // Overriding or setting default configs
+        self.server.config.port = port;
+        self.server.config.address = address;
+        self.server.config.request.max_form_count = self.server.config.request.max_form_count orelse Constant.default_max_form_count;
+
         if (is_introspect) {
             var aw = std.Io.Writer.Allocating.init(self.allocator);
             defer aw.deinit();
@@ -158,11 +163,6 @@ pub const App = struct {
             try stdout.print("{s}\n", .{aw.written()});
             std.process.exit(0);
         }
-
-        // Overriding or setting default configs
-        self.server.config.port = port;
-        self.server.config.address = address;
-        self.server.config.request.max_form_count = self.server.config.request.max_form_count orelse Constant.default_max_form_count;
 
         try stdout.flush();
     }

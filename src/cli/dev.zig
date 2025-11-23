@@ -17,7 +17,7 @@ fn dev(ctx: zli.CommandContext) !void {
     const binpath = ctx.flag("binpath", []const u8);
 
     buildjs(ctx, binpath) catch |err| {
-        log.info("Error building TS! {any}", .{err});
+        log.debug("Error building TS! {any}", .{err});
     };
 
     log.debug("First time building, we will run zig build first", .{});
@@ -43,7 +43,7 @@ fn dev(ctx: zli.CommandContext) !void {
     };
 
     buildjs(ctx, binpath) catch |err| {
-        log.info("Error building TS! {any}", .{err});
+        log.debug("Error building TS! {any}", .{err});
     };
 
     var runner = std.process.Child.init(&.{program_path}, allocator);
@@ -65,7 +65,7 @@ fn dev(ctx: zli.CommandContext) !void {
             std.debug.print("\n", .{});
 
             buildjs(ctx, binpath) catch |err| {
-                log.info("Error watching TS! {any}", .{err});
+                log.debug("Error watching TS! {any}", .{err});
             };
         }
         if (should_restart or bin_mtime == 0) bin_mtime = stat.mtime;
@@ -93,10 +93,10 @@ const PackageJson = struct {
     };
 
     fn parse(allocator: std.mem.Allocator) !std.json.Parsed(PackageJson) {
-        log.info("Parsing package.json", .{});
+        log.debug("Parsing package.json", .{});
         const package_json_str = std.fs.cwd().readFileAlloc(allocator, "package.json", std.math.maxInt(usize)) catch |err| switch (err) {
             error.FileNotFound => {
-                log.info("Package.json not found", .{});
+                log.debug("Package.json not found", .{});
                 return error.PackageJsonNotFound;
             },
             else => return err,
@@ -154,18 +154,18 @@ fn buildjs(ctx: zli.CommandContext, binpath: []const u8) !void {
     var package_json = package_json_parsed.value;
 
     const pm = package_json.getPackageManager();
-    log.info("Package manager: {s}", .{@tagName(pm)});
+    log.debug("Package manager: {s}", .{@tagName(pm)});
 
     const has_esbuild_bin = if (std.fs.cwd().statFile("node_modules/.bin/esbuild") catch null) |_| true else false;
     if (!has_esbuild_bin) {
-        log.info("Installing dependencies for JavaScript", .{});
+        log.debug("Installing dependencies for JavaScript", .{});
         var installer = std.process.Child.init(&.{ @tagName(pm), "install" }, ctx.allocator);
         try installer.spawn();
         _ = try installer.wait();
 
-        log.info("Dependencies installed", .{});
+        log.debug("Dependencies installed", .{});
     } else {
-        log.info("Esbuild binary found", .{});
+        log.debug("Esbuild binary found", .{});
     }
 
     const outfile_arg = try std.fmt.allocPrintSentinel(ctx.allocator, "--outfile={s}/assets/main.js", .{rootdir}, 0);

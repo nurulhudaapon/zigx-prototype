@@ -32,6 +32,10 @@ fn @"export"(ctx: zli.CommandContext) !void {
     };
     defer std.zon.parse.free(ctx.allocator, app_meta);
 
+    const port = app_meta.config.server.port orelse 3000;
+    const appoutdir = app_meta.rootdir orelse "site/.zx";
+    const host = app_meta.config.server.address orelse "0.0.0.0";
+
     var app_child = std.process.Child.init(&.{app_meta.binpath.?}, ctx.allocator);
     app_child.stdout_behavior = .Ignore;
     app_child.stderr_behavior = .Ignore;
@@ -49,10 +53,6 @@ fn @"export"(ctx: zli.CommandContext) !void {
 
     var printer = zx.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
-
-    const port = app_meta.config.server.port.?;
-    const appoutdir = app_meta.rootdir orelse "site/.zx";
-    const host = app_meta.config.server.address orelse "0.0.0.0";
 
     log.debug("Port: {d}, Outdir: {s}", .{ port, appoutdir });
 
