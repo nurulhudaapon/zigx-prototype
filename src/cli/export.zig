@@ -36,7 +36,7 @@ fn @"export"(ctx: zli.CommandContext) !void {
     const appoutdir = app_meta.rootdir orelse "site/.zx";
     const host = app_meta.config.server.address orelse "0.0.0.0";
 
-    var app_child = std.process.Child.init(&.{app_meta.binpath.?}, ctx.allocator);
+    var app_child = std.process.Child.init(&.{ app_meta.binpath.?, "--cli-command", "export" }, ctx.allocator);
     app_child.stdout_behavior = .Ignore;
     app_child.stderr_behavior = .Ignore;
     try app_child.spawn();

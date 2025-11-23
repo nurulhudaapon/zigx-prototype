@@ -46,7 +46,7 @@ fn dev(ctx: zli.CommandContext) !void {
         log.debug("Error building TS! {any}", .{err});
     };
 
-    var runner = std.process.Child.init(&.{program_path}, allocator);
+    var runner = std.process.Child.init(&.{ program_path, "--cli-command", "dev" }, allocator);
     try runner.spawn();
     defer _ = runner.kill() catch unreachable;
 

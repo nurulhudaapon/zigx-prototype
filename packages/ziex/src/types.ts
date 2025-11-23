@@ -22,5 +22,4 @@ export type ComponentMetadata = {
    * e.g. () => import('./components/CounterComponent.tsx')
    */
   import: () => Promise<(props: unknown) => React.ReactElement>;
-}
-
+};

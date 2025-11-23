@@ -13,7 +13,7 @@ fn serve(ctx: zli.CommandContext) !void {
     const port = ctx.flag("port", u32);
     const port_str = try std.fmt.allocPrint(ctx.allocator, "{d}", .{port});
     defer ctx.allocator.free(port_str);
-    var system = std.process.Child.init(&.{ "zig", "build", "serve", "--", "--port", port_str }, ctx.allocator);
+    var system = std.process.Child.init(&.{ "zig", "build", "serve", "--", "--port", port_str, "--cli-command", "serve" }, ctx.allocator);
     try system.spawn();
     const term = try system.wait();
     _ = term;

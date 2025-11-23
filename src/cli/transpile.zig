@@ -556,6 +556,20 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
         std.debug.print("Generated meta.zig at: {s}\n", .{meta_path});
         std.debug.print("Generated main.zig at: {s}\n", .{main_zig_path});
     }
+
+    // Copy devscript.js to the output assets/_zx/devscript.js
+    const devscript_path = try std.fs.path.join(allocator, &.{ output_dir, "assets", "_zx", "devscript.js" });
+    defer allocator.free(devscript_path);
+    // create the directory if it doesn't exist
+    std.fs.cwd().makePath(std.fs.path.dirname(devscript_path) orelse ".") catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+    try std.fs.cwd().writeFile(.{
+        .sub_path = devscript_path,
+        .data = @embedFile("./transpile/template/devscript.js"),
+    });
+    log.debug("Copied devscript.js to: {s}", .{devscript_path});
 }
 
 fn writeRoute(writer: anytype, route: Route) !void {

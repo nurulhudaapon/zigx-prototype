@@ -93,7 +93,10 @@ pub const App = struct {
 
         app.allocator = allocator;
         app.meta = config.meta;
-        app.handler = Handler{ .meta = config.meta, .allocator = allocator };
+        app.handler = Handler{
+            .meta = config.meta,
+            .allocator = allocator,
+        };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
 
         var router = try app.server.router(.{});
@@ -162,6 +165,8 @@ pub const App = struct {
                 const cli_command_str = args.next() orelse return error.MissingCliCommand;
                 const cli_command = std.meta.stringToEnum(Meta.CliCommand, cli_command_str) orelse return error.InvalidCliCommand;
                 self.meta.cli_command = cli_command;
+
+                log.debug("CLI command: {s}", .{cli_command_str});
             }
         }
 
@@ -185,10 +190,10 @@ pub const App = struct {
             std.process.exit(0);
         }
 
-        // if (self.meta.cli_command == .dev) {
-        var router = try self.server.router(.{});
-        router.get("/_zx/devsocket", devsocket, .{});
-        // }
+        if (self.meta.cli_command == .dev) {
+            var router = try self.server.router(.{});
+            router.get("/_zx/devsocket", devsocket, .{});
+        }
 
         try stdout.flush();
     }
@@ -197,21 +202,32 @@ pub const App = struct {
         handler.handlePageRequest(req, res);
     }
 
+    const DevSocketContext = struct {
+        fn handle(self: DevSocketContext, stream: std.net.Stream) void {
+            _ = self;
+            // Set retry interval to 100ms for fast reconnection when server restarts
+            stream.writeAll("retry: 100\n\n") catch return;
+
+            // Send periodic heartbeats to keep connection alive
+            const heartbeat_interval_ns = 30 * std.time.ns_per_s; // 30 seconds
+            while (true) {
+                std.Thread.sleep(heartbeat_interval_ns);
+                // Send heartbeat as a comment (doesn't trigger events)
+                stream.writeAll(":heartbeat\n\n") catch return;
+            }
+        }
+    };
+
     fn devsocket(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
         _ = handler;
         _ = req;
-        res.status = 200;
-        res.header("Content-Type", "text/event-stream");
-        res.header("Cache-Control", "no-cache");
-        res.header("Connection", "keep-alive");
 
-        try res.chunk(":connected\n\n");
+        // Add optional header to disable nginx buffering
+        res.header("X-Accel-Buffering", "no");
 
-        const interval_ns = 1 * std.time.ns_per_s; // 15 seconds
-        while (true) {
-            std.Thread.sleep(interval_ns);
-            try res.chunk(":heartbeat\n\n");
-        }
+        // Start the event stream (automatically sets Content-Type, Cache-Control, Connection)
+        // When server restarts, connection drops and client will reconnect automatically
+        try res.startEventStream(DevSocketContext{}, DevSocketContext.handle);
     }
 
     fn normalizePath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
