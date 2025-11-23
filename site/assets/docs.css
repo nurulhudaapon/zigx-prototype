@@ -11,6 +11,7 @@
     --code-bg: #ffffff;
     --nav-bg: #ffffff;
     --sidebar-width: 250px;
+    --right-sidebar-width: 200px;
 }
 
 /* Global scrollbar styling - always visible */
@@ -41,6 +42,101 @@ body {
     scrollbar-color: rgba(176, 176, 176, 0.5) transparent;
 }
 
+/* Top Bar */
+.top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--nav-bg);
+    border-bottom: 2px solid var(--border-color);
+    height: 64px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.top-bar-content {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+}
+
+.top-bar-logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.top-bar-logo:hover {
+    color: var(--link-color);
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.top-bar-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.top-bar-link {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: color 0.2s;
+    padding: 0.5rem 0;
+}
+
+.top-bar-link:hover {
+    color: var(--link-color);
+}
+
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.top-bar-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.top-bar-icon:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--link-color);
+}
+
+.top-bar-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
 .container {
     display: flex;
     min-height: 100vh;
@@ -50,13 +146,12 @@ body {
 .sidebar {
     position: fixed;
     left: 0;
-    top: 0;
+    top: 64px;
     width: var(--sidebar-width);
-    height: 100vh;
+    height: calc(100vh - 64px);
     background: var(--nav-bg);
     border-right: 2px solid var(--border-color);
     overflow-y: auto;
-    padding: 2rem 0;
     scrollbar-gutter: stable;
 }
 
@@ -182,6 +277,97 @@ body {
     min-width: 0;
     max-width: 100%;
     overflow-x: hidden;
+}
+
+/* Content with right sidebar */
+.container:has(.right-sidebar) .content {
+    margin-right: var(--right-sidebar-width);
+}
+
+/* Right Sidebar (ON THIS PAGE) */
+.right-sidebar {
+    position: fixed;
+    right: 0;
+    top: 64px;
+    width: var(--right-sidebar-width);
+    height: calc(100vh - 64px);
+    background: var(--nav-bg);
+    border-left: 2px solid var(--border-color);
+    overflow-y: auto;
+    padding: 2rem 1.5rem;
+    scrollbar-gutter: stable;
+}
+
+.right-sidebar-content {
+    position: sticky;
+    top: 2rem;
+}
+
+.right-sidebar-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+    margin: 0 0 1.25rem 0;
+    padding: 0;
+}
+
+.right-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.right-sidebar-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    color: #666;
+    text-decoration: none;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    border-left: 2px solid transparent;
+    margin-left: -0.75rem;
+    padding-left: 0.75rem;
+}
+
+.right-sidebar-link:hover {
+    background: rgba(0, 102, 204, 0.06);
+    color: var(--link-color);
+    border-left-color: var(--link-color);
+}
+
+.right-sidebar-link:active {
+    background: rgba(0, 102, 204, 0.1);
+}
+
+.right-sidebar-link-nested {
+    font-size: 0.75rem;
+    color: #888;
+    padding-left: 1.25rem;
+    margin-left: -0.75rem;
+}
+
+.right-sidebar-link-nested:hover {
+    color: var(--link-color);
+}
+
+/* Active link styling */
+.right-sidebar-link.active {
+    background: rgba(0, 102, 204, 0.08);
+    color: var(--link-color);
+    border-left-color: var(--link-color);
+    font-weight: 500;
+}
+
+.examples-content,
+.cli-content {
+    margin-left: 0;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
 }
 
 .section {
@@ -706,12 +892,15 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     border-left: 1px solid var(--border-color);
 }
 
-.example-code h4 {
+.example-code h4,
+.example-code span[data-no-nav] {
     padding: 0.75rem 1rem;
     background: var(--nav-bg);
     border-bottom: 2px solid var(--border-color);
     margin: 0;
     font-size: 0.875rem;
+    display: block;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #666;
@@ -880,6 +1069,19 @@ code[class*="language-"] {
     /* Don't override text color - let tokens handle it */
 }
 
+/* Hide right sidebar on smaller screens */
+@media (max-width: 1400px) {
+    .right-sidebar {
+        display: none !important;
+    }
+    
+    /* Override the :has() selector to remove margin when sidebar is hidden */
+    .container:has(.right-sidebar) .content,
+    .container .content {
+        margin-right: 0 !important;
+    }
+}
+
 /* Responsive - Medium screens */
 @media (max-width: 1024px) and (min-width: 769px) {
     .code-example {
@@ -901,10 +1103,13 @@ code[class*="language-"] {
     
     .sidebar {
         transform: translateX(-100%);
+        top: 64px;
+        height: calc(100vh - 64px);
     }
     
     .content {
         margin-left: 0;
+        margin-right: 0 !important;
         padding: 2rem;
     }
     
@@ -988,10 +1193,13 @@ code[class*="language-"] {
     
     .sidebar {
         transform: translateX(-100%);
+        top: 64px;
+        height: calc(100vh - 64px);
     }
     
     .content {
         margin-left: 0;
+        margin-right: 0 !important;
         padding: 2rem;
     }
     

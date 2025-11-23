@@ -14,17 +14,18 @@ pub const routes = [_]zx.App.Meta.Route{
         .layout = @import(".zx/pages/docs/layout.zig").Layout,
     },
     .{
-        .path = "/docs/example",
-        .page = @import(".zx/pages/docs/example/page.zig").Page,
-        .layout = @import(".zx/pages/docs/example/layout.zig").Layout,
+        .path = "/examples",
+        .page = @import(".zx/pages/examples/page.zig").Page,
+        .layout = @import(".zx/pages/examples/layout.zig").Layout,
     },
     .{
-        .path = "/docs/example/form",
-        .page = @import(".zx/pages/docs/example/form/page.zig").Page,
+        .path = "/examples/form",
+        .page = @import(".zx/pages/examples/form/page.zig").Page,
     },
     .{
-        .path = "/docs/cli",
-        .page = @import(".zx/pages/docs/cli/page.zig").Page,
+        .path = "/cli",
+        .page = @import(".zx/pages/cli/page.zig").Page,
+        .layout = @import(".zx/pages/cli/layout.zig").Layout,
     },
     .{
         .path = "/time",
@@ -36,12 +37,12 @@ pub const routes = [_]zx.App.Meta.Route{
     },
     .{
         .path = "/doc/example",
-        .page = @import(".zx/pages/docs/example/page.zig").Page,
-        .layout = @import(".zx/pages/docs/example/layout.zig").Layout,
+        .page = @import(".zx/pages/examples/page.zig").Page,
+        .layout = @import(".zx/pages/examples/layout.zig").Layout,
     },
     .{
         .path = "/doc/example/form",
-        .page = @import(".zx/pages/docs/example/form/page.zig").Page,
+        .page = @import(".zx/pages/examples/form/page.zig").Page,
     },
 };
 

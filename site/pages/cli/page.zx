@@ -1,0 +1,152 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    return (
+        <main @allocator={ctx.arena}>
+            <h1 id="overview">Command Line Interface</h1>
+            <p>ZX comes with a built-in CLI tool to help you manage your project. You can install it by following the instructions in the <a href="/docs#getting-started">Getting Started</a> section.</p>
+
+            <h2 id="installation">Installation</h2>
+            <p>Install the ZX CLI using one of the following methods:</p>
+            
+            <h3 id="install-linux-macos">Linux/macOS</h3>
+            <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | bash</code></pre>
+            
+            <h3 id="install-windows">Windows</h3>
+            <pre><code class="language-powershell">powershell -c "irm ziex.dev/install.ps1 | iex"</code></pre>
+            
+            <h3 id="install-specific-version">Install Specific Version</h3>
+            <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | VERSION=0.0.403 bash</code></pre>
+
+            <h2 id="commands">Commands</h2>
+
+            <h3 id="init">init</h3>
+            <p>Initialize a new ZX project in the current directory. This command creates all the necessary files and directory structure to get started with ZX.</p>
+            <pre><code class="language-bash">zx init [flags]</code></pre>
+            <h4 id="init-flags">Flags</h4>
+            <ul>
+                <li><code>--template, -t &lt;name&gt;</code>: Template to use (default: <code>"default"</code>). Available options:
+                    <ul>
+                        <li><code>default</code>: Basic ZX project template</li>
+                        <li><code>react</code>: ZX project with React client-side components support</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Note:</strong> The command will skip initialization if <code>build.zig.zon</code> already exists in the current directory.</p>
+
+            <h3 id="dev">dev</h3>
+            <p>Start the app in development mode with hot reloading. This command watches for changes in your files and automatically rebuilds the project when changes are detected. It also builds TypeScript/JavaScript files if present.</p>
+            <pre><code class="language-bash">zx dev [flags]</code></pre>
+            <h4 id="dev-flags">Flags</h4>
+            <ul>
+                <li><code>--binpath, -b &lt;path&gt;</code>: Binpath of the app in case you have multiple executable artifacts or are using a custom <code>zig-out</code> directory (default: empty, auto-detected)</li>
+                <li><code>--build-args &lt;args&gt;</code>: Additional build arguments to pass to <code>zig build</code> (space-separated)</li>
+            </ul>
+            <p><strong>Example:</strong></p>
+            <pre><code class="language-bash">zx dev --build-args "--release-fast"</code></pre>
+
+            <h3 id="serve">serve</h3>
+            <p>Serve the project for production. This command builds and runs the executable, starting the development server.</p>
+            <pre><code class="language-bash">zx serve [flags]</code></pre>
+            <h4 id="serve-flags">Flags</h4>
+            <ul>
+                <li><code>--port, -p &lt;number&gt;</code>: Port to run the server on (default: <code>3000</code>)</li>
+            </ul>
+            <p><strong>Example:</strong></p>
+            <pre><code class="language-bash">zx serve --port 8080</code></pre>
+
+            <h3 id="transpile">transpile</h3>
+            <p>Transpile <code>.zx</code> files to Zig source code. This is useful for debugging, inspecting the generated code, or understanding how ZX transforms your JSX-like syntax into Zig.</p>
+            <pre><code class="language-bash">zx transpile &lt;path&gt; [flags]</code></pre>
+            <h4 id="transpile-arguments">Arguments</h4>
+            <ul>
+                <li><code>&lt;path&gt;</code>: Path to <code>.zx</code> file or directory containing <code>.zx</code> files (required)</li>
+            </ul>
+            <h4 id="transpile-flags">Flags</h4>
+            <ul>
+                <li><code>--outdir, -o &lt;directory&gt;</code>: Output directory for transpiled Zig files (default: <code>".zx"</code>)</li>
+            </ul>
+            <p><strong>Examples:</strong></p>
+            <pre><code class="language-bash"># Transpile a single file
+zx transpile site/pages/page.zx
+
+# Transpile a directory
+zx transpile site/pages --outdir site/.zx
+
+# Transpile and output to stdout (when using default outdir with a file)
+zx transpile site/pages/page.zx</code></pre>
+
+            <h3 id="fmt">fmt</h3>
+            <p>Format ZX source code files. This command automatically formats your <code>.zx</code> files according to ZX's formatting rules. <em>(Alpha)</em></p>
+            <pre><code class="language-bash">zx fmt [path] [flags]</code></pre>
+            <h4 id="fmt-arguments">Arguments</h4>
+            <ul>
+                <li><code>[path]</code>: Path to <code>.zx</code> file or directory (optional, formats current directory if not specified)</li>
+            </ul>
+            <h4 id="fmt-flags">Flags</h4>
+            <ul>
+                <li><code>--stdio</code>: Read from stdin and write formatted output to stdout</li>
+                <li><code>--stdout</code>: Write formatted output to stdout instead of modifying files on disk</li>
+            </ul>
+            <p><strong>Examples:</strong></p>
+            <pre><code class="language-bash"># Format all .zx files in current directory
+zx fmt
+
+# Format a specific file
+zx fmt site/pages/page.zx
+
+# Format and output to stdout
+zx fmt site/pages/page.zx --stdout
+
+# Format from stdin
+cat file.zx | zx fmt --stdio</code></pre>
+
+            <h3 id="export">export</h3>
+            <p>Generate static site assets. This command builds your project and exports it as a static site, generating HTML files for all routes. Useful for deploying to static hosting services.</p>
+            <pre><code class="language-bash">zx export [flags]</code></pre>
+            <h4 id="export-flags">Flags</h4>
+            <ul>
+                <li><code>--outdir, -o &lt;directory&gt;</code>: Output directory for exported static files (default: <code>"dist"</code>)</li>
+                <li><code>--binpath, -b &lt;path&gt;</code>: Binpath of the app executable (default: auto-detected)</li>
+            </ul>
+            <p><strong>Example:</strong></p>
+            <pre><code class="language-bash">zx export --outdir ./build</code></pre>
+            <p><strong>Note:</strong> Make sure to run <code>zig build</code> first to build the ZX executable before exporting.</p>
+
+            <h3 id="update">update</h3>
+            <p>Update the version of the ZX dependency in your project's <code>build.zig.zon</code> file. This updates the ZX library version used by your project, not the CLI tool itself.</p>
+            <pre><code class="language-bash">zx update [flags]</code></pre>
+            <h4 id="update-flags">Flags</h4>
+            <ul>
+                <li><code>--version, -v &lt;version&gt;</code>: Version to update to (default: <code>"latest"</code>). Can be a specific version like <code>"0.0.403"</code> or <code>"latest"</code> for the latest release</li>
+            </ul>
+            <p><strong>Examples:</strong></p>
+            <pre><code class="language-bash"># Update to latest version
+zx update
+
+# Update to specific version
+zx update --version 0.0.403</code></pre>
+
+            <h3 id="upgrade">upgrade</h3>
+            <p>Upgrade the version of the ZX CLI tool itself. This downloads and installs a new version of the CLI binary.</p>
+            <pre><code class="language-bash">zx upgrade [flags]</code></pre>
+            <h4 id="upgrade-flags">Flags</h4>
+            <ul>
+                <li><code>--version, -v &lt;version&gt;</code>: Version to upgrade to (default: <code>"latest"</code>). Can be a specific version like <code>"0.0.403"</code> or <code>"latest"</code> for the latest release</li>
+            </ul>
+            <p><strong>Examples:</strong></p>
+            <pre><code class="language-bash"># Upgrade to latest version
+zx upgrade
+
+# Upgrade to specific version
+zx upgrade --version 0.0.403</code></pre>
+            <p><strong>Note:</strong> After upgrading, the command will automatically display the new version.</p>
+
+            <h3 id="version">version</h3>
+            <p>Show the current version of the ZX CLI tool.</p>
+            <pre><code class="language-bash">zx version</code></pre>
+            <p>This command displays the installed CLI version, which may differ from the ZX library version used in your project.</p>
+
+        </main>
+    );
+}
+
+const zx = @import("zx");

@@ -2,82 +2,82 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     const allocator = ctx.arena;
     // If example
     var aw_if: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_if = @embedFile("../../../pages/docs/example/if.zx");
-    const zig_example_if = @embedFile("../docs/example/if.zig");
-    const html_page_if = @import("../docs/example/if.zig").Page(allocator);
+    const zx_example_if = @embedFile("../../../pages/examples/if.zx");
+    const zig_example_if = @embedFile("../examples/if.zig");
+    const html_page_if = @import("../examples/if.zig").Page(allocator);
     html_page_if.render(&aw_if.writer) catch unreachable;
     const html_example_if = allocator.dupe(u8, aw_if.written()) catch unreachable;
 
     // Switch example
     var aw_switch: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_switch = @embedFile("../../../pages/docs/example/switch.zx");
-    const zig_example_switch = @embedFile("../docs/example/switch.zig");
-    const html_page_switch = @import("../docs/example/switch.zig").Page(allocator);
+    const zx_example_switch = @embedFile("../../../pages/examples/switch.zx");
+    const zig_example_switch = @embedFile("../examples/switch.zig");
+    const html_page_switch = @import("../examples/switch.zig").Page(allocator);
     html_page_switch.render(&aw_switch.writer) catch unreachable;
     const html_example_switch = allocator.dupe(u8, aw_switch.written()) catch unreachable;
 
     // For example
     var aw_for: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_for = @embedFile("../../../pages/docs/example/for.zx");
-    const zig_example_for = @embedFile("../docs/example/for.zig");
-    const html_page_for = @import("../docs/example/for.zig").Page(allocator);
+    const zx_example_for = @embedFile("../../../pages/examples/for.zx");
+    const zig_example_for = @embedFile("../examples/for.zig");
+    const html_page_for = @import("../examples/for.zig").Page(allocator);
     html_page_for.render(&aw_for.writer) catch unreachable;
     const html_example_for = allocator.dupe(u8, aw_for.written()) catch unreachable;
 
     // Component expression example
     var aw_component: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_component = @embedFile("../../../pages/docs/example/component.zx");
-    const zig_example_component = @embedFile("../docs/example/component.zig");
-    const html_page_component = @import("../docs/example/component.zig").Page(allocator);
+    const zx_example_component = @embedFile("../../../pages/examples/component.zx");
+    const zig_example_component = @embedFile("../examples/component.zig");
+    const html_page_component = @import("../examples/component.zig").Page(allocator);
     html_page_component.render(&aw_component.writer) catch unreachable;
     const html_example_component = allocator.dupe(u8, aw_component.written()) catch unreachable;
 
     // Text expression example
     var aw_text: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_text = @embedFile("../../../pages/docs/example/text.zx");
-    const zig_example_text = @embedFile("../docs/example/text.zig");
-    const html_page_text = @import("../docs/example/text.zig").Page(allocator);
+    const zx_example_text = @embedFile("../../../pages/examples/text.zx");
+    const zig_example_text = @embedFile("../examples/text.zig");
+    const html_page_text = @import("../examples/text.zig").Page(allocator);
     html_page_text.render(&aw_text.writer) catch unreachable;
     const html_example_text = allocator.dupe(u8, aw_text.written()) catch unreachable;
 
     // Format expression example
     var aw_format: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_format = @embedFile("../../../pages/docs/example/format.zx");
-    const zig_example_format = @embedFile("../docs/example/format.zig");
-    const html_page_format = @import("../docs/example/format.zig").Page(allocator);
+    const zx_example_format = @embedFile("../../../pages/examples/format.zx");
+    const zig_example_format = @embedFile("../examples/format.zig");
+    const html_page_format = @import("../examples/format.zig").Page(allocator);
     html_page_format.render(&aw_format.writer) catch unreachable;
     const html_example_format = allocator.dupe(u8, aw_format.written()) catch unreachable;
 
     // Components example
     var aw_components: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_components = @embedFile("../../../pages/docs/example/components.zx");
-    const zig_example_components = @embedFile("../docs/example/components.zig");
-    const html_page_components = @import("../docs/example/components.zig").Page(ctx);
+    const zx_example_components = @embedFile("../../../pages/examples/components.zx");
+    const zig_example_components = @embedFile("../examples/components.zig");
+    const html_page_components = @import("../examples/components.zig").Page(ctx);
     html_page_components.render(&aw_components.writer) catch unreachable;
     const html_example_components = allocator.dupe(u8, aw_components.written()) catch unreachable;
 
     // Routing example
     var aw_routing: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_routing = @embedFile("../../../pages/docs/example/routing.zx");
-    const zig_example_routing = @embedFile("../docs/example/routing.zig");
-    const html_page_routing = @import("../docs/example/routing.zig").Page(ctx);
+    const zx_example_routing = @embedFile("../../../pages/examples/routing.zx");
+    const zig_example_routing = @embedFile("../examples/routing.zig");
+    const html_page_routing = @import("../examples/routing.zig").Page(ctx);
     html_page_routing.render(&aw_routing.writer) catch unreachable;
     const html_example_routing = allocator.dupe(u8, aw_routing.written()) catch unreachable;
 
     // Layout example
     var aw_layout: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_layout = @embedFile("../../../pages/docs/example/layout.zx");
-    const zig_example_layout = @embedFile("../docs/example/layout.zig");
+    const zx_example_layout = @embedFile("../../../pages/examples/layout.zx");
+    const zig_example_layout = @embedFile("../examples/layout.zig");
     const layoutctx = zx.LayoutContext.init(ctx.request, ctx.response, ctx.allocator);
-    const html_page_layout = @import("../docs/example/layout.zig").Layout(layoutctx, html_page_routing);
+    const html_page_layout = @import("../examples/layout.zig").Layout(layoutctx, html_page_routing);
     html_page_layout.render(&aw_layout.writer) catch unreachable;
     const html_example_layout = allocator.dupe(u8, aw_layout.written()) catch unreachable;
 
     // Allocator example
     var aw_allocator: std.io.Writer.Allocating = .init(allocator);
-    const zx_example_allocator = @embedFile("../../../pages/docs/example/allocator.zx");
-    const zig_example_allocator = @embedFile("../docs/example/allocator.zig");
-    const html_page_allocator = @import("../docs/example/allocator.zig").Page(ctx);
+    const zx_example_allocator = @embedFile("../../../pages/examples/allocator.zx");
+    const zig_example_allocator = @embedFile("../examples/allocator.zig");
+    const html_page_allocator = @import("../examples/allocator.zig").Page(ctx);
     html_page_allocator.render(&aw_allocator.writer) catch unreachable;
     const html_example_allocator = allocator.dupe(u8, aw_allocator.written()) catch unreachable;
 
@@ -87,36 +87,18 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
 
 
     return (
+        <div @allocator={allocator}>
+            <section id="introduction" class="section">
+                <h2>Introduction</h2>
+                <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
+                    components using familiar JSX patterns, transpiled to efficient Zig code.</p>
+                <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
+                    fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
+                    <em>Currently 120X faster than Next.js at SSR</em>.
+                </p>
+            </section>
         
-
-        
-                <main class="content" @allocator={allocator}>
-        
-                    <section id="introduction" class="section">
-                        <div class="section-header">
-                            <h2>Introduction</h2>
-                            <div class="source-code-badge">
-                                <a href="https://github.com/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer"
-                                    class="source-code-badge-link">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path
-                                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-                                    </svg>
-                                    <span>View Source Code</span>
-                                </a>
-                            </div>
-                        </div>
-                        <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
-                            components using familiar JSX patterns, transpiled to efficient Zig code.</p>
-                        <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
-                            fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
-                            <em>Currently 120X faster than Next.js at SSR</em>.
-                        </p>
-                    </section>
-        
-        
-        
-                    <section id="getting-started" class="section">
+            <section id="getting-started" class="section">
                         <h2>Getting Started</h2>
         
                         <h3>Installation</h3>
@@ -367,9 +349,7 @@ zig build serve</code></pre>
                             </li>
                         </ul>
                     </section>
-                    
-
-                </main>
+        </div>
 
     );
 }
@@ -404,7 +384,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
     return (
         <div class="code-example" @allocator={allocator}>
             <div class="example-code">
-                <h4>ZX</h4>
+                <span data-no-nav="true">ZX</span>
                 <pre><code id={zx_code_id} class="language-tsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>
             </div>
             <div class="example-code">

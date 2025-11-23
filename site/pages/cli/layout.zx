@@ -1,12 +1,9 @@
 pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
-
-
     const js_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.js?v={s}", .{zx.info.version_string}) catch unreachable;
     const css_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.css?v={s}", .{zx.info.version_string}) catch unreachable;
 
     return (
-        <div  @allocator={ctx.arena}>
-                    
+        <div @allocator={ctx.arena}>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
             <link rel="stylesheet" href={css_version}>
             <header class="top-bar">
@@ -32,16 +29,11 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
             </header>
         
             <div class="container">
-        
                 <nav class="sidebar">
                     <ul class="nav-menu">
-                        <li><a href="/docs#introduction">Introduction</a></li>
-                        <li><a href="/docs#getting-started">Getting Started</a></li>
-                        <li><a href="/docs#expressions">Expressions</a></li>
-                        <li><a href="/docs#control-flow">Control Flow</a></li>
-                        <li><a href="/docs#components">Components</a></li>
-                        <li><a href="/docs#routing">Routing</a></li>
-                        <li><a href="/docs#builtin-attributes">Builtin Attributes</a></li>
+                        <li><a href="/cli#overview">Overview</a></li>
+                        <li><a href="/cli#installation">Installation</a></li>
+                        <li><a href="/cli#commands">Commands</a></li>
                     </ul>
                 </nav>
 
@@ -61,9 +53,9 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
             <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js"/>
         </div>
-        
     );
 }
 
 const zx = @import("zx");
 const std = @import("std");
+

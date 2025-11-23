@@ -1,12 +1,9 @@
 pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
-
-
     const js_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.js?v={s}", .{zx.info.version_string}) catch unreachable;
     const css_version = std.fmt.allocPrint(ctx.arena, "/assets/docs.css?v={s}", .{zx.info.version_string}) catch unreachable;
 
     return (
-        <div  @allocator={ctx.arena}>
-                    
+        <div @allocator={ctx.arena}>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet">
             <link rel="stylesheet" href={css_version}>
             <header class="top-bar">
@@ -31,37 +28,16 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
                 </div>
             </header>
         
-            <div class="container">
-        
-                <nav class="sidebar">
-                    <ul class="nav-menu">
-                        <li><a href="/docs#introduction">Introduction</a></li>
-                        <li><a href="/docs#getting-started">Getting Started</a></li>
-                        <li><a href="/docs#expressions">Expressions</a></li>
-                        <li><a href="/docs#control-flow">Control Flow</a></li>
-                        <li><a href="/docs#components">Components</a></li>
-                        <li><a href="/docs#routing">Routing</a></li>
-                        <li><a href="/docs#builtin-attributes">Builtin Attributes</a></li>
-                    </ul>
-                </nav>
-
-                <main class="content">
+            <div class="container examples-container">
+                <main class="content examples-content">
                     {(children)}
                 </main>
-
-                <aside class="right-sidebar" id="on-this-page">
-                    <div class="right-sidebar-content">
-                        <h3 class="right-sidebar-title">ON THIS PAGE</h3>
-                        <nav class="right-sidebar-nav" id="on-this-page-nav"></nav>
-                    </div>
-                </aside>
             </div>
 
             <script async type="module" src={js_version}></script>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js"/>
         </div>
-        
     );
 }
 
