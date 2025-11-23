@@ -15,19 +15,22 @@ pub const App = struct {
             page: *const fn (ctx: zx.PageContext) Component,
             layout: ?*const fn (ctx: zx.LayoutContext, component: Component) Component = null,
         };
+        pub const CliCommand = enum { dev, serve, @"export" };
+
         routes: []const Route,
         rootdir: []const u8,
+        cli_command: ?CliCommand = null,
     };
     pub const Config = struct {
         server: httpz.Config,
-        meta: *const Meta,
+        meta: Meta,
     };
 
-    const Handler = struct {
-        meta: *const App.Meta,
+    pub const Handler = struct {
+        meta: App.Meta,
         allocator: std.mem.Allocator,
 
-        pub fn handle(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
+        pub fn handlePageRequest(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
             const allocator = self.allocator;
             const path = req.url.path;
 
@@ -78,7 +81,7 @@ pub const App = struct {
     pub const info = std.fmt.comptimePrint("\x1b[1mZX\x1b[0m \x1b[2m· {s}\x1b[0m", .{version});
 
     allocator: std.mem.Allocator,
-    meta: *const Meta,
+    meta: Meta,
     handler: Handler,
     server: httpz.Server(*Handler),
 
@@ -92,6 +95,17 @@ pub const App = struct {
         app.meta = config.meta;
         app.handler = Handler{ .meta = config.meta, .allocator = allocator };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
+
+        var router = try app.server.router(.{});
+
+        // Static assets
+        router.get("/assets/*", handlePageRequestWrapper, .{});
+        router.get("/", handlePageRequestWrapper, .{});
+
+        // Routes
+        for (config.meta.routes) |route| {
+            router.get(route.path, handlePageRequestWrapper, .{});
+        }
 
         // Introspect the app, this will exit the program in some cases like --introspect flag
         try app.introspect();
@@ -142,6 +156,13 @@ pub const App = struct {
 
             // --address: Override the configured/default address
             if (std.mem.eql(u8, arg, "--address")) address = args.next() orelse return error.MissingAddress;
+
+            // --cli-command: Override the CLI command
+            if (std.mem.eql(u8, arg, "--cli-command")) {
+                const cli_command_str = args.next() orelse return error.MissingCliCommand;
+                const cli_command = std.meta.stringToEnum(Meta.CliCommand, cli_command_str) orelse return error.InvalidCliCommand;
+                self.meta.cli_command = cli_command;
+            }
         }
 
         var stdout_writer = std.fs.File.stdout().writerStreaming(&.{});
@@ -164,7 +185,33 @@ pub const App = struct {
             std.process.exit(0);
         }
 
+        // if (self.meta.cli_command == .dev) {
+        var router = try self.server.router(.{});
+        router.get("/_zx/devsocket", devsocket, .{});
+        // }
+
         try stdout.flush();
+    }
+
+    fn handlePageRequestWrapper(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+        handler.handlePageRequest(req, res);
+    }
+
+    fn devsocket(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+        _ = handler;
+        _ = req;
+        res.status = 200;
+        res.header("Content-Type", "text/event-stream");
+        res.header("Cache-Control", "no-cache");
+        res.header("Connection", "keep-alive");
+
+        try res.chunk(":connected\n\n");
+
+        const interval_ns = 1 * std.time.ns_per_s; // 15 seconds
+        while (true) {
+            std.Thread.sleep(interval_ns);
+            try res.chunk(":heartbeat\n\n");
+        }
     }
 
     fn normalizePath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -298,6 +345,7 @@ pub const App = struct {
         routes: []const Route,
         config: SerilizableAppMeta.Config,
         version: []const u8,
+        cli_command: ?Meta.CliCommand = null,
 
         pub fn init(allocator: std.mem.Allocator, app: *const App) !SerilizableAppMeta {
             var routes = try allocator.alloc(Route, app.meta.routes.len);
@@ -315,6 +363,7 @@ pub const App = struct {
                 },
                 .version = App.version,
                 .rootdir = app.meta.rootdir,
+                .cli_command = app.meta.cli_command,
             };
         }
 

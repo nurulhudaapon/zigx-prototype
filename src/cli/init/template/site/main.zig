@@ -2,7 +2,7 @@ const meta = @import("zx_meta").meta;
 const std = @import("std");
 const zx = @import("zx");
 
-const config = zx.App.Config{ .server = .{}, .meta = &meta };
+const config = zx.App.Config{ .server = .{}, .meta = meta };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
