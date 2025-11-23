@@ -39,8 +39,6 @@ fn transpile(ctx: zli.CommandContext) !void {
         return;
     };
 
-    log.debug("outdir: {s}", .{outdir});
-
     // Check if path is a file and outdir is default
     const default_outdir = ".zx";
     const is_default_outdir = std.mem.eql(u8, outdir, default_outdir);
@@ -325,7 +323,7 @@ const ClientComponentSerializable = struct {
     import: []const u8,
 };
 
-fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8) !void {
+fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8, verbose: bool) !void {
     // Generate Zig array literal contents (without outer array declaration)
     var aw = std.io.Writer.Allocating.init(allocator);
     defer aw.deinit();
@@ -389,9 +387,13 @@ fn genClientMainWasm(allocator: std.mem.Allocator, components: []const ClientCom
         .sub_path = main_csz_path,
         .data = main_csz_z,
     });
+
+    if (verbose) {
+        std.debug.print("Generated main_wasm.zig at: {s}\n", .{main_csz_path});
+    }
 }
 
-fn genClientMain(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8) !void {
+fn genClientMain(allocator: std.mem.Allocator, components: []const ClientComponentSerializable, output_dir: []const u8, verbose: bool) !void {
     var json_str = std.json.Stringify.valueAlloc(allocator, components, .{
         .whitespace = .indent_2,
     }) catch @panic("OOM");
@@ -430,9 +432,11 @@ fn genClientMain(allocator: std.mem.Allocator, components: []const ClientCompone
     defer allocator.free(main_csr_react_z);
 
     _ = output_dir;
-    log.debug("node_modules path: {s}", .{"node_modules"});
-    log.debug("ziex path: {s}", .{"ziex"});
-    log.debug("components.ts path: {s}", .{"components.ts"});
+    if (verbose) {
+        log.debug("node_modules path: {s}", .{"node_modules"});
+        log.debug("ziex path: {s}", .{"ziex"});
+        log.debug("components.ts path: {s}", .{"components.ts"});
+    }
 
     // Create the node_modules/ziex/ if it doesn't exist
     const ziex_dir = try std.fs.path.join(allocator, &.{ "node_modules", "@ziex/components" });
@@ -569,7 +573,8 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
         .sub_path = devscript_path,
         .data = @embedFile("./transpile/template/devscript.js"),
     });
-    log.debug("Copied devscript.js to: {s}", .{devscript_path});
+    if (verbose)
+        log.debug("Copied devscript.js to: {s}", .{devscript_path});
 }
 
 fn writeRoute(writer: anytype, route: Route) !void {
@@ -963,13 +968,13 @@ fn transpileCommand(
     }
 
     if (csr_components.items.len > 0) {
-        genClientMain(allocator, csr_components.items, output_dir) catch |err| {
+        genClientMain(allocator, csr_components.items, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate main.tsx: {}\n", .{err});
         };
     }
 
     if (csz_components.items.len > 0) {
-        genClientMainWasm(allocator, csz_components.items, output_dir) catch |err| {
+        genClientMainWasm(allocator, csz_components.items, output_dir, verbose) catch |err| {
             std.debug.print("Warning: Failed to generate main_wasm.zig: {}\n", .{err});
         };
     }

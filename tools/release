@@ -4,4 +4,4 @@ RELEASE_VERSION=v$(grep -E '^\s*\.version\s*=' build.zig.zon | sed -E 's/.*"([^"
 
 echo "Releasing version: $RELEASE_VERSION"
 
-gh release create $RELEASE_VERSION -F RELEASE.md
+gh release create $RELEASE_VERSION -F RELEASE.md --prerelease
