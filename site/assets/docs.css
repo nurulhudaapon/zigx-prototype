@@ -10,8 +10,64 @@
     --link-color: #0066cc;
     --code-bg: #ffffff;
     --nav-bg: #ffffff;
+    --bg-color: #ffffff;
     --sidebar-width: 250px;
     --right-sidebar-width: 200px;
+    --submenu-bg: rgba(0, 0, 0, 0.02);
+    --hover-bg: rgba(0, 0, 0, 0.05);
+    --link-hover-bg: rgba(0, 102, 204, 0.05);
+    --link-active-bg: rgba(0, 102, 204, 0.08);
+    --code-border: #e0e0e0;
+    --badge-bg: #f6f8fa;
+    --badge-border: #e0e0e0;
+    --badge-hover-bg: #eaeef2;
+    --badge-hover-border: #d0d7de;
+    --subtitle-color: #666;
+    --scrollbar-thumb: rgba(176, 176, 176, 0.5);
+    --tooltip-bg: #333;
+    --copy-button-bg: #f6f8fa;
+    --copy-button-border: #e0e0e0;
+    --copy-button-hover-bg: #eaeef2;
+    --copy-button-hover-border: #d0d7de;
+    --code-overlay: rgba(255, 255, 255, 0.25);
+    --preview-bg: #ffffff;
+    --link-hover-color: #0052a3;
+    --tooltip-icon-bg: #0066cc;
+    --success-color: #28a745;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --border-color: #3a3a3a;
+        --text-color: #e0e0e0;
+        --link-color: #4a9eff;
+        /* Dark code blocks for dark mode */
+        --code-bg: #2d2d2d;
+        --nav-bg: #1a1a1a;
+        --bg-color: #121212;
+        --submenu-bg: rgba(255, 255, 255, 0.05);
+        --hover-bg: rgba(255, 255, 255, 0.1);
+        --link-hover-bg: rgba(74, 158, 255, 0.15);
+        --link-active-bg: rgba(74, 158, 255, 0.2);
+        /* Dark borders for code blocks in dark mode */
+        --code-border: #4a4a4a;
+        --badge-bg: #2a2a2a;
+        --badge-border: #3a3a3a;
+        --badge-hover-bg: #333;
+        --badge-hover-border: #4a4a4a;
+        --subtitle-color: #a0a0a0;
+        --scrollbar-thumb: rgba(150, 150, 150, 0.5);
+        --tooltip-bg: #2a2a2a;
+        --copy-button-bg: #2a2a2a;
+        --copy-button-border: #3a3a3a;
+        --copy-button-hover-bg: #333;
+        --copy-button-hover-border: #4a4a4a;
+        --code-overlay: rgba(0, 0, 0, 0.3);
+        --preview-bg: #1a1a1a;
+        --link-hover-color: #6bb3ff;
+        --tooltip-icon-bg: #4a9eff;
+        --success-color: #2dce5d;
+    }
 }
 
 /* Global scrollbar styling - always visible */
@@ -27,7 +83,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(176, 176, 176, 0.5);
+    background: var(--scrollbar-thumb);
     border-radius: 30px;
 }
 
@@ -36,10 +92,10 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: var(--text-color);
     line-height: 1.6;
-    background: white;
+    background: var(--bg-color);
     /* Firefox scrollbar styling */
     scrollbar-width: thin;
-    scrollbar-color: rgba(176, 176, 176, 0.5) transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 /* Top Bar */
@@ -128,7 +184,7 @@ body {
 }
 
 .top-bar-icon:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--hover-bg);
     color: var(--link-color);
 }
 
@@ -140,6 +196,7 @@ body {
 .container {
     display: flex;
     min-height: 100vh;
+    background: var(--bg-color);
 }
 
 /* Sidebar Navigation */
@@ -176,7 +233,7 @@ body {
 }
 
 .source-code-link:hover {
-    color: #0052a3;
+    color: var(--link-hover-color);
     text-decoration: underline;
 }
 
@@ -189,7 +246,7 @@ body {
 
 .nav-subtitle {
     font-size: 0.875rem;
-    color: #666;
+    color: var(--subtitle-color);
 }
 
 .nav-menu {
@@ -229,7 +286,7 @@ body {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease-out;
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--submenu-bg);
 }
 
 .nav-item-with-submenu:hover .nav-submenu,
@@ -240,17 +297,17 @@ body {
 
 .nav-submenu li {
     border-bottom: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-top: 1px solid var(--border-color);
 }
 
 .nav-submenu a {
     padding-left: 3rem;
     font-size: 0.9em;
-    color: #666;
+    color: var(--subtitle-color);
 }
 
 .nav-submenu a:hover {
-    background: rgba(0, 102, 204, 0.05);
+    background: var(--link-hover-bg);
     border-left-color: var(--link-color);
 }
 
@@ -264,7 +321,7 @@ body {
 }
 
 .nav-menu a:hover {
-    background: white;
+    background: var(--hover-bg);
     border-left-color: var(--link-color);
 }
 
@@ -277,6 +334,8 @@ body {
     min-width: 0;
     max-width: 100%;
     overflow-x: hidden;
+    background: var(--bg-color);
+    color: var(--text-color);
 }
 
 /* Content with right sidebar */
@@ -308,7 +367,7 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #666;
+    color: var(--subtitle-color);
     margin: 0 0 1.25rem 0;
     padding: 0;
 }
@@ -322,7 +381,7 @@ body {
 .right-sidebar-link {
     display: block;
     padding: 0.5rem 0.75rem;
-    color: #666;
+    color: var(--subtitle-color);
     text-decoration: none;
     font-size: 0.8125rem;
     line-height: 1.5;
@@ -334,18 +393,18 @@ body {
 }
 
 .right-sidebar-link:hover {
-    background: rgba(0, 102, 204, 0.06);
+    background: var(--link-hover-bg);
     color: var(--link-color);
     border-left-color: var(--link-color);
 }
 
 .right-sidebar-link:active {
-    background: rgba(0, 102, 204, 0.1);
+    background: var(--link-active-bg);
 }
 
 .right-sidebar-link-nested {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--subtitle-color);
     padding-left: 1.25rem;
     margin-left: -0.75rem;
 }
@@ -356,7 +415,7 @@ body {
 
 /* Active link styling */
 .right-sidebar-link.active {
-    background: rgba(0, 102, 204, 0.08);
+    background: var(--link-active-bg);
     color: var(--link-color);
     border-left-color: var(--link-color);
     font-weight: 500;
@@ -373,6 +432,7 @@ body {
 .section {
     margin-bottom: 4rem;
     scroll-margin-top: 2rem;
+    color: var(--text-color);
 }
 
 .section-header {
@@ -389,6 +449,7 @@ body {
     font-weight: 700;
     margin: 0;
     flex: 1;
+    color: var(--text-color);
 }
 
 .section h3 {
@@ -396,6 +457,7 @@ body {
     font-weight: 600;
     margin-top: 2rem;
     margin-bottom: 1rem;
+    color: var(--text-color);
 }
 
 .section h4 {
@@ -403,10 +465,12 @@ body {
     font-weight: 600;
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
+    color: var(--text-color);
 }
 
 .section p {
     margin-bottom: 1rem;
+    color: var(--text-color);
 }
 
 /* Source Code Badge */
@@ -420,8 +484,8 @@ body {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: #f6f8fa;
-    border: 1px solid var(--border-color);
+    background: var(--badge-bg);
+    border: 1px solid var(--badge-border);
     border-radius: 6px;
     color: var(--text-color);
     text-decoration: none;
@@ -431,8 +495,8 @@ body {
 }
 
 .source-code-badge-link:hover {
-    background: #eaeef2;
-    border-color: #d0d7de;
+    background: var(--badge-hover-bg);
+    border-color: var(--badge-hover-border);
     color: var(--link-color);
     text-decoration: none;
 }
@@ -462,17 +526,26 @@ code {
     border-radius: 3px;
     font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
     font-size: 0.9em;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--code-border);
+    color: var(--text-color);
+}
+
+/* Code blocks in dark mode - let Prism theme handle colors */
+@media (prefers-color-scheme: dark) {
+    code,
+    pre code {
+        color: #e0e0e0;
+    }
 }
 
 pre {
-    background: #ffffff;
+    background: var(--code-bg);
     padding: 1.5rem;
     border-radius: 0;
     overflow-x: auto;
     overflow-y: auto;
     margin: 1.5rem 0;
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--code-border);
     white-space: pre;
     max-width: 100%;
     box-sizing: border-box;
@@ -523,7 +596,7 @@ pre code {
     cursor: pointer;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #666;
+    color: var(--subtitle-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     transition: all 0.2s;
@@ -532,13 +605,17 @@ pre code {
 
 .tab-btn:hover {
     color: var(--text-color);
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--hover-bg);
 }
 
 /* Default active state for preview tab button (since it's checked by default) */
 .example-code .tab-btn[for$="-preview"] {
     color: var(--link-color);
     border-bottom-color: var(--link-color);
+}
+
+.tab-btn {
+    color: var(--subtitle-color);
 }
 
 .tab-content {
@@ -578,7 +655,7 @@ pre code {
 /* Reset preview button when other tabs are checked */
 .example-code:has(.tab-radio[id$="-html"]:checked) .tab-btn[for$="-preview"],
 .example-code:has(.tab-radio[id$="-zig"]:checked) .tab-btn[for$="-preview"] {
-    color: #666 !important;
+    color: var(--subtitle-color) !important;
     border-bottom-color: transparent !important;
 }
 
@@ -607,7 +684,7 @@ pre code {
     margin: 0;
     border: none;
     padding: 0;
-    background: white;
+    background: var(--code-bg);
     overflow: visible;
     white-space: pre;
     max-width: 100%;
@@ -659,7 +736,7 @@ code[contenteditable="true"]:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--code-overlay);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
@@ -682,7 +759,7 @@ code[contenteditable="true"]:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--code-overlay);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
@@ -754,8 +831,8 @@ code[contenteditable="true"][data-full-content]:focus::before {
     top: 0;
     left: 0;
     right: 0;
-    background: #ffffff;
-    color: #333 !important;
+    background: var(--code-bg);
+    color: var(--text-color) !important;
     padding: inherit;
     white-space: pre;
     font-family: inherit;
@@ -808,8 +885,8 @@ code[data-full-content]:not([contenteditable]):hover::before {
     top: 0;
     left: 0;
     right: 0;
-    background: #ffffff;
-    color: #333 !important;
+    background: var(--code-bg);
+    color: var(--text-color) !important;
     padding: inherit;
     white-space: pre;
     font-family: inherit;
@@ -850,7 +927,7 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    background: white;
+    background: var(--preview-bg);
     padding: 10px;
 }
 
@@ -858,7 +935,7 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     width: 100%;
     height: 100%;
     border: none;
-    background: white;
+    background: var(--preview-bg);
     overflow: hidden;
 }
 
@@ -874,7 +951,7 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
 }
 
 .example-code {
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--code-border);
     display: flex;
     flex-direction: column;
     height: auto;
@@ -885,25 +962,25 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
 }
 
 .example-code:first-child {
-    border-right: 1px solid var(--border-color);
+    border-right: 1px solid var(--code-border);
 }
 
 .example-code:last-child {
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--code-border);
 }
 
 .example-code h4,
 .example-code span[data-no-nav] {
     padding: 0.75rem 1rem;
     background: var(--nav-bg);
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--code-border);
     margin: 0;
     font-size: 0.875rem;
     display: block;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #666;
+    color: var(--subtitle-color);
     height: 2.75rem;
     min-height: 2.75rem;
     box-sizing: border-box;
@@ -920,8 +997,8 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #0066cc;
-    color: white;
+    background: var(--tooltip-icon-bg);
+    color: var(--bg-color);
     font-size: 0.7rem;
     font-weight: normal;
     font-style: normal;
@@ -939,8 +1016,8 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     right: 0;
     margin-bottom: 8px;
     padding: 6px 10px;
-    background: #333;
-    color: white;
+    background: var(--tooltip-bg);
+    color: var(--text-color);
     font-size: 0.75rem;
     white-space: nowrap;
     border-radius: 4px;
@@ -960,7 +1037,7 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     right: 8px;
     margin-bottom: 4px;
     border: 4px solid transparent;
-    border-top-color: #333;
+    border-top-color: var(--tooltip-bg);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
@@ -980,7 +1057,7 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     padding: 0;
     overflow: visible;
     white-space: pre;
-    background: #ffffff;
+    background: var(--code-bg);
     flex: 1;
     min-height: 0;
     min-width: 0;
@@ -994,8 +1071,8 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     top: 0.75rem;
     right: 0.75rem;
     padding: 0.5rem 0.75rem;
-    background: #f6f8fa;
-    border: 1px solid var(--border-color);
+    background: var(--copy-button-bg);
+    border: 1px solid var(--copy-button-border);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.75rem;
@@ -1018,19 +1095,19 @@ pre:hover .copy-button,
 }
 
 .copy-button:hover {
-    background: #eaeef2;
-    border-color: #d0d7de;
+    background: var(--copy-button-hover-bg);
+    border-color: var(--copy-button-hover-border);
     color: var(--link-color);
 }
 
 .copy-button:active {
-    background: #d0d7de;
+    background: var(--copy-button-hover-border);
 }
 
 .copy-button.copied {
-    background: #28a745;
-    border-color: #28a745;
-    color: white;
+    background: var(--success-color);
+    border-color: var(--success-color);
+    color: var(--bg-color);
 }
 
 .copy-button svg {
@@ -1059,13 +1136,13 @@ pre:hover .copy-button,
 }
 
 
-/* Prism.js overrides for white background */
+/* Prism.js overrides */
 pre[class*="language-"] {
-    background: #ffffff !important;
+    background: var(--code-bg) !important;
 }
 
 code[class*="language-"] {
-    background: #ffffff !important;
+    background: var(--code-bg) !important;
     /* Don't override text color - let tokens handle it */
 }
 
@@ -1092,13 +1169,13 @@ code[class*="language-"] {
     }
     
     .example-code:first-child {
-        border-right: 2px solid var(--border-color);
-        border-bottom: 1px solid var(--border-color);
+        border-right: 2px solid var(--code-border);
+        border-bottom: 1px solid var(--code-border);
     }
     
     .example-code:last-child {
-        border-left: 2px solid var(--border-color);
-        border-top: 1px solid var(--border-color);
+        border-left: 2px solid var(--code-border);
+        border-top: 1px solid var(--code-border);
     }
     
     .sidebar {
@@ -1182,13 +1259,13 @@ code[class*="language-"] {
     }
     
     .example-code:first-child {
-        border-right: 2px solid var(--border-color);
-        border-bottom: 1px solid var(--border-color);
+        border-right: 2px solid var(--code-border);
+        border-bottom: 1px solid var(--code-border);
     }
     
     .example-code:last-child {
-        border-left: 2px solid var(--border-color);
-        border-top: 1px solid var(--border-color);
+        border-left: 2px solid var(--code-border);
+        border-top: 1px solid var(--code-border);
     }
     
     .sidebar {

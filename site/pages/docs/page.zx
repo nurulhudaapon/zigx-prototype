@@ -372,6 +372,19 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
     const truncated_zig_code = util.removeCommonIndentation(allocator, zig_return_content);
     const escaped_full_zig = props.zig_code;
 
+    // Wrap HTML with dark mode styles for iframe
+    const dark_mode_style = 
+        \\<style>
+        \\  * { color-scheme: light dark; }
+        \\  @media (prefers-color-scheme: dark) {
+        \\    body { background: #1a1a1a !important; color: #e0e0e0 !important; }
+        \\    * { color: #e0e0e0 !important; }
+        \\    p, div, span, h1, h2, h3, h4, h5, h6 { color: #e0e0e0 !important; }
+        \\  }
+        \\</style>
+    ;
+    const html_with_style = std.fmt.allocPrint(allocator, "{s}{s}", .{ dark_mode_style, props.html_code }) catch unreachable;
+
     const preview_id = std.fmt.allocPrint(allocator, "tab-{s}-preview", .{props.id}) catch unreachable;
     const html_id = std.fmt.allocPrint(allocator, "tab-{s}-html", .{props.id}) catch unreachable;
     const zig_id = std.fmt.allocPrint(allocator, "tab-{s}-zig", .{props.id}) catch unreachable;
@@ -400,7 +413,7 @@ fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component 
                 </div>
                 <div class="tab-content" id={preview_content_id}>
                     <div class="preview-wrapper">
-                        <iframe class="preview-frame" srcdoc={props.html_code}></iframe>
+                        <iframe class="preview-frame" srcdoc={html_with_style}></iframe>
                     </div>
                 </div>
                 <div class="tab-content" id={html_content_id}>
