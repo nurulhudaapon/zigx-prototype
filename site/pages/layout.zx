@@ -10,8 +10,6 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
         
         <body>
             {(children)}
-
-            <script src="/assets/_zx/devscript.js"></script>
         </body>
         </html>
     );

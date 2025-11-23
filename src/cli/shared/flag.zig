@@ -6,4 +6,12 @@ pub const binpath_flag = zli.Flag{
     .default_value = .{ .String = "" },
 };
 
+pub const build_args = zli.Flag{
+    .name = "build-args",
+    .description = "Build arguments to use",
+    .type = .String,
+    .default_value = .{ .String = "" },
+    .hidden = true,
+};
+
 const zli = @import("zli");

@@ -3,13 +3,6 @@ import * as prettierPluginHtml from "https://unpkg.com/prettier@3.6.2/plugins/ht
 
 // Find and format HTML code snippets
 document.addEventListener("DOMContentLoaded", async () => {
-
-  new EventSource('/_zx/devsocket').addEventListener('change', () => location.reload())
-
-
-
-
-
   const htmlCodeElements = document.querySelectorAll('code.language-markup');
 
   for (const codeElement of htmlCodeElements) {

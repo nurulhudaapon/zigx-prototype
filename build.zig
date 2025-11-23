@@ -202,10 +202,6 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     exe.step.dependOn(&transpile_cmd.step);
     b.installArtifact(exe);
 
-    // --- Steps: Transpile (Not used for now) ---
-    const transpile_step = b.step("transpile", "Transpile Zx components before running");
-    transpile_step.dependOn(&transpile_cmd.step);
-
     // --- Steps: Serve ---
     const serve_step = b.step("serve", "Run the Zx website");
     const serve_cmd = b.addRunArtifact(exe);

@@ -5,6 +5,7 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     }, dev);
 
     try cmd.addFlag(flag.binpath_flag);
+    try cmd.addFlag(flag.build_args);
 
     return cmd;
 }
@@ -15,21 +16,34 @@ const BIN_DIR = "zig-out/bin";
 fn dev(ctx: zli.CommandContext) !void {
     const allocator = ctx.allocator;
     const binpath = ctx.flag("binpath", []const u8);
+    const build_args_str = ctx.flag("build-args", []const u8);
+    var build_args = std.mem.splitSequence(u8, build_args_str, " ");
+
+    var build_args_array = std.ArrayList([]const u8).empty;
+    try build_args_array.append(allocator, "zig");
+    try build_args_array.append(allocator, "build");
+    while (build_args.next()) |arg| {
+        const trimmed_arg = std.mem.trim(u8, arg, " ");
+        if (std.mem.eql(u8, trimmed_arg, "")) continue;
+        try build_args_array.append(allocator, trimmed_arg);
+    }
 
     jsutil.buildjs(ctx, binpath, false) catch |err| {
         log.debug("Error building TS! {any}", .{err});
     };
 
-    log.debug("First time building, we will run zig build first", .{});
-    var build_builder = std.process.Child.init(&.{ "zig", "build" }, allocator);
+    log.debug("First time building, we will run `{s}`", .{try std.mem.join(allocator, " ", build_args_array.items)});
+    var build_builder = std.process.Child.init(build_args_array.items, allocator);
     try build_builder.spawn();
     _ = try build_builder.wait();
 
     log.debug("Building complete, finding ZX executable", .{});
 
-    var builder = std.process.Child.init(&.{ "zig", "build", "--watch" }, allocator);
+    try build_args_array.append(allocator, "--watch");
+    var builder = std.process.Child.init(build_args_array.items, allocator);
     try builder.spawn();
     defer _ = builder.kill() catch unreachable;
+    log.debug("Building with watch mode `{s}`", .{try std.mem.join(allocator, " ", build_args_array.items)});
 
     var program_meta = util.findprogram(allocator, binpath) catch |err| {
         try ctx.writer.print("Error finding ZX executable! {any}\n", .{err});

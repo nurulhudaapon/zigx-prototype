@@ -27,7 +27,7 @@ pub const App = struct {
     };
 
     pub const Handler = struct {
-        meta: App.Meta,
+        meta: *App.Meta,
         allocator: std.mem.Allocator,
 
         pub fn handlePageRequest(self: *Handler, req: *httpz.Request, res: *httpz.Response) void {
@@ -43,8 +43,12 @@ pub const App = struct {
             const pagectx = zx.PageContext.init(req, res, allocator);
             const layoutctx = zx.LayoutContext.init(req, res, allocator);
 
-            for (self.meta.routes) |route| {
-                const rendered = matchRoute(request_path, route, pagectx, layoutctx, null, self.meta.routes) catch {
+            const meta = self.meta;
+            const is_dev_mode = meta.cli_command == .dev;
+            // log.debug("cli command: {s}", .{@tagName(meta.cli_command orelse .serve)});
+
+            for (meta.routes) |route| {
+                const rendered = matchRoute(request_path, route, pagectx, layoutctx, null, meta.routes, is_dev_mode) catch {
                     res.body = "Internal Server Error";
                     res.status = 500;
                     return;
@@ -57,7 +61,7 @@ pub const App = struct {
 
             // log.debug("requst_path: {s}", .{request_path});
             const assets_path = std.fs.path.join(allocator, &.{
-                self.meta.rootdir,
+                meta.rootdir,
                 if (std.mem.startsWith(u8, request_path, "/assets/")) "" else "public",
                 request_path,
             }) catch return;
@@ -71,7 +75,7 @@ pub const App = struct {
 
             // log.debug("found asset serving {s}", .{assets_path});
             res.content_type = httpz.ContentType.forFile(request_path);
-            // res.header("Cache-Control", "max-age=31536000, public");
+            res.header("Cache-Control", "max-age=31536000, public");
             res.body = file_content;
             return;
         }
@@ -94,7 +98,7 @@ pub const App = struct {
         app.allocator = allocator;
         app.meta = config.meta;
         app.handler = Handler{
-            .meta = config.meta,
+            .meta = &app.meta,
             .allocator = allocator,
         };
         app.server = try httpz.Server(*Handler).init(allocator, config.server, &app.handler);
@@ -103,7 +107,7 @@ pub const App = struct {
 
         // Static assets
         router.get("/assets/*", handlePageRequestWrapper, .{});
-        router.get("/", handlePageRequestWrapper, .{});
+        router.get("/*", handlePageRequestWrapper, .{});
 
         // Routes
         for (config.meta.routes) |route| {
@@ -166,7 +170,7 @@ pub const App = struct {
                 const cli_command = std.meta.stringToEnum(Meta.CliCommand, cli_command_str) orelse return error.InvalidCliCommand;
                 self.meta.cli_command = cli_command;
 
-                log.debug("CLI command: {s}", .{cli_command_str});
+                // log.debug("CLI command: {s}", .{cli_command_str});
             }
         }
 
@@ -199,6 +203,8 @@ pub const App = struct {
     }
 
     fn handlePageRequestWrapper(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+        // log.debug("Request and path {s}", .{req.url.path});
+        // if (req.route_data) |rd| log.debug("Route data {any}", .{rd});
         handler.handlePageRequest(req, res);
     }
 
@@ -238,6 +244,42 @@ pub const App = struct {
         return path;
     }
 
+    /// ElementInjector handles injecting elements into component trees
+    const ElementInjector = struct {
+        allocator: std.mem.Allocator,
+
+        /// Inject a script element into the body of a component
+        /// Returns true if injection was successful, false if body element not found
+        pub fn injectScriptIntoBody(self: ElementInjector, page: *Component, script_src: []const u8) bool {
+            if (page.getElementByName(self.allocator, .body)) |body_element| {
+                // Allocate attributes array properly (not a pointer to stack memory)
+                const attributes = self.allocator.alloc(zx.Element.Attribute, 1) catch {
+                    std.debug.print("Error allocating attributes: OOM\n", .{});
+                    return false;
+                };
+                attributes[0] = .{
+                    .name = "src",
+                    .value = script_src,
+                };
+
+                const script_element = Component{
+                    .element = .{
+                        .tag = .script,
+                        .attributes = attributes,
+                    },
+                };
+
+                body_element.appendChild(self.allocator, script_element) catch |err| {
+                    std.debug.print("Error appending script to body: {}\n", .{err});
+                    self.allocator.free(attributes);
+                    return false;
+                };
+                return true;
+            }
+            return false;
+        }
+    };
+
     fn matchRoute(
         request_path: []const u8,
         route: App.Meta.Route,
@@ -245,6 +287,7 @@ pub const App = struct {
         layoutctx: zx.LayoutContext,
         own_writer: ?*std.Io.Writer,
         all_routes: []const App.Meta.Route,
+        is_dev_mode: bool,
     ) !bool {
         const normalized_route_path = normalizePath(pagectx.arena, route.path) catch return false;
 
@@ -324,13 +367,33 @@ pub const App = struct {
             }
 
             // Apply layouts in order (root to leaf)
+            var injector: ?ElementInjector = null;
+            if (is_dev_mode) {
+                // log.debug("Injecting dev script into body element of most parent layout (first one)", .{});
+                injector = ElementInjector{ .allocator = pagectx.arena };
+            }
+
             for (0..layouts_count) |i| {
                 page = layouts_to_apply[i](layoutctx, page);
+                // In dev mode, inject dev script into body element of most parent layout (first one)
+                if (injector) |*inj| {
+                    if (i == 0) {
+                        // log.debug("Injecting dev script into body element of most parent layout (first one)", .{});
+                        _ = inj.injectScriptIntoBody(&page, "/assets/_zx/devscript.js");
+                        injector = null; // Only inject once
+                    }
+                }
             }
 
             // Apply this route's own layout last
             if (route.layout) |layout_fn| {
                 page = layout_fn(layoutctx, page);
+                // In dev mode, inject into root route's layout if this is the root route (most parent)
+                if (injector) |*inj| {
+                    if (is_root_route) {
+                        _ = inj.injectScriptIntoBody(&page, "/assets/_zx/devscript.js");
+                    }
+                }
             }
 
             const writer = own_writer orelse &layoutctx.response.buffer.writer;
