@@ -5,11 +5,15 @@ pub fn Layout(ctx: zx.LayoutContext, children: zx.Component) zx.Component {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>ZX</title>
+            <title>ZX - Fast Web Framework for Zig</title>
+            <meta name="description" content="A Zig library for building web applications with JSX-like syntax. Write declarative UI components using familiar JSX patterns, transpiled to efficient Zig code.">
         </head>
         
         <body>
             {(children)}
+
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/prism-core.min.js"/>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js"/>
         </body>
         </html>
     );
