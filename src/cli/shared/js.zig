@@ -74,7 +74,7 @@ pub fn checkEsbuildBin() bool {
     return if (std.fs.cwd().statFile("node_modules/.bin/esbuild") catch null) |_| true else false;
 }
 
-pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, verbose: bool) !void {
+pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, is_dev: bool, verbose: bool) !void {
     var program_meta = try util.findprogram(ctx.allocator, binpath);
     defer program_meta.deinit(ctx.allocator);
 
@@ -131,25 +131,116 @@ pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, verbose: bool) !voi
 
     const esbuild_args = [_][:0]const u8{
         "node_modules/.bin/esbuild",
+        // "--metafile=esbuild-meta.json",
         main_tsx_argz,
         "--bundle",
         "--minify",
         outfile_arg,
-        // "--define:process.env.NODE_ENV=\\\"production\\\"",
-        // "--define:__DEV__=false",
+        if (is_dev) "--define:process.env.NODE_ENV=\"development\"" else "--define:process.env.NODE_ENV=\"production\"",
+        if (is_dev) "--define:__DEV__=true" else "--define:__DEV__=false",
     };
+
+    log.debug("Esbuild args: {s}", .{try std.mem.join(ctx.allocator, " ", &esbuild_args)});
     var esbuild_cmd = std.process.Child.init(&esbuild_args, ctx.allocator);
-    if (!verbose) {
-        esbuild_cmd.stdout_behavior = .Ignore;
-        esbuild_cmd.stderr_behavior = .Ignore;
+
+    esbuild_cmd.stderr_behavior = .Pipe;
+    esbuild_cmd.stdout_behavior = .Pipe;
+    try esbuild_cmd.spawn();
+
+    var stdout = std.ArrayList(u8).empty;
+    var stderr = std.ArrayList(u8).empty;
+    esbuild_cmd.collectOutput(ctx.allocator, &stdout, &stderr, 8192) catch |err| {
+        std.debug.print("Error collecting output: {any}", .{err});
+    };
+
+    log.debug("Esbuild stdout: {s} \n stderr: {s}", .{ stdout.items, stderr.items });
+
+    const esbuild_output = try parseEsbuildOutput(stderr.items);
+
+    // Pretty print esbuild output with colors
+    if (verbose and esbuild_output.path.len > 0 and esbuild_output.size.len > 0 and esbuild_output.time.len > 0) {
+        // Colorize the output: path cyan, size green, time yellow, emoji: package 📦
+        const cyan = "\x1b[36m";
+        const green = "\x1b[32m";
+        const yellow = "\x1b[33m";
+        const reset = "\x1b[0m";
+        try ctx.writer.print(
+            "📦 Bundled JS to {s}{s}{s} ({s}{s}{s}) in {s}{s}{s}\n",
+            .{
+                cyan,   esbuild_output.path, reset,
+                green,  esbuild_output.size, reset,
+                yellow, esbuild_output.time, reset,
+            },
+        );
+    }
+}
+
+const EsbuildOutput = struct {
+    path: []const u8,
+    size: []const u8,
+    time: []const u8,
+};
+
+// Example output:
+//   site/.zx/assets/main.js  190.7kb
+// ⚡ Done in 21ms
+fn parseEsbuildOutput(stdout: []const u8) !EsbuildOutput {
+    // First trim by line break and whitespace
+    const trimmed_output = std.mem.trim(u8, stdout, " \t\n\r");
+
+    // Split by line
+    var lines = std.mem.splitSequence(u8, trimmed_output, "\n");
+
+    var path: []const u8 = "";
+    var size: []const u8 = "";
+    var time: []const u8 = "";
+
+    var line_count: usize = 0;
+
+    // Continue with while loop and only take lines that have length
+    while (lines.next()) |line| {
+        const trimmed_line = std.mem.trim(u8, line, " \t\r");
+        if (trimmed_line.len > 0) {
+            if (line_count == 0) {
+                // First found one is path (and size)
+                // Find the last space-separated token (the size)
+                var last_space: ?usize = null;
+                var i = trimmed_line.len;
+                while (i > 0) {
+                    i -= 1;
+                    if (trimmed_line[i] == ' ' or trimmed_line[i] == '\t') {
+                        last_space = i;
+                        break;
+                    }
+                }
+
+                if (last_space) |space_idx| {
+                    path = std.mem.trim(u8, trimmed_line[0..space_idx], " \t");
+                    size = std.mem.trim(u8, trimmed_line[space_idx + 1 ..], " \t");
+                } else {
+                    path = trimmed_line;
+                }
+                line_count += 1;
+            } else if (line_count == 1) {
+                // Second found one is time
+                // Look for "Done in" pattern
+                if (std.mem.indexOf(u8, trimmed_line, "Done in")) |done_idx| {
+                    const time_start = done_idx + 7; // "Done in" is 7 chars
+                    if (time_start < trimmed_line.len) {
+                        time = std.mem.trim(u8, trimmed_line[time_start..], " \t\r");
+                    }
+                }
+                line_count += 1;
+                break; // We found both, no need to continue
+            }
+        }
     }
 
-    if (verbose) try ctx.writer.print("\n\x1b[1m─────────────────── Bundling JS ───────────────────\x1b[0m\n", .{});
-
-    try esbuild_cmd.spawn();
-    _ = try esbuild_cmd.wait();
-
-    if (verbose) try ctx.writer.print("\x1b[1m─────────────────────────────────────────────────────\x1b[0m\n\n", .{});
+    return EsbuildOutput{
+        .path = path,
+        .size = size,
+        .time = time,
+    };
 }
 
 const std = @import("std");

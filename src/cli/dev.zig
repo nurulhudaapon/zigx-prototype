@@ -28,7 +28,7 @@ fn dev(ctx: zli.CommandContext) !void {
         try build_args_array.append(allocator, trimmed_arg);
     }
 
-    jsutil.buildjs(ctx, binpath, false) catch |err| {
+    jsutil.buildjs(ctx, binpath, true, false) catch |err| {
         log.debug("Error building TS! {any}", .{err});
     };
 
@@ -56,7 +56,7 @@ fn dev(ctx: zli.CommandContext) !void {
         return;
     };
 
-    jsutil.buildjs(ctx, binpath, true) catch |err| {
+    jsutil.buildjs(ctx, binpath, true, true) catch |err| {
         log.debug("Error building TS! {any}", .{err});
     };
 
@@ -71,14 +71,20 @@ fn dev(ctx: zli.CommandContext) !void {
 
         const should_restart = stat.mtime != bin_mtime and bin_mtime != 0;
         if (should_restart) {
-            std.debug.print("Change detected, restarting server...\n", .{});
+            const cyan = "\x1b[36m";
+            const yellow = "\x1b[33m";
+            const reset = "\x1b[0m";
+            try ctx.writer.print("{s}🔄 Change detected{s}, {s}restarting server...{s}", .{
+                cyan,   reset,
+                yellow, reset,
+            });
 
             _ = try runner.kill();
             try runner.spawn();
 
             std.debug.print("\n", .{});
 
-            jsutil.buildjs(ctx, binpath, true) catch |err| {
+            jsutil.buildjs(ctx, binpath, true, true) catch |err| {
                 log.debug("Error watching TS! {any}", .{err});
             };
         }

@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(exe);
-    b.installArtifact(htmlz_dep.artifact("superhtml"));
+    // b.installArtifact(htmlz_dep.artifact("superhtml"));
 
     // --- ZX LSP ---
     const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) void {
     // b.installArtifact(zxls_exe);
 
     // --- ZX Site (Docs, Example, sample) ---
-    const site_exe = setupDocSite(b, exe, mod, .{
+    const site_result = setupDocSite(b, exe, mod, .{
         .name = "zx_site",
         .root_module = b.createModule(.{
             .root_source_file = b.path("site/main.zig"),
@@ -68,7 +68,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     const site_step = b.step("site", "Build the site (docs, example, sample)");
-    site_step.dependOn(&b.addInstallArtifact(site_exe, .{}).step);
+    site_step.dependOn(&site_result.transpile_step.step);
+    site_step.dependOn(&b.addInstallArtifact(site_result.exe, .{}).step);
 
     // --- Steps: Run ---
     const run_step = b.step("run", "Run the app");
@@ -79,7 +80,7 @@ pub fn build(b: *std.Build) void {
 
     // --- Steps: Run Docs ---
     const run_docs_step = b.step("serve", "Run the site (docs, example, sample)");
-    const run_docs_cmd = b.addRunArtifact(site_exe);
+    const run_docs_cmd = b.addRunArtifact(site_result.exe);
     run_docs_step.dependOn(&run_docs_cmd.step);
     run_docs_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_docs_cmd.addArgs(args);
@@ -211,13 +212,14 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     if (b.args) |args| serve_cmd.addArgs(args);
 }
 
-pub fn setupDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.Build.Module, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
+pub fn setupDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.Build.Module, options: std.Build.ExecutableOptions) struct { exe: *std.Build.Step.Compile, transpile_step: *std.Build.Step.Run } {
     // --- ZX Transpilation ---
     const transpile_cmd = b.addRunArtifact(zx_exe);
     transpile_cmd.addArg("transpile");
     transpile_cmd.addArg(b.pathJoin(&.{"site"}));
     transpile_cmd.addArg("--outdir");
-    const outdir = transpile_cmd.addOutputDirectoryArg("site");
+    const outdir = b.path("site/.zx");
+    transpile_cmd.addArg("site/.zx");
     transpile_cmd.expectExitCode(0);
 
     // --- ZX File Cache Invalidator ---
@@ -252,5 +254,5 @@ pub fn setupDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std
 
     exe.step.dependOn(&transpile_cmd.step);
 
-    return exe;
+    return .{ .exe = exe, .transpile_step = transpile_cmd };
 }
