@@ -10,7 +10,9 @@ pub fn register(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.m
     return cmd;
 }
 
-const RESTART_INTERVAL_NS = std.time.ns_per_ms * 100; // 100ms
+const MIN_RESTART_INTERVAL_NS = std.time.ns_per_ms * 10; // 10ms
+const MAX_RESTART_INTERVAL_NS = std.time.ns_per_ms * 300; // 300ms
+const INTERVAL_STEP_NS = std.time.ns_per_ms / 10; // Increase by 0.1ms each step
 const BIN_DIR = "zig-out/bin";
 
 fn dev(ctx: zli.CommandContext) !void {
@@ -65,8 +67,10 @@ fn dev(ctx: zli.CommandContext) !void {
     defer _ = runner.kill() catch unreachable;
 
     var bin_mtime: i128 = 0;
+    var current_interval_ns: u64 = MIN_RESTART_INTERVAL_NS;
+
     while (true) {
-        std.Thread.sleep(RESTART_INTERVAL_NS);
+        std.Thread.sleep(current_interval_ns);
         const stat = try std.fs.cwd().statFile(program_path);
 
         const should_restart = stat.mtime != bin_mtime and bin_mtime != 0;
@@ -87,6 +91,19 @@ fn dev(ctx: zli.CommandContext) !void {
             jsutil.buildjs(ctx, binpath, true, true) catch |err| {
                 log.debug("Error watching TS! {any}", .{err});
             };
+
+            // Reset interval to minimum when changes are detected
+            current_interval_ns = MIN_RESTART_INTERVAL_NS;
+            log.debug("Restart interval reset to {d}ms", .{current_interval_ns / std.time.ns_per_ms});
+        } else {
+            // Gradually increase interval up to maximum when no changes
+            if (current_interval_ns < MAX_RESTART_INTERVAL_NS) {
+                // const old_interval = current_interval_ns;
+                current_interval_ns = @min(current_interval_ns + INTERVAL_STEP_NS, MAX_RESTART_INTERVAL_NS);
+                // if (old_interval != current_interval_ns) {
+                //     log.debug("No changes detected, increasing restart interval to {d}ms", .{current_interval_ns / std.time.ns_per_ms});
+                // }
+            }
         }
         if (should_restart or bin_mtime == 0) bin_mtime = stat.mtime;
     }

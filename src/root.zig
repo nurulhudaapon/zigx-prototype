@@ -1,4 +1,6 @@
-//! By convention, root.zig is the root source file when making a library.
+//! ZX - A Zig library for building web applications with JSX-like syntax.
+//! This module provides the core component system, rendering engine, and utilities
+//! for creating type-safe, high-performance web applications with server-side rendering.
 const std = @import("std");
 
 pub const Ast = @import("zx/Ast.zig");
