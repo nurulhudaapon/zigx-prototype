@@ -55,8 +55,15 @@ pub fn build(b: *std.Build) void {
     _ = zxls_exe;
     // b.installArtifact(zxls_exe);
 
+    // --- Steps: Run ---
+    const run_step = b.step("run", "Run the app");
+    const run_cmd = b.addRunArtifact(exe);
+    run_step.dependOn(&run_cmd.step);
+    run_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_cmd.addArgs(args);
+
     // --- ZX Site (Docs, Example, sample) ---
-    const site_result = setupDocSite(b, exe, mod, .{
+    setupZxDocSite(b, exe, mod, .{
         .name = "zx_site",
         .root_module = b.createModule(.{
             .root_source_file = b.path("site/main.zig"),
@@ -67,23 +74,6 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    const site_step = b.step("site", "Build the site (docs, example, sample)");
-    site_step.dependOn(&site_result.transpile_step.step);
-    site_step.dependOn(&b.addInstallArtifact(site_result.exe, .{}).step);
-
-    // --- Steps: Run ---
-    const run_step = b.step("run", "Run the app");
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-
-    // --- Steps: Run Docs ---
-    const run_docs_step = b.step("serve", "Run the site (docs, example, sample)");
-    const run_docs_cmd = b.addRunArtifact(site_result.exe);
-    run_docs_step.dependOn(&run_docs_cmd.step);
-    run_docs_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_docs_cmd.addArgs(args);
 
     // --- Steps: Test ---
     const mod_tests = b.addTest(.{ .root_module = mod });
@@ -212,7 +202,11 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     if (b.args) |args| serve_cmd.addArgs(args);
 }
 
-pub fn setupDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.Build.Module, options: std.Build.ExecutableOptions) struct { exe: *std.Build.Step.Compile, transpile_step: *std.Build.Step.Run } {
+fn setupZxDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.Build.Module, options: std.Build.ExecutableOptions) void {
+    var site_outdir = std.fs.cwd().openDir("site/.zx", .{}) catch null;
+    if (site_outdir == null) return;
+    site_outdir.?.close();
+
     // --- ZX Transpilation ---
     const transpile_cmd = b.addRunArtifact(zx_exe);
     transpile_cmd.addArg("transpile");
@@ -254,5 +248,15 @@ pub fn setupDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std
 
     exe.step.dependOn(&transpile_cmd.step);
 
-    return .{ .exe = exe, .transpile_step = transpile_cmd };
+    // --- Steps: Site Build ---
+    const site_step = b.step("site", "Build the site (docs, example, sample)");
+    site_step.dependOn(&transpile_cmd.step);
+    site_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+
+    // --- Steps: Run Docs ---
+    const run_docs_step = b.step("serve", "Run the site (docs, example, sample)");
+    const run_docs_cmd = b.addRunArtifact(exe);
+    run_docs_step.dependOn(&run_docs_cmd.step);
+    run_docs_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_docs_cmd.addArgs(args);
 }

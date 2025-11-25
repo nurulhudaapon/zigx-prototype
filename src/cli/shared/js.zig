@@ -129,19 +129,17 @@ pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, is_dev: bool, verbo
     log.debug("Building main.tsx: in package.json: {s}", .{package_json.main orelse "na"});
     log.debug("Outfile: {s}", .{outfile_arg});
 
-    const esbuild_args = [_][:0]const u8{
-        "node_modules/.bin/esbuild",
-        // "--metafile=esbuild-meta.json",
-        main_tsx_argz,
-        "--bundle",
-        "--minify",
-        outfile_arg,
-        if (is_dev) "--define:process.env.NODE_ENV=\"development\"" else "--define:process.env.NODE_ENV=\"production\"",
-        if (is_dev) "--define:__DEV__=true" else "--define:__DEV__=false",
-    };
+    var esbuild_args = std.ArrayList([]const u8).empty;
+    try esbuild_args.append(ctx.allocator, "node_modules/.bin/esbuild");
+    try esbuild_args.append(ctx.allocator, main_tsx_argz);
+    try esbuild_args.append(ctx.allocator, "--bundle");
+    if (!is_dev) try esbuild_args.append(ctx.allocator, "--minify");
+    try esbuild_args.append(ctx.allocator, outfile_arg);
+    if (is_dev) try esbuild_args.append(ctx.allocator, "--define:process.env.NODE_ENV=\"development\"") else try esbuild_args.append(ctx.allocator, "--define:process.env.NODE_ENV=\"production\"");
+    if (is_dev) try esbuild_args.append(ctx.allocator, "--define:__DEV__=true") else try esbuild_args.append(ctx.allocator, "--define:__DEV__=false");
 
-    log.debug("Esbuild args: {s}", .{try std.mem.join(ctx.allocator, " ", &esbuild_args)});
-    var esbuild_cmd = std.process.Child.init(&esbuild_args, ctx.allocator);
+    log.debug("Esbuild args: {s}", .{try std.mem.join(ctx.allocator, " ", esbuild_args.items)});
+    var esbuild_cmd = std.process.Child.init(esbuild_args.items, ctx.allocator);
 
     esbuild_cmd.stderr_behavior = .Pipe;
     esbuild_cmd.stdout_behavior = .Pipe;
