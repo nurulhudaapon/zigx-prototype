@@ -661,9 +661,21 @@ fn scanRecursive(
             try allocator.dupe(u8, "/")
         else
             try allocator.dupe(u8, current_path);
+        defer allocator.free(route_path);
+
+        // In route path we can have users/[id]/profile in those such case convert to users/:id/profile
+        var normalized_route_path = std.array_list.Managed(u8).init(allocator);
+        for (route_path) |c| {
+            if (c == '[') {
+                try normalized_route_path.append(':');
+            } else if (c != ']') {
+                try normalized_route_path.append(c);
+            }
+            // skip ']' characters
+        }
 
         const route = Route{
-            .path = route_path,
+            .path = try normalized_route_path.toOwnedSlice(),
             .page_import = page_import,
             .layout_import = layout_import,
         };

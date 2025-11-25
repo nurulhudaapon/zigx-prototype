@@ -9,6 +9,10 @@ pub const routes = [_]zx.App.Meta.Route{
         .page = @import(".zx/pages/about/page.zig").Page,
     },
     .{
+        .path = "/about/:id",
+        .page = @import(".zx/pages/about/[id]/page.zig").Page,
+    },
+    .{
         .path = "/docs",
         .page = @import(".zx/pages/docs/page.zig").Page,
         .layout = @import(".zx/pages/docs/layout.zig").Layout,
@@ -28,21 +32,13 @@ pub const routes = [_]zx.App.Meta.Route{
         .layout = @import(".zx/pages/cli/layout.zig").Layout,
     },
     .{
+        .path = "/cli/:id/command",
+        .page = @import(".zx/pages/cli/page.zig").Page,
+        .layout = @import(".zx/pages/cli/layout.zig").Layout,
+    },
+    .{
         .path = "/time",
         .page = @import(".zx/pages/time/page.zig").Page,
-    },
-    .{
-        .path = "/doc",
-        .page = @import(".zx/pages/docs/page.zig").Page,
-    },
-    .{
-        .path = "/doc/example",
-        .page = @import(".zx/pages/examples/page.zig").Page,
-        .layout = @import(".zx/pages/examples/layout.zig").Layout,
-    },
-    .{
-        .path = "/doc/example/form",
-        .page = @import(".zx/pages/examples/form/page.zig").Page,
     },
 };
 

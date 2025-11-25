@@ -1,0 +1,46 @@
+pub fn Page(ctx: zx.PageContext) zx.Component {
+    const allocator = ctx.arena;
+    const features = [_][]const u8{
+        "JSX-like syntax in Zig",
+        "Server-Side Rendering (SSR)",
+        "Type-safe components",
+        "File-based routing",
+        "Fast and efficient",
+    };
+    
+    return (
+        <div @allocator={allocator}>
+            <link rel="stylesheet" href="/doc.css">
+            <div class="content">
+                <section class="section">
+                    <div class="section-header">
+                        <h2>About ZX</h2>
+                    </div>
+                    <p>ZX is a modern web framework that combines the expressiveness of JSX with the performance and safety of Zig.</p>
+                    
+                    <h3>Key Features</h3>
+                    <ul>
+                        {for (features) |feature| (
+                            <li>{feature}</li>
+                        )}
+                    </ul>
+                    
+                    <h3>Why ZX?</h3>
+                    <p>Built with Zig, ZX offers:</p>
+                    <ul>
+                        <li>Blazing fast server-side rendering</li>
+                        <li>Memory safety without garbage collection</li>
+                        <li>Compile-time guarantees</li>
+                        <li>Zero-cost abstractions</li>
+                    </ul>
+                    
+                    <footer>
+                        <p>Copyright - ZX Framework - Built with Zig</p>
+                    </footer>
+                </section>
+            </div>
+        </div>
+    );
+}
+
+const zx = @import("zx");
