@@ -12,7 +12,7 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
 ```
 
 ## Changelog
-- feat: custom --port and --address flags for `zig build serve`
+- feat: path segment support
 
 ## Feature Checklist
 
@@ -24,7 +24,7 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
 - [x] Routing
     - [x] File-system Routing
     - [x] Search Parameters
-    - [ ] Path Segments
+    - [x] Path Segments
 - [x] Components
 - [x] Control Flow
     - [ ] `if`

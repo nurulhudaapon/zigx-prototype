@@ -28,51 +28,6 @@ winget install -e --id zig.zig # Windows
 ## Quick Example
 
 ```tsx site/pages/docs/example/overview.zx
-pub fn QuickExample(allocator: zx.Allocator) zx.Component {
-    const is_loading = true;
-    const chars = "Hello, ZX Dev!";
-
-    return (
-        <main @allocator={allocator}>
-            <section>
-                {if (is_loading) (<h1>Loading...</h1>) else (<h1>Loaded</h1>)}
-            </section>
-        
-            <section>
-                {for (chars) |char| (<span>{[char:c]}</span>)}
-            </section>
-        
-            <section>
-                {for (users) |user| (
-                    <Profile name={user.name} age={user.age} role={user.role} />
-                )}
-            </section>
-        </main>
-    );
-}
-
-fn Profile(allocator: zx.Allocator, user: User) zx.Component {
-    return (
-        <div @allocator={allocator}>
-            <h1>{user.name}</h1>
-            <p>{[user.age:d]}</p>
-            {switch (user.role) {
-                .admin => (<p>Admin</p>),
-                .member => (<p>Member</p>),
-            }}
-        </div>
-    );
-}
-
-const UserRole = enum { admin, member };
-const User = struct { name: []const u8, age: u32, role: UserRole };
-
-const users = [_]User{
-    .{ .name = "John", .age = 20, .role = .admin },
-    .{ .name = "Jane", .age = 21, .role = .member },
-};
-
-const zx = @import("zx");
 ```
 ## Feature Checklist
 
@@ -84,7 +39,7 @@ const zx = @import("zx");
 - [x] Routing
     - [x] File-system Routing
     - [x] Search Parameters
-    - [ ] Path Segments
+    - [x] Path Segments
 - [x] Components
 - [x] Control Flow
     - [ ] `if`
