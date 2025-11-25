@@ -31,6 +31,12 @@ test "for" {
     try test_transpile("control_flow/for");
     try test_render(@import("./../data/control_flow/for.zig").Page);
 }
+test "for_capture" {
+    try test_render(@import("./../data/control_flow/for.zig").StructCapture);
+}
+test "for_capture_to_component" {
+    try test_render(@import("./../data/control_flow/for.zig").StructCaptureToComponent);
+}
 test "for_block" {
     try test_transpile("control_flow/for_block");
     try test_render(@import("./../data/control_flow/for_block.zig").Page);

@@ -1845,15 +1845,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.identifier, expr);
                         },
                         .format => |fmt| {
-                            // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
-                            try output.addToken(.identifier, "std");
+                            // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
+                            try output.addToken(.identifier, "_zx");
                             try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "fmt");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "allocPrint");
+                            try output.addToken(.identifier, "print");
                             try output.addToken(.l_paren, "(");
-                            try output.addToken(.identifier, "allocator");
-                            try output.addToken(.comma, ",");
 
                             // Format string: "{format}"
                             const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
@@ -1911,15 +1907,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.identifier, expr);
                         },
                         .format => |fmt| {
-                            // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
-                            try output.addToken(.identifier, "std");
+                            // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
+                            try output.addToken(.identifier, "_zx");
                             try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "fmt");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "allocPrint");
+                            try output.addToken(.identifier, "print");
                             try output.addToken(.l_paren, "(");
-                            try output.addToken(.identifier, "allocator");
-                            try output.addToken(.comma, ",");
 
                             // Format string: "{format}"
                             const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
@@ -2525,15 +2517,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                 try output.addToken(.identifier, expr);
                                             },
                                             .format => |fmt| {
-                                                // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
-                                                try output.addToken(.identifier, "std");
+                                                // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
+                                                try output.addToken(.identifier, "_zx");
                                                 try output.addToken(.period, ".");
-                                                try output.addToken(.identifier, "fmt");
-                                                try output.addToken(.period, ".");
-                                                try output.addToken(.identifier, "allocPrint");
+                                                try output.addToken(.identifier, "print");
                                                 try output.addToken(.l_paren, "(");
-                                                try output.addToken(.identifier, "allocator");
-                                                try output.addToken(.comma, ",");
 
                                                 // Format string: "{format}"
                                                 const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
@@ -2602,15 +2590,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.identifier, expr);
                                     },
                                     .format => |fmt| {
-                                        // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
-                                        try output.addToken(.identifier, "std");
+                                        // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
+                                        try output.addToken(.identifier, "_zx");
                                         try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "fmt");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "allocPrint");
+                                        try output.addToken(.identifier, "print");
                                         try output.addToken(.l_paren, "(");
-                                        try output.addToken(.identifier, "allocator");
-                                        try output.addToken(.comma, ",");
 
                                         // Format string: "{format}"
                                         const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
@@ -2721,15 +2705,11 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
                         try output.addToken(.identifier, expr);
                     },
                     .format => |fmt| {
-                        // Format expression: use std.fmt.allocPrint(allocator, "{format}", .{expr}) for attribute values
-                        try output.addToken(.identifier, "std");
+                        // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
+                        try output.addToken(.identifier, "_zx");
                         try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "fmt");
-                        try output.addToken(.period, ".");
-                        try output.addToken(.identifier, "allocPrint");
+                        try output.addToken(.identifier, "print");
                         try output.addToken(.l_paren, "(");
-                        try output.addToken(.identifier, "allocator");
-                        try output.addToken(.comma, ",");
 
                         // Format string: "{format}"
                         const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
@@ -3176,15 +3156,11 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                     try output.addToken(.identifier, "text");
                     try output.addToken(.equal, "=");
 
-                    // Generate: std.fmt.allocPrint(allocator, "{format}", .{expr})
-                    try output.addToken(.identifier, "std");
+                    // Generate: _zx.fmt("{format}", .{expr})
+                    try output.addToken(.identifier, "_zx");
                     try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "fmt");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "allocPrint");
+                    try output.addToken(.identifier, "print");
                     try output.addToken(.l_paren, "(");
-                    try output.addToken(.identifier, "allocator");
-                    try output.addToken(.comma, ",");
 
                     const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
                     defer allocator.free(format_str);
@@ -3224,15 +3200,11 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
                     try output.addToken(.identifier, "text");
                     try output.addToken(.equal, "=");
 
-                    // Generate: std.fmt.allocPrint(allocator, "{s}", .{raw_content})
-                    try output.addToken(.identifier, "std");
+                    // Generate: _zx.fmt("{s}", .{raw_content})
+                    try output.addToken(.identifier, "_zx");
                     try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "fmt");
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "allocPrint");
+                    try output.addToken(.identifier, "print");
                     try output.addToken(.l_paren, "(");
-                    try output.addToken(.identifier, "allocator");
-                    try output.addToken(.comma, ",");
 
                     // Format string: "{s}"
                     try output.addToken(.string_literal, "\"{s}\"");

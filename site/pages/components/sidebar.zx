@@ -1,0 +1,75 @@
+pub const SidebarProps = struct {
+    pub const Link = struct {
+        href: []const u8,
+        text: []const u8,
+    };
+
+    links: []const Link,
+    children: zx.Component,
+};
+
+
+
+pub fn Sidebar(allocator: zx.Allocator, props: SidebarProps) zx.Component {
+
+    const js_version = std.fmt.allocPrint(allocator, "/assets/docs.js?v={s}", .{zx.info.version_string}) catch unreachable;
+    const css_version = std.fmt.allocPrint(allocator, "/assets/docs.css?v={s}", .{zx.info.version_string}) catch unreachable;
+
+    return (
+        <div  @allocator={allocator}>
+                    
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism.min.css" rel="stylesheet" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/themes/prism-tomorrow.min.css" rel="stylesheet" media="(prefers-color-scheme: dark)">
+            <link rel="stylesheet" href={css_version}>
+            <header class="top-bar">
+                <div class="top-bar-content">
+                    <div class="top-bar-left">
+                        <a href="/" class="top-bar-logo">ZX</a>
+                    </div>
+                    <div class="top-bar-right">
+                        <nav class="top-bar-nav">
+                            <a href="/docs" class="top-bar-link">Docs</a>
+                            <a href="/examples" class="top-bar-link">Examples</a>
+                            <a href="/cli" class="top-bar-link">CLI</a>
+                        </nav>
+                        <div class="top-bar-actions">
+                            <a href="https://github.com/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer" class="top-bar-icon" aria-label="GitHub" title="v{zx.info.version_string}">
+                                <GitHubIcon allocator={allocator} />
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+        
+            <div class="container">
+        
+                <nav class="sidebar">
+                    <ul class="nav-menu">
+                        {for (props.links) |link| (
+                            <li><a href={link.href}>{link.text}</a></li>
+                        )}
+                    </ul>
+                </nav>
+
+                <main class="content">
+                    {(props.children)}
+                </main>
+
+                <aside class="right-sidebar" id="on-this-page">
+                    <div class="right-sidebar-content">
+                        <h3 class="right-sidebar-title">ON THIS PAGE</h3>
+                        <nav class="right-sidebar-nav" id="on-this-page-nav"></nav>
+                    </div>
+                </aside>
+            </div>
+
+            <script async type="module" src={js_version}></script>
+        </div>
+    );
+}
+
+const GitHubIcon = icons.GitHub;
+
+const icons = @import("../components/icons.zig");
+const zx = @import("zx");
+const std = @import("std");

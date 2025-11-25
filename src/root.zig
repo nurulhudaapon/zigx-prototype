@@ -446,6 +446,12 @@ const ZxContext = struct {
         return .{ .text = text };
     }
 
+    pub fn print(self: *ZxContext, comptime format: []const u8, args: anytype) []const u8 {
+        const allocator = self.getAllocator();
+        const text = std.fmt.allocPrint(allocator, format, args) catch @panic("OOM");
+        return text;
+    }
+
     pub fn lazy(self: *ZxContext, comptime func: anytype, props: anytype) Component {
         const allocator = self.getAllocator();
         const FuncInfo = @typeInfo(@TypeOf(func));

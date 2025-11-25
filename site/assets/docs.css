@@ -42,7 +42,7 @@
         --text-color: #e0e0e0;
         --link-color: #4a9eff;
         /* Dark code blocks for dark mode */
-        --code-bg: #2d2d2d;
+        --code-bg: #1a1a1a;
         --nav-bg: #1a1a1a;
         --bg-color: #121212;
         --submenu-bg: rgba(255, 255, 255, 0.05);
@@ -1070,22 +1070,22 @@ code[data-full-content]:not([contenteditable])[data-expanded] {
     position: absolute;
     top: 0.75rem;
     right: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem;
     background: var(--copy-button-bg);
     border: 1px solid var(--copy-button-border);
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 500;
     color: var(--text-color);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     transition: all 0.2s ease;
     z-index: 10;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
     opacity: 0;
     pointer-events: none;
+    width: 32px;
+    height: 32px;
 }
 
 pre:hover .copy-button,
@@ -1111,8 +1111,8 @@ pre:hover .copy-button,
 }
 
 .copy-button svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
 }
 

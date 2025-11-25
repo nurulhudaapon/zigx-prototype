@@ -1,3 +1,27 @@
+const features = [_]Feature{
+    .{ .icon = "⚡", .title = "You Need Speed", .description = "If performance matters, ZX delivers. Built with Zig, it handles server-side rendering way faster than most frameworks—we're talking 120x faster than Next.js in benchmarks." },
+    .{ .icon = "🛡️", .title = "Type Safety Matters", .description = "Zig's type system catches bugs at compile time, not runtime. You get memory safety without dealing with garbage collection overhead." },
+    .{ .icon = "🎨", .title = "You Like JSX", .description = "If you're comfortable with JSX, ZX will feel familiar. Write components the same way, and it compiles down to efficient Zig code behind the scenes." },
+    .{ .icon = "🚀", .title = "SEO is Important", .description = "Need server-side rendering for SEO? ZX has you covered. It also supports static site generation, so you can pre-render pages when it makes sense." },
+    .{ .icon = "📁", .title = "Simple Routing", .description = "File-based routing means your folder structure is your routes. No need to configure route tables or complex routing logic." },
+    .{ .icon = "🔧", .title = "Real Control Flow", .description = "Use if/else, loops, and switch statements directly in your components. No need to work around framework limitations—just write normal Zig code." },
+};
+
+const performances = [_]Performance{
+    .{ .value = "120x", .label = "Faster SSR than Next.js" },
+    .{ .value = "0ms", .label = "Runtime Overhead" },
+    .{ .value = "100%", .label = "Compile-time Safety" },
+    .{ .value = "∞", .label = "Memory Safety" },
+};
+
+const hero_stats = [_]HeroStat{
+    .{ .value = "120x", .label = "Faster SSR than Next.js" },
+    .{ .value = "0ms", .label = "Runtime Overhead" },
+    .{ .value = "100%", .label = "Compile-time Safety" },
+    .{ .value = "∞", .label = "Memory Safety" },
+};
+
+
 pub fn Page(ctx: zx.PageContext) zx.Component {
     const allocator = ctx.arena;
     const css_version = std.fmt.allocPrint(allocator, "/assets/home.css?v={s}", .{zx.info.version_string}) catch unreachable;
@@ -23,9 +47,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                             <li><a href="/cli" class="nav-link">CLI</a></li>
                         </ul>
                         <a href="https://github.com/nurulhudaapon/zx" target="_blank" rel="noopener noreferrer" class="nav-github" aria-label="GitHub">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
-                            </svg>
+                            <GitHubIcon allocator={allocator} />
                             <span>GitHub</span>
                         </a>
                     </div>
@@ -42,18 +64,9 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                     </p>
                     
                     <div class="hero-stats">
-                        <div class="hero-stat">
-                            <span class="hero-stat-value">120x</span>
-                            <span class="hero-stat-label">Faster than Next.js</span>
-                        </div>
-                        <div class="hero-stat">
-                            <span class="hero-stat-value">0ms</span>
-                            <span class="hero-stat-label">Runtime Overhead</span>
-                        </div>
-                        <div class="hero-stat">
-                            <span class="hero-stat-value">100%</span>
-                            <span class="hero-stat-label">Type Safe</span>
-                        </div>
+                        {for (hero_stats) |h| (
+                            <HeroStatCard allocator={allocator} value={h.value} label={h.label} />
+                        )}
                     </div>
 
                     <div class="hero-cta">
@@ -70,59 +83,9 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                 </p>
                 
                 <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-icon">⚡</div>
-                        <h3 class="feature-title">You Need Speed</h3>
-                        <p class="feature-description">
-                            If performance matters, ZX delivers. Built with Zig, it handles server-side rendering 
-                            way faster than most frameworks—we're talking 120x faster than Next.js in benchmarks.
-                        </p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">🛡️</div>
-                        <h3 class="feature-title">Type Safety Matters</h3>
-                        <p class="feature-description">
-                            Zig's type system catches bugs at compile time, not runtime. You get memory safety 
-                            without dealing with garbage collection overhead.
-                        </p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">🎨</div>
-                        <h3 class="feature-title">You Like JSX</h3>
-                        <p class="feature-description">
-                            If you're comfortable with JSX, ZX will feel familiar. Write components the same way, 
-                            and it compiles down to efficient Zig code behind the scenes.
-                        </p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">🚀</div>
-                        <h3 class="feature-title">SEO is Important</h3>
-                        <p class="feature-description">
-                            Need server-side rendering for SEO? ZX has you covered. It also supports static site 
-                            generation, so you can pre-render pages when it makes sense.
-                        </p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">📁</div>
-                        <h3 class="feature-title">Simple Routing</h3>
-                        <p class="feature-description">
-                            File-based routing means your folder structure is your routes. No need to configure 
-                            route tables or complex routing logic.
-                        </p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">🔧</div>
-                        <h3 class="feature-title">Real Control Flow</h3>
-                        <p class="feature-description">
-                            Use if/else, loops, and switch statements directly in your components. No need to 
-                            work around framework limitations—just write normal Zig code.
-                        </p>
-                    </div>
+                    {for (features) |f| (
+                        <FeatureCard allocator={allocator} icon={f.icon} title ={f.title} description={f.description} />
+                    )}
                 </div>
             </section>
 
@@ -146,25 +109,9 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                 </p>
                 
                 <div class="performance-grid">
-                    <div class="performance-card">
-                        <div class="performance-value">120x</div>
-                        <div class="performance-label">Faster SSR than Next.js</div>
-                    </div>
-                    
-                    <div class="performance-card">
-                        <div class="performance-value">0ms</div>
-                        <div class="performance-label">Runtime Overhead</div>
-                    </div>
-                    
-                    <div class="performance-card">
-                        <div class="performance-value">100%</div>
-                        <div class="performance-label">Compile-time Safety</div>
-                    </div>
-                    
-                    <div class="performance-card">
-                        <div class="performance-value">∞</div>
-                        <div class="performance-label">Memory Safety</div>
-                    </div>
+                    {for (performances) |p| (
+                        <PerformanceCard allocator={allocator} value={p.value} label={p.label} />
+                    )}
                 </div>
             </section>
 
@@ -181,5 +128,40 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     );
 }
 
+
+const Feature = struct { icon: []const u8, title: []const u8, description: []const u8 };
+fn FeatureCard(allocator: zx.Allocator, props: Feature) zx.Component {
+
+    return (
+        <div @allocator={allocator} class="feature-card">
+            <div class="feature-icon">{props.icon}</div>
+            <h3 class="feature-title">{props.title}</h3>
+            <p class="feature-description">{props.description}</p>
+        </div>
+    );
+}
+
+const Performance = struct { value: []const u8, label: []const u8 };
+fn PerformanceCard(allocator: zx.Allocator, props: Performance) zx.Component {
+    return (
+        <div @allocator={allocator} class="performance-card">
+            <div class="performance-value">{props.value}</div>
+            <div class="performance-label">{props.label}</div>
+        </div>
+    );
+}
+
+const HeroStat = struct { value: []const u8, label: []const u8 };
+fn HeroStatCard(allocator: zx.Allocator, props: HeroStat) zx.Component {
+    return (
+        <div @allocator={allocator} class="hero-stat">
+            <div class="hero-stat-value">{props.value}</div>
+            <div class="hero-stat-label">{props.label}</div>
+        </div>
+    );
+}
+
 const std = @import("std");
 const zx = @import("zx");
+const icons = @import("./components/icons.zig");
+const GitHubIcon = icons.GitHub;

@@ -7,4 +7,38 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     );
 }
 
+
+pub fn StructCapture(allocator: zx.Allocator) zx.Component {
+    return (
+        <main @allocator={allocator}>
+            {for (users) |user| (<p>{user.name} - {[user.age:d]}</p>)}
+        </main>
+    );
+}
+
+pub fn StructCaptureToComponent(allocator: zx.Allocator) zx.Component {
+    return (
+        <main @allocator={allocator}>
+            {for (users) |user| (
+                <UserComponent name={user.name} age={user.age} />
+            )}
+        </main>
+    );
+}
+
+const User = struct { name: []const u8, age: u32 };
+const users = [_]User{
+    .{ .name = "John", .age = 20 },
+    .{ .name = "Jane", .age = 21 },
+    .{ .name = "Jim", .age = 22 },
+    .{ .name = "Jill", .age = 23 },
+};
+
+fn UserComponent(allocator: zx.Allocator, props: User) zx.Component {
+    return (
+        <p @allocator={allocator}>{props.name} - {[props.age:d]}</p>
+    );
+}
+
 const zx = @import("zx");
+const std = @import("std");
