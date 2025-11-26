@@ -1514,12 +1514,12 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                 } else {
                     // No "else" found - parse if branch and create fragment as else branch
                     log.debug("No 'else' found in conditional expression, creating conditional with fragment as else branch", .{});
-                    
+
                     // Extract condition: everything from "if" to opening paren of if branch
                     var condition_start: usize = 2; // Skip "if"
                     // Skip whitespace after "if"
                     while (condition_start < expr.len and std.ascii.isWhitespace(expr[condition_start])) condition_start += 1;
-                    
+
                     // Find the start of the condition (usually a '(')
                     var condition_end = condition_start;
                     var paren_depth: i32 = 0;
@@ -1534,7 +1534,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                         }
                         condition_end += 1;
                     }
-                    
+
                     // If no parens found, try to find opening paren for if branch
                     if (condition_end == condition_start) {
                         // Look for opening paren after condition
@@ -1542,9 +1542,9 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                         // Take everything up to the opening paren of if branch
                         while (condition_end < expr.len and expr[condition_end] != '(') condition_end += 1;
                     }
-                    
+
                     const condition = if (condition_start < condition_end) expr[condition_start..condition_end] else "";
-                    
+
                     // Extract if branch: after condition, skip whitespace, find opening paren
                     var if_start = condition_end;
                     while (if_start < expr.len and (std.ascii.isWhitespace(expr[if_start]) or expr[if_start] == ')')) if_start += 1;
@@ -1564,7 +1564,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             if (paren_depth > 0) if_end += 1;
                         }
                         const if_jsx_content = expr[if_start..if_end];
-                        
+
                         // Parse if branch (wrap in fragment if needed)
                         if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
                             log.debug("Successfully parsed if branch", .{});
@@ -1963,7 +1963,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                         } else {
                                             // No "else" found - create conditional with fragment as else branch
                                             const if_jsx_content = expr[if_start..if_end];
-                                            
+
                                             // Parse if branch (wrap in fragment if needed)
                                             if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
                                                 // Create empty fragment for else branch
@@ -2548,7 +2548,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                     } else {
                         // No "else" found - create conditional with fragment as else branch
                         log.debug("No 'else' found, creating conditional with fragment as else branch", .{});
-                        
+
                         // Extract condition properly
                         var cond_start2 = cond_start + 2; // Skip "if"
                         while (cond_start2 < content.len and std.ascii.isWhitespace(content[cond_start2])) cond_start2 += 1;
