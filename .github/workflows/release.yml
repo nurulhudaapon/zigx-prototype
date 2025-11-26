@@ -56,6 +56,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-zig-release-
 
+      - name: Sync Template Files
+        run: bash tools/synctemplate
+
       - name: Build release binary
         run: zig build release-${{ matrix.target.name }}
 
