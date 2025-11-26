@@ -50,8 +50,8 @@ winget install -e --id zig.zig # Windows
     - [x] `for` nested
     - [x] `switch`
     - [x] `switch` nested
-    - [ ] `while`
-    - [ ] `while` nested
+    - [x] `while`
+    - [x] `while` nested
 - [x] Assets
     - [x] Copying
     - [x] Serving

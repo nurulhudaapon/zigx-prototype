@@ -69,6 +69,7 @@ test "for_if" {
 }
 test "for_for" {
     try test_transpile("control_flow/for_for");
+    try test_render(@import("./../data/control_flow/for_for.zig").Page);
 }
 test "for_switch" {
     try test_transpile("control_flow/for_switch");

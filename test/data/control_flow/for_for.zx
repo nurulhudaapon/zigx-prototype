@@ -1,10 +1,10 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const groups = [_]struct { name: []const u8, members: []const []const u8 }{
         .{ .name = "Team A", .members = &[_][]const u8{ "John", "Jane" } },
         .{ .name = "Team B", .members = &[_][]const u8{ "Jim", "Jill" } },
     };
     return (
-        <main @allocator={ctx.arena}>
+        <main @allocator={allocator}>
             {for (groups) |group| (
                 <div>
                     {for (group.members) |member| (<p>{member}</p>)}

@@ -7,8 +7,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
             .allocator = allocator,
             .children = blk: {
                 const __zx_children = _zx.getAllocator().alloc(zx.Component, user_names.len) catch unreachable;
-                for (user_names, 0..) |name, i| {
-                    __zx_children[i] = _zx.zx(
+                for (user_names, 0..) |name, _zx_i| {
+                    __zx_children[_zx_i] = _zx.zx(
                         .p,
                         .{
                             .children = &.{
@@ -31,8 +31,8 @@ pub fn StructCapture(allocator: zx.Allocator) zx.Component {
             .allocator = allocator,
             .children = blk: {
                 const __zx_children = _zx.getAllocator().alloc(zx.Component, users.len) catch unreachable;
-                for (users, 0..) |user, i| {
-                    __zx_children[i] = _zx.zx(
+                for (users, 0..) |user, _zx_i| {
+                    __zx_children[_zx_i] = _zx.zx(
                         .p,
                         .{
                             .children = &.{
@@ -57,8 +57,8 @@ pub fn StructCaptureToComponent(allocator: zx.Allocator) zx.Component {
             .allocator = allocator,
             .children = blk: {
                 const __zx_children = _zx.getAllocator().alloc(zx.Component, users.len) catch unreachable;
-                for (users, 0..) |user, i| {
-                    __zx_children[i] = _zx.lazy(UserComponent, .{ .name = user.name, .age = user.age });
+                for (users, 0..) |user, _zx_i| {
+                    __zx_children[_zx_i] = _zx.lazy(UserComponent, .{ .name = user.name, .age = user.age });
                 }
                 break :blk __zx_children;
             },

@@ -10,8 +10,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
             .children = switch (user_type) {
                 .admin => blk: {
                     const __zx_children = _zx.getAllocator().alloc(zx.Component, admin_users.len) catch unreachable;
-                    for (admin_users, 0..) |name, i| {
-                        __zx_children[i] = _zx.zx(
+                    for (admin_users, 0..) |name, _zx_i| {
+                        __zx_children[_zx_i] = _zx.zx(
                             .p,
                             .{
                                 .children = &.{
@@ -24,8 +24,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 },
                 .member => blk: {
                     const __zx_children = _zx.getAllocator().alloc(zx.Component, member_users.len) catch unreachable;
-                    for (member_users, 0..) |name, i| {
-                        __zx_children[i] = _zx.zx(
+                    for (member_users, 0..) |name, _zx_i| {
+                        __zx_children[_zx_i] = _zx.zx(
                             .p,
                             .{
                                 .children = &.{

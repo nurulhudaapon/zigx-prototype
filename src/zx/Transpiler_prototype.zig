@@ -1201,22 +1201,22 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             var else_elem: *ZXElement = undefined;
                             var if_parsed = false;
                             var else_parsed = false;
-                            
+
                             // Try to parse if branch
                             var if_trimmed = if_jsx_content;
                             while (if_trimmed.len > 0 and std.ascii.isWhitespace(if_trimmed[0])) if_trimmed = if_trimmed[1..];
-                            while (if_trimmed.len > 0 and std.ascii.isWhitespace(if_trimmed[if_trimmed.len - 1])) if_trimmed = if_trimmed[0..if_trimmed.len - 1];
-                            
+                            while (if_trimmed.len > 0 and std.ascii.isWhitespace(if_trimmed[if_trimmed.len - 1])) if_trimmed = if_trimmed[0 .. if_trimmed.len - 1];
+
                             if (std.mem.startsWith(u8, if_trimmed, "switch")) {
                                 // If branch contains a switch expression, parse it directly and create a fragment with switch_expr child
                                 // Parse the switch expression from the content
                                 var switch_parsed = true;
                                 var switch_expr_str = if_trimmed;
-                                
+
                                 // Find opening paren after "switch"
                                 var switch_pos: usize = 6; // Skip "switch"
                                 while (switch_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos])) switch_pos += 1;
-                                
+
                                 if (switch_pos < switch_expr_str.len and switch_expr_str[switch_pos] == '(') {
                                     switch_pos += 1; // Skip opening paren
                                     // Find switch expression (text between ( and ))
@@ -1229,28 +1229,28 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                         if (switch_paren_depth2 > 0) switch_expr_end += 1;
                                     }
                                     const switch_expr = switch_expr_str[switch_expr_start..switch_expr_end];
-                                    
+
                                     // Skip closing paren and whitespace
                                     var brace_pos = switch_expr_end + 1;
                                     while (brace_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[brace_pos])) brace_pos += 1;
-                                    
+
                                     // Find opening brace
                                     if (brace_pos < switch_expr_str.len and switch_expr_str[brace_pos] == '{') {
                                         brace_pos += 1; // Skip opening brace
-                                        
+
                                         // Parse cases - reuse the switch parsing logic
                                         var cases = std.ArrayList(ZXElement.SwitchCase){};
                                         defer cases.deinit(allocator);
-                                        
+
                                         var case_start = brace_pos;
                                         while (case_start < switch_expr_str.len) {
                                             // Skip whitespace
                                             while (case_start < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[case_start])) case_start += 1;
                                             if (case_start >= switch_expr_str.len) break;
-                                            
+
                                             // Check for closing brace
                                             if (switch_expr_str[case_start] == '}') break;
-                                            
+
                                             // Parse pattern (e.g., ".admin")
                                             const pattern_start = case_start;
                                             var pattern_end = pattern_start;
@@ -1258,7 +1258,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 pattern_end += 1;
                                             }
                                             const pattern = switch_expr_str[pattern_start..pattern_end];
-                                            
+
                                             // Skip whitespace and =>
                                             var arrow_pos = pattern_end;
                                             while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
@@ -1268,15 +1268,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 switch_parsed = false;
                                                 break;
                                             }
-                                            
+
                                             // Skip whitespace after =>
                                             while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
-                                            
+
                                             // Parse value - check for JSX element: (<p>Admin</p>)
                                             if (arrow_pos < switch_expr_str.len and switch_expr_str[arrow_pos] == '(') {
                                                 arrow_pos += 1; // Skip opening paren
                                                 const value_start = arrow_pos;
-                                                
+
                                                 // JSX element: (<p>Admin</p>)
                                                 var jsx_paren_depth: i32 = 1;
                                                 var jsx_brace_depth: i32 = 0;
@@ -1289,7 +1289,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     if (jsx_paren_depth > 0) jsx_end += 1;
                                                 }
                                                 const jsx_content = switch_expr_str[value_start..jsx_end];
-                                                
+
                                                 if (parseJsx(allocator, jsx_content)) |jsx_elem| {
                                                     try cases.append(allocator, .{
                                                         .pattern = pattern,
@@ -1304,15 +1304,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 switch_parsed = false;
                                                 break;
                                             }
-                                            
+
                                             // Skip whitespace and comma if present
                                             while (arrow_pos < switch_expr_str.len and (std.ascii.isWhitespace(switch_expr_str[arrow_pos]) or switch_expr_str[arrow_pos] == ',')) {
                                                 arrow_pos += 1;
                                             }
-                                            
+
                                             case_start = arrow_pos;
                                         }
-                                        
+
                                         if (switch_parsed and cases.items.len > 0) {
                                             // Create fragment with switch_expr child
                                             var cases_owned = std.ArrayList(ZXElement.SwitchCase){};
@@ -1326,7 +1326,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                         }
                                     }
                                 }
-                                
+
                                 if (!if_parsed) {
                                     // Fallback: try to parse as JSX
                                     if (parseJsxOrFragment(allocator, if_jsx_content)) |parsed| {
@@ -1345,22 +1345,22 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                     if_parsed = false;
                                 }
                             }
-                            
+
                             // Try to parse else branch
                             var else_trimmed = else_jsx_content;
                             while (else_trimmed.len > 0 and std.ascii.isWhitespace(else_trimmed[0])) else_trimmed = else_trimmed[1..];
-                            while (else_trimmed.len > 0 and std.ascii.isWhitespace(else_trimmed[else_trimmed.len - 1])) else_trimmed = else_trimmed[0..else_trimmed.len - 1];
-                            
+                            while (else_trimmed.len > 0 and std.ascii.isWhitespace(else_trimmed[else_trimmed.len - 1])) else_trimmed = else_trimmed[0 .. else_trimmed.len - 1];
+
                             if (std.mem.startsWith(u8, else_trimmed, "switch")) {
                                 // Else branch contains a switch expression, parse it directly and create a fragment with switch_expr child
                                 // Parse the switch expression from the content (same logic as if branch)
                                 var switch_parsed = true;
                                 var switch_expr_str = else_trimmed;
-                                
+
                                 // Find opening paren after "switch"
                                 var switch_pos: usize = 6; // Skip "switch"
                                 while (switch_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos])) switch_pos += 1;
-                                
+
                                 if (switch_pos < switch_expr_str.len and switch_expr_str[switch_pos] == '(') {
                                     switch_pos += 1; // Skip opening paren
                                     // Find switch expression (text between ( and ))
@@ -1373,28 +1373,28 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                         if (switch_paren_depth2 > 0) switch_expr_end += 1;
                                     }
                                     const switch_expr = switch_expr_str[switch_expr_start..switch_expr_end];
-                                    
+
                                     // Skip closing paren and whitespace
                                     var brace_pos = switch_expr_end + 1;
                                     while (brace_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[brace_pos])) brace_pos += 1;
-                                    
+
                                     // Find opening brace
                                     if (brace_pos < switch_expr_str.len and switch_expr_str[brace_pos] == '{') {
                                         brace_pos += 1; // Skip opening brace
-                                        
+
                                         // Parse cases
                                         var cases = std.ArrayList(ZXElement.SwitchCase){};
                                         defer cases.deinit(allocator);
-                                        
+
                                         var case_start = brace_pos;
                                         while (case_start < switch_expr_str.len) {
                                             // Skip whitespace
                                             while (case_start < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[case_start])) case_start += 1;
                                             if (case_start >= switch_expr_str.len) break;
-                                            
+
                                             // Check for closing brace
                                             if (switch_expr_str[case_start] == '}') break;
-                                            
+
                                             // Parse pattern (e.g., ".admin")
                                             const pattern_start = case_start;
                                             var pattern_end = pattern_start;
@@ -1402,7 +1402,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 pattern_end += 1;
                                             }
                                             const pattern = switch_expr_str[pattern_start..pattern_end];
-                                            
+
                                             // Skip whitespace and =>
                                             var arrow_pos = pattern_end;
                                             while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
@@ -1412,15 +1412,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 switch_parsed = false;
                                                 break;
                                             }
-                                            
+
                                             // Skip whitespace after =>
                                             while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
-                                            
+
                                             // Parse value - check for JSX element: (<p>Admin</p>)
                                             if (arrow_pos < switch_expr_str.len and switch_expr_str[arrow_pos] == '(') {
                                                 arrow_pos += 1; // Skip opening paren
                                                 const value_start = arrow_pos;
-                                                
+
                                                 // JSX element: (<p>Admin</p>)
                                                 var jsx_paren_depth: i32 = 1;
                                                 var jsx_brace_depth: i32 = 0;
@@ -1433,7 +1433,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     if (jsx_paren_depth > 0) jsx_end += 1;
                                                 }
                                                 const jsx_content = switch_expr_str[value_start..jsx_end];
-                                                
+
                                                 if (parseJsx(allocator, jsx_content)) |jsx_elem| {
                                                     try cases.append(allocator, .{
                                                         .pattern = pattern,
@@ -1448,15 +1448,15 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 switch_parsed = false;
                                                 break;
                                             }
-                                            
+
                                             // Skip whitespace and comma if present
                                             while (arrow_pos < switch_expr_str.len and (std.ascii.isWhitespace(switch_expr_str[arrow_pos]) or switch_expr_str[arrow_pos] == ',')) {
                                                 arrow_pos += 1;
                                             }
-                                            
+
                                             case_start = arrow_pos;
                                         }
-                                        
+
                                         if (switch_parsed and cases.items.len > 0) {
                                             // Create fragment with switch_expr child
                                             var cases_owned = std.ArrayList(ZXElement.SwitchCase){};
@@ -1470,7 +1470,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                         }
                                     }
                                 }
-                                
+
                                 if (!else_parsed) {
                                     // Fallback: try to parse as JSX
                                     if (parseJsxOrFragment(allocator, else_jsx_content)) |parsed| {
@@ -1489,7 +1489,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                     else_parsed = false;
                                 }
                             }
-                            
+
                             if (if_parsed and else_parsed) {
                                 try parent.children.append(allocator, .{ .conditional_expr = .{
                                     .condition = condition,
@@ -2055,11 +2055,11 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                     // Parse switch expression from block content
                                     var switch_parsed_in_block = true;
                                     var switch_expr_str = block_content[switch_check_pos..];
-                                    
+
                                     // Find opening paren after "switch"
                                     var switch_pos_inner: usize = 6; // Skip "switch"
                                     while (switch_pos_inner < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos_inner])) switch_pos_inner += 1;
-                                    
+
                                     if (switch_pos_inner < switch_expr_str.len and switch_expr_str[switch_pos_inner] == '(') {
                                         switch_pos_inner += 1; // Skip opening paren
                                         // Find switch expression (text between ( and ))
@@ -2072,19 +2072,19 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                             if (switch_paren_depth_inner > 0) switch_expr_end_inner += 1;
                                         }
                                         const switch_expr_in_block = switch_expr_str[switch_expr_start_inner..switch_expr_end_inner];
-                                        
+
                                         // Skip closing paren and whitespace
                                         var switch_brace_pos_inner = switch_expr_end_inner + 1;
                                         while (switch_brace_pos_inner < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_brace_pos_inner])) switch_brace_pos_inner += 1;
-                                        
+
                                         // Find opening brace
                                         if (switch_brace_pos_inner < switch_expr_str.len and switch_expr_str[switch_brace_pos_inner] == '{') {
                                             switch_brace_pos_inner += 1; // Skip opening brace
-                                            
+
                                             // Parse cases manually
                                             var switch_cases = std.ArrayList(ZXElement.SwitchCase){};
                                             defer switch_cases.deinit(allocator);
-                                            
+
                                             // Extract the switch cases content (everything between the braces)
                                             const switch_case_start_inner = switch_brace_pos_inner;
                                             var switch_case_brace_depth_inner: i32 = 1;
@@ -2094,17 +2094,17 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                 if (switch_expr_str[switch_case_end_inner] == '}') switch_case_brace_depth_inner -= 1;
                                                 if (switch_case_brace_depth_inner > 0) switch_case_end_inner += 1;
                                             }
-                                            
+
                                             // Parse cases
                                             var case_start_inner = switch_brace_pos_inner;
                                             while (case_start_inner < switch_case_end_inner) {
                                                 // Skip whitespace
                                                 while (case_start_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_start_inner])) case_start_inner += 1;
                                                 if (case_start_inner >= switch_case_end_inner) break;
-                                                
+
                                                 // Check for closing brace
                                                 if (switch_expr_str[case_start_inner] == '}') break;
-                                                
+
                                                 // Parse pattern
                                                 const case_pattern_start_inner = case_start_inner;
                                                 var case_pattern_end_inner = case_pattern_start_inner;
@@ -2112,7 +2112,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     case_pattern_end_inner += 1;
                                                 }
                                                 const case_pattern_inner = switch_expr_str[case_pattern_start_inner..case_pattern_end_inner];
-                                                
+
                                                 // Skip whitespace and =>
                                                 var case_arrow_pos_inner = case_pattern_end_inner;
                                                 while (case_arrow_pos_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner])) case_arrow_pos_inner += 1;
@@ -2122,10 +2122,10 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     switch_parsed_in_block = false;
                                                     break;
                                                 }
-                                                
+
                                                 // Skip whitespace after =>
                                                 while (case_arrow_pos_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner])) case_arrow_pos_inner += 1;
-                                                
+
                                                 // Parse value - JSX element: (<p>...</p>)
                                                 if (case_arrow_pos_inner < switch_case_end_inner and switch_expr_str[case_arrow_pos_inner] == '(') {
                                                     case_arrow_pos_inner += 1; // Skip opening paren
@@ -2141,7 +2141,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                         if (case_jsx_paren_depth_inner > 0) case_jsx_end_inner += 1;
                                                     }
                                                     const case_jsx_content_inner = switch_expr_str[case_value_start_inner..case_jsx_end_inner];
-                                                    
+
                                                     if (parseJsx(allocator, case_jsx_content_inner)) |case_jsx_elem| {
                                                         try switch_cases.append(allocator, .{
                                                             .pattern = case_pattern_inner,
@@ -2156,20 +2156,20 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     switch_parsed_in_block = false;
                                                     break;
                                                 }
-                                                
+
                                                 // Skip whitespace and comma if present
                                                 while (case_arrow_pos_inner < switch_case_end_inner and (std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner]) or switch_expr_str[case_arrow_pos_inner] == ',')) {
                                                     case_arrow_pos_inner += 1;
                                                 }
-                                                
+
                                                 case_start_inner = case_arrow_pos_inner;
                                             }
-                                            
+
                                             if (switch_parsed_in_block and switch_cases.items.len > 0) {
                                                 // Create switch_expr_block
                                                 var switch_cases_owned = std.ArrayList(ZXElement.SwitchCase){};
                                                 try switch_cases_owned.appendSlice(allocator, switch_cases.items);
-                                                
+
                                                 try cases.append(allocator, .{
                                                     .pattern = pattern,
                                                     .value = .{ .switch_expr_block = .{
@@ -2575,11 +2575,12 @@ fn isCustomComponent(tag: []const u8) bool {
 
 /// Render JSX element as zx.zx() function call using tokens
 fn renderJsxAsTokens(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
-    try renderJsxAsTokensWithLoopContext(allocator, output, elem, indent, null, null, js_imports, client_components);
+    try renderJsxAsTokensWithLoopContext(allocator, output, elem, indent, null, null, 0, js_imports, client_components);
 }
 
 /// Render JSX element with optional loop context for variable substitution
-fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
+/// block_index: Used to generate unique labels (blk0, blk1, etc.) and variable names (__zx_children0, __zx_children1, etc.) for nested loops
+fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8, block_index: usize, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {
         // Check if this component has @rendering attribute (client-side rendering)
@@ -2806,9 +2807,17 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
         if (elem.children.items.len == 1 and elem.children.items[0] == .for_loop_expr) {
             const for_loop = elem.children.items[0].for_loop_expr;
 
+            // Generate unique label and variable names based on block_index
+            const blk_label = if (block_index == 0) "blk" else try std.fmt.allocPrint(allocator, "blk{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(blk_label);
+            const children_var = if (block_index == 0) "__zx_children" else try std.fmt.allocPrint(allocator, "__zx_children{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(children_var);
+            const index_var = if (block_index == 0) "_zx_i" else try std.fmt.allocPrint(allocator, "_zx_i{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(index_var);
+
             // Render the blk directly without &.{ ... } wrapper
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "blk");
+            try output.addToken(.identifier, blk_label);
             try output.addToken(.colon, ":");
             try output.addToken(.invalid, " ");
             try output.addToken(.l_brace, "{");
@@ -2818,7 +2827,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try addIndentTokens(output, indent + 3);
             try output.addToken(.keyword_const, "const");
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.invalid, " ");
             try output.addToken(.equal, "=");
             try output.addToken(.invalid, " ");
@@ -2863,7 +2872,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.identifier, for_loop.item_name);
             try output.addToken(.comma, ",");
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "i");
+            try output.addToken(.identifier, index_var);
             try output.addToken(.pipe, "|");
             try output.addToken(.invalid, " ");
             try output.addToken(.l_brace, "{");
@@ -2871,14 +2880,14 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 
             // __zx_children[i] = _zx.zx(...);
             try addIndentTokens(output, indent + 4);
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.l_bracket, "[");
-            try output.addToken(.identifier, "i");
+            try output.addToken(.identifier, index_var);
             try output.addToken(.r_bracket, "]");
             try output.addToken(.invalid, " ");
             try output.addToken(.equal, "=");
             try output.addToken(.invalid, " ");
-            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 4, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 4, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
             try output.addToken(.semicolon, ";");
             try output.addToken(.invalid, "\n");
 
@@ -2892,9 +2901,9 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.keyword_break, "break");
             try output.addToken(.invalid, " ");
             try output.addToken(.colon, ":");
-            try output.addToken(.identifier, "blk");
+            try output.addToken(.identifier, blk_label);
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.semicolon, ";");
             try output.addToken(.invalid, "\n");
 
@@ -2906,10 +2915,18 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
         } else if (elem.children.items.len == 1 and elem.children.items[0] == .while_loop_expr) {
             const while_loop = elem.children.items[0].while_loop_expr;
 
+            // Generate unique label and variable names based on block_index
+            const blk_label = if (block_index == 0) "blk" else try std.fmt.allocPrint(allocator, "blk{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(blk_label);
+            const children_var = if (block_index == 0) "__zx_children" else try std.fmt.allocPrint(allocator, "__zx_children{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(children_var);
+            const count_var = if (block_index == 0) "__zx_count" else try std.fmt.allocPrint(allocator, "__zx_count{d}", .{block_index});
+            defer if (block_index > 0) allocator.free(count_var);
+
             // Render the blk directly without &.{ ... } wrapper
             // Use a fixed-size array allocation with a reasonable maximum
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "blk");
+            try output.addToken(.identifier, blk_label);
             try output.addToken(.colon, ":");
             try output.addToken(.invalid, " ");
             try output.addToken(.l_brace, "{");
@@ -2919,7 +2936,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try addIndentTokens(output, indent + 3);
             try output.addToken(.keyword_var, "var");
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.identifier, count_var);
             try output.addToken(.invalid, " ");
             try output.addToken(.colon, ":");
             try output.addToken(.invalid, " ");
@@ -2935,7 +2952,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try addIndentTokens(output, indent + 3);
             try output.addToken(.keyword_const, "const");
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.invalid, " ");
             try output.addToken(.equal, "=");
             try output.addToken(.invalid, " ");
@@ -2980,20 +2997,20 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 
             // __zx_children[__zx_count] = _zx.zx(...);
             try addIndentTokens(output, indent + 4);
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.l_bracket, "[");
-            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.identifier, count_var);
             try output.addToken(.r_bracket, "]");
             try output.addToken(.invalid, " ");
             try output.addToken(.equal, "=");
             try output.addToken(.invalid, " ");
-            try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, js_imports, client_components);
+            try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, block_index + 1, js_imports, client_components);
             try output.addToken(.semicolon, ";");
             try output.addToken(.invalid, "\n");
 
             // __zx_count += 1;
             try addIndentTokens(output, indent + 4);
-            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.identifier, count_var);
             try output.addToken(.invalid, " ");
             try output.addToken(.plus, "+");
             try output.addToken(.equal, "=");
@@ -3012,14 +3029,14 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.keyword_break, "break");
             try output.addToken(.invalid, " ");
             try output.addToken(.colon, ":");
-            try output.addToken(.identifier, "blk");
+            try output.addToken(.identifier, blk_label);
             try output.addToken(.invalid, " ");
-            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.identifier, children_var);
             try output.addToken(.l_bracket, "[");
             try output.addToken(.identifier, "0");
             try output.addToken(.period, ".");
             try output.addToken(.period, ".");
-            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.identifier, count_var);
             try output.addToken(.r_bracket, "]");
             try output.addToken(.semicolon, ";");
             try output.addToken(.invalid, "\n");
@@ -3032,7 +3049,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
         } else if (elem.children.items.len == 1 and elem.children.items[0] == .switch_expr) {
             // Special case: if the only child is a switch_expr with all for_loop_block cases, assign it directly
             const switch_expr = elem.children.items[0].switch_expr;
-            
+
             // Check if all cases have for_loop_block values
             var all_for_loops = true;
             for (switch_expr.cases.items) |switch_case| {
@@ -3041,7 +3058,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     break;
                 }
             }
-            
+
             if (all_for_loops and switch_expr.cases.items.len > 0) {
                 // Render switch directly without &.{ ... } wrapper
                 try output.addToken(.invalid, " ");
@@ -3068,10 +3085,19 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     try output.addToken(.invalid, " ");
                     try output.addToken(.invalid, "=>");
                     try output.addToken(.invalid, " ");
-                    
+
                     // Render for_loop_block
                     const for_loop = switch_case.value.for_loop_block;
-                    try output.addToken(.identifier, "blk");
+
+                    // Generate unique label and variable names based on block_index
+                    const blk_label = if (block_index == 0) "blk" else try std.fmt.allocPrint(allocator, "blk{d}", .{block_index});
+                    defer if (block_index > 0) allocator.free(blk_label);
+                    const children_var = if (block_index == 0) "__zx_children" else try std.fmt.allocPrint(allocator, "__zx_children{d}", .{block_index});
+                    defer if (block_index > 0) allocator.free(children_var);
+                    const index_var = if (block_index == 0) "_zx_i" else try std.fmt.allocPrint(allocator, "_zx_i{d}", .{block_index});
+                    defer if (block_index > 0) allocator.free(index_var);
+
+                    try output.addToken(.identifier, blk_label);
                     try output.addToken(.colon, ":");
                     try output.addToken(.invalid, " ");
                     try output.addToken(.l_brace, "{");
@@ -3081,7 +3107,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     try addIndentTokens(output, indent + 4);
                     try output.addToken(.keyword_const, "const");
                     try output.addToken(.invalid, " ");
-                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.identifier, children_var);
                     try output.addToken(.invalid, " ");
                     try output.addToken(.equal, "=");
                     try output.addToken(.invalid, " ");
@@ -3126,7 +3152,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     try output.addToken(.identifier, for_loop.item_name);
                     try output.addToken(.comma, ",");
                     try output.addToken(.invalid, " ");
-                    try output.addToken(.identifier, "i");
+                    try output.addToken(.identifier, index_var);
                     try output.addToken(.pipe, "|");
                     try output.addToken(.invalid, " ");
                     try output.addToken(.l_brace, "{");
@@ -3134,14 +3160,14 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 
                     // __zx_children[i] = _zx.zx(...);
                     try addIndentTokens(output, indent + 5);
-                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.identifier, children_var);
                     try output.addToken(.l_bracket, "[");
-                    try output.addToken(.identifier, "i");
+                    try output.addToken(.identifier, index_var);
                     try output.addToken(.r_bracket, "]");
                     try output.addToken(.invalid, " ");
                     try output.addToken(.equal, "=");
                     try output.addToken(.invalid, " ");
-                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                     try output.addToken(.semicolon, ";");
                     try output.addToken(.invalid, "\n");
 
@@ -3155,9 +3181,9 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                     try output.addToken(.keyword_break, "break");
                     try output.addToken(.invalid, " ");
                     try output.addToken(.colon, ":");
-                    try output.addToken(.identifier, "blk");
+                    try output.addToken(.identifier, blk_label);
                     try output.addToken(.invalid, " ");
-                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.identifier, children_var);
                     try output.addToken(.semicolon, ";");
                     try output.addToken(.invalid, "\n");
 
@@ -3178,7 +3204,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                 try output.addToken(.period, ".");
                 try output.addToken(.l_brace, "{");
                 try output.addToken(.invalid, "\n");
-                
+
                 // Render switch inside array
                 try addIndentTokens(output, indent + 3);
                 try output.addToken(.invalid, "switch");
@@ -3219,7 +3245,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         },
                         .jsx_element => |jsx_elem| {
                             // JSX element: _zx.zx(.p, .{ ... })
-                            try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                         },
                         .conditional_expr => |cond| {
                             // Conditional expression: if (condition) <render if_branch> else <render else_branch>
@@ -3231,14 +3257,14 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.invalid, " ");
 
                             // Render if branch
-                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
 
                             try output.addToken(.invalid, " ");
                             try output.addToken(.keyword_else, "else");
                             try output.addToken(.invalid, " ");
 
                             // Render else branch
-                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                         },
                         .for_loop_block => |for_loop| {
                             // For loop block: blk: { const children = ...; for (...) { ... }; break :blk children; }
@@ -3312,7 +3338,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.invalid, " ");
                             try output.addToken(.equal, "=");
                             try output.addToken(.invalid, " ");
-                            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                             try output.addToken(.semicolon, ";");
                             try output.addToken(.invalid, "\n");
 
@@ -3347,22 +3373,22 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.l_brace, "{");
                             try output.addToken(.invalid, "\n");
 
-                                    for (switch_block.cases.items) |nested_switch_case| {
-                                        try addIndentTokens(output, indent + 5);
-                                        // Pattern (e.g., .admin)
-                                        if (nested_switch_case.pattern.len > 0 and nested_switch_case.pattern[0] == '.') {
-                                            try output.addToken(.period, ".");
-                                            if (nested_switch_case.pattern.len > 1) {
-                                                try output.addToken(.identifier, nested_switch_case.pattern[1..]);
-                                            }
-                                        } else {
-                                            try output.addToken(.identifier, nested_switch_case.pattern);
-                                        }
-                                        try output.addToken(.invalid, " ");
-                                        try output.addToken(.invalid, "=>");
-                                        try output.addToken(.invalid, " ");
+                            for (switch_block.cases.items) |nested_switch_case| {
+                                try addIndentTokens(output, indent + 5);
+                                // Pattern (e.g., .admin)
+                                if (nested_switch_case.pattern.len > 0 and nested_switch_case.pattern[0] == '.') {
+                                    try output.addToken(.period, ".");
+                                    if (nested_switch_case.pattern.len > 1) {
+                                        try output.addToken(.identifier, nested_switch_case.pattern[1..]);
+                                    }
+                                } else {
+                                    try output.addToken(.identifier, nested_switch_case.pattern);
+                                }
+                                try output.addToken(.invalid, " ");
+                                try output.addToken(.invalid, "=>");
+                                try output.addToken(.invalid, " ");
 
-                                        switch (nested_switch_case.value) {
+                                switch (nested_switch_case.value) {
                                     .string_literal => |str| {
                                         try output.addToken(.identifier, "_zx");
                                         try output.addToken(.period, ".");
@@ -3374,7 +3400,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.r_paren, ")");
                                     },
                                     .jsx_element => |jsx_elem| {
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .conditional_expr => |cond| {
                                         try output.addToken(.keyword_if, "if");
@@ -3382,11 +3408,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, cond.condition);
                                         try output.addToken(.r_paren, ")");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.keyword_else, "else");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .for_loop_block => |for_loop| {
                                         try output.addToken(.identifier, "blk");
@@ -3456,7 +3482,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.equal, "=");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                         try output.addToken(.semicolon, ";");
                                         try output.addToken(.invalid, "\n");
 
@@ -3497,7 +3523,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                 try output.addToken(.r_brace, "}");
                 try output.addToken(.comma, ",");
                 try output.addToken(.invalid, "\n");
-                
+
                 try addIndentTokens(output, indent + 2);
                 try output.addToken(.r_brace, "}");
                 try output.addToken(.comma, ",");
@@ -3631,7 +3657,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.r_paren, ")");
                                     },
                                     .jsx_element => |jsx_elem| {
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .conditional_expr => |cond2| {
                                         try output.addToken(.keyword_if, "if");
@@ -3639,11 +3665,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, cond2.condition);
                                         try output.addToken(.r_paren, ")");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.keyword_else, "else");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .for_loop_block => |for_loop| {
                                         try output.addToken(.identifier, "blk");
@@ -3713,7 +3739,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.equal, "=");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                         try output.addToken(.semicolon, ";");
                                         try output.addToken(.invalid, "\n");
 
@@ -3771,7 +3797,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.r_paren, ")");
                                                 },
                                                 .jsx_element => |jsx_elem| {
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                 },
                                                 .conditional_expr => |cond2| {
                                                     try output.addToken(.keyword_if, "if");
@@ -3779,11 +3805,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.invalid, cond2.condition);
                                                     try output.addToken(.r_paren, ")");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                     try output.addToken(.invalid, " ");
                                                     try output.addToken(.keyword_else, "else");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                 },
                                                 .for_loop_block => |for_loop| {
                                                     try output.addToken(.identifier, "blk");
@@ -3853,7 +3879,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.invalid, " ");
                                                     try output.addToken(.equal, "=");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                                     try output.addToken(.semicolon, ";");
                                                     try output.addToken(.invalid, "\n");
 
@@ -3894,7 +3920,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.r_brace, "}");
                             try output.addToken(.invalid, "\n");
                         } else {
-                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                         }
 
                         try output.addToken(.invalid, " ");
@@ -3940,7 +3966,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.r_paren, ")");
                                     },
                                     .jsx_element => |jsx_elem| {
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .conditional_expr => |cond2| {
                                         try output.addToken(.keyword_if, "if");
@@ -3948,11 +3974,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, cond2.condition);
                                         try output.addToken(.r_paren, ")");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.keyword_else, "else");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                                     },
                                     .for_loop_block => |for_loop| {
                                         try output.addToken(.identifier, "blk");
@@ -4022,7 +4048,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.invalid, " ");
                                         try output.addToken(.equal, "=");
                                         try output.addToken(.invalid, " ");
-                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                         try output.addToken(.semicolon, ";");
                                         try output.addToken(.invalid, "\n");
 
@@ -4080,7 +4106,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.r_paren, ")");
                                                 },
                                                 .jsx_element => |jsx_elem| {
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                 },
                                                 .conditional_expr => |cond3| {
                                                     try output.addToken(.keyword_if, "if");
@@ -4088,11 +4114,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.invalid, cond3.condition);
                                                     try output.addToken(.r_paren, ")");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                     try output.addToken(.invalid, " ");
                                                     try output.addToken(.keyword_else, "else");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                 },
                                                 .for_loop_block => |for_loop| {
                                                     try output.addToken(.identifier, "blk");
@@ -4162,7 +4188,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                     try output.addToken(.invalid, " ");
                                                     try output.addToken(.equal, "=");
                                                     try output.addToken(.invalid, " ");
-                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                                     try output.addToken(.semicolon, ";");
                                                     try output.addToken(.invalid, "\n");
 
@@ -4203,7 +4229,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try output.addToken(.r_brace, "}");
                             try output.addToken(.invalid, "\n");
                         } else {
-                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                         }
 
                         try output.addToken(.comma, ",");
@@ -4282,7 +4308,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.invalid, " ");
                         try output.addToken(.equal, "=");
                         try output.addToken(.invalid, " ");
-                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                         try output.addToken(.semicolon, ";");
                         try output.addToken(.invalid, "\n");
 
@@ -4389,7 +4415,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.invalid, " ");
                         try output.addToken(.equal, "=");
                         try output.addToken(.invalid, " ");
-                        try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, js_imports, client_components);
+                        try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, block_index + 1, js_imports, client_components);
                         try output.addToken(.semicolon, ";");
                         try output.addToken(.invalid, "\n");
 
@@ -4474,7 +4500,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                 },
                                 .jsx_element => |jsx_elem| {
                                     // JSX element: _zx.zx(.p, .{ ... })
-                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                 },
                                 .conditional_expr => |cond| {
                                     // Conditional expression: if (condition) <render if_branch> else <render else_branch>
@@ -4486,14 +4512,14 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                     try output.addToken(.invalid, " ");
 
                                     // Render if branch
-                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
 
                                     try output.addToken(.invalid, " ");
                                     try output.addToken(.keyword_else, "else");
                                     try output.addToken(.invalid, " ");
 
                                     // Render else branch
-                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, block_index, js_imports, client_components);
                                 },
                                 .for_loop_block => |for_loop| {
                                     // For loop block: blk: { const children = ...; for (...) { ... }; break :blk children; }
@@ -4567,7 +4593,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                     try output.addToken(.invalid, " ");
                                     try output.addToken(.equal, "=");
                                     try output.addToken(.invalid, " ");
-                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                     try output.addToken(.semicolon, ";");
                                     try output.addToken(.invalid, "\n");
 
@@ -4628,7 +4654,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                 try output.addToken(.r_paren, ")");
                                             },
                                             .jsx_element => |jsx_elem| {
-                                                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                             },
                                             .conditional_expr => |cond3| {
                                                 try output.addToken(.keyword_if, "if");
@@ -4636,11 +4662,11 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                 try output.addToken(.invalid, cond3.condition);
                                                 try output.addToken(.r_paren, ")");
                                                 try output.addToken(.invalid, " ");
-                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                                 try output.addToken(.invalid, " ");
                                                 try output.addToken(.keyword_else, "else");
                                                 try output.addToken(.invalid, " ");
-                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 5, loop_iterable, loop_item, block_index, js_imports, client_components);
                                             },
                                             .for_loop_block => |for_loop| {
                                                 try output.addToken(.identifier, "blk");
@@ -4710,7 +4736,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                                 try output.addToken(.invalid, " ");
                                                 try output.addToken(.equal, "=");
                                                 try output.addToken(.invalid, " ");
-                                                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                                                 try output.addToken(.semicolon, ";");
                                                 try output.addToken(.invalid, "\n");
 
@@ -4833,7 +4859,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         } else {
                             // Not a custom component, render normally
                             // Use _zx.zx(.tag, .{ ... }) for nested elements - recursively call with loop context
-                            try renderJsxAsTokensWithLoopContext(allocator, output, child_elem, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                            try renderJsxAsTokensWithLoopContext(allocator, output, child_elem, indent + 3, loop_iterable, loop_item, block_index, js_imports, client_components);
                             try output.addToken(.comma, ",");
                             try output.addToken(.invalid, "\n");
                             continue;
@@ -4895,7 +4921,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 }
 
 /// Render nested elements recursively using _zx.zx() calls
-fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, switch_expr: @TypeOf(@as(ZXElement.Child, undefined).switch_expr), indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
+fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, switch_expr: @TypeOf(@as(ZXElement.Child, undefined).switch_expr), indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8, block_index: usize, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
     // Switch expression: {switch (expr) { case => value, ... }}
     // Render as: switch (expr) { case => value, ... }
     try output.addToken(.invalid, "switch");
@@ -4934,7 +4960,7 @@ fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, s
                 try output.addToken(.r_paren, ")");
             },
             .jsx_element => |jsx_elem| {
-                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent, loop_iterable, loop_item, js_imports, client_components);
+                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent, loop_iterable, loop_item, block_index, js_imports, client_components);
             },
             .conditional_expr => |cond| {
                 try output.addToken(.keyword_if, "if");
@@ -4942,14 +4968,22 @@ fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, s
                 try output.addToken(.invalid, cond.condition);
                 try output.addToken(.r_paren, ")");
                 try output.addToken(.invalid, " ");
-                try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent, loop_iterable, loop_item, js_imports, client_components);
+                try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent, loop_iterable, loop_item, block_index, js_imports, client_components);
                 try output.addToken(.invalid, " ");
                 try output.addToken(.keyword_else, "else");
                 try output.addToken(.invalid, " ");
-                try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent, loop_iterable, loop_item, js_imports, client_components);
+                try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent, loop_iterable, loop_item, block_index, js_imports, client_components);
             },
             .for_loop_block => |for_loop| {
-                try output.addToken(.identifier, "blk");
+                // Generate unique label and variable names based on block_index
+                const blk_label = if (block_index == 0) "blk" else try std.fmt.allocPrint(allocator, "blk{d}", .{block_index});
+                defer if (block_index > 0) allocator.free(blk_label);
+                const children_var = if (block_index == 0) "__zx_children" else try std.fmt.allocPrint(allocator, "__zx_children{d}", .{block_index});
+                defer if (block_index > 0) allocator.free(children_var);
+                const index_var = if (block_index == 0) "_zx_i" else try std.fmt.allocPrint(allocator, "_zx_i{d}", .{block_index});
+                defer if (block_index > 0) allocator.free(index_var);
+
+                try output.addToken(.identifier, blk_label);
                 try output.addToken(.colon, ":");
                 try output.addToken(.invalid, " ");
                 try output.addToken(.l_brace, "{");
@@ -4958,7 +4992,7 @@ fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, s
                 try addIndentTokens(output, indent + 1);
                 try output.addToken(.keyword_const, "const");
                 try output.addToken(.invalid, " ");
-                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.identifier, children_var);
                 try output.addToken(.invalid, " ");
                 try output.addToken(.equal, "=");
                 try output.addToken(.invalid, " ");
@@ -5002,21 +5036,21 @@ fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, s
                 try output.addToken(.identifier, for_loop.item_name);
                 try output.addToken(.comma, ",");
                 try output.addToken(.invalid, " ");
-                try output.addToken(.identifier, "i");
+                try output.addToken(.identifier, index_var);
                 try output.addToken(.pipe, "|");
                 try output.addToken(.invalid, " ");
                 try output.addToken(.l_brace, "{");
                 try output.addToken(.invalid, "\n");
 
                 try addIndentTokens(output, indent + 2);
-                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.identifier, children_var);
                 try output.addToken(.l_bracket, "[");
-                try output.addToken(.identifier, "i");
+                try output.addToken(.identifier, index_var);
                 try output.addToken(.r_bracket, "]");
                 try output.addToken(.invalid, " ");
                 try output.addToken(.equal, "=");
                 try output.addToken(.invalid, " ");
-                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 2, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 2, for_loop.iterable, for_loop.item_name, block_index + 1, js_imports, client_components);
                 try output.addToken(.semicolon, ";");
                 try output.addToken(.invalid, "\n");
 
@@ -5028,9 +5062,9 @@ fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, s
                 try output.addToken(.keyword_break, "break");
                 try output.addToken(.invalid, " ");
                 try output.addToken(.colon, ":");
-                try output.addToken(.identifier, "blk");
+                try output.addToken(.identifier, blk_label);
                 try output.addToken(.invalid, " ");
-                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.identifier, children_var);
                 try output.addToken(.semicolon, ";");
                 try output.addToken(.invalid, "\n");
 

@@ -11,8 +11,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
             .allocator = allocator,
             .children = blk: {
                 const __zx_children = _zx.getAllocator().alloc(zx.Component, users.len) catch unreachable;
-                for (users, 0..) |user, i| {
-                    __zx_children[i] = _zx.zx(
+                for (users, 0..) |user, _zx_i| {
+                    __zx_children[_zx_i] = _zx.zx(
                         .div,
                         .{
                             .children = &.{
