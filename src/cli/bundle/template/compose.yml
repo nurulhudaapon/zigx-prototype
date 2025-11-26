@@ -1,0 +1,10 @@
+name: "$BIN_NAME"
+services:
+  $BIN_NAME:
+    build:
+      context: ./../
+      dockerfile: ./bundle/Dockerfile
+    container_name: "$BIN_NAME"
+    ports:
+      - "$PORT:$PORT"
+    restart: unless-stopped

@@ -3,8 +3,8 @@
 zig-out
 
 # ZX
-dist
-bundle
+/dist
+/bundle
 
 # Node.js
 node_modules

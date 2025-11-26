@@ -1,11 +1,16 @@
+# Zig
 .zig-cache
 zig-out
-.zx
-tmp
+
+# ZX
 dist
-site/public/index.js
-test/data/assets/main.js
-test/data/assets/main.wasm
+/bundle
+
+# Node.js
 node_modules
+
+# Project Specific
 packages/transformjs
-bundle
+site/.zx
+tmp
+test/data/assets/
