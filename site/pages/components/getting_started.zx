@@ -1,0 +1,61 @@
+pub fn GettingStarted(allocator: zx.Allocator) zx.Component {
+    return (
+        <section id="getting-started" class="section" @allocator={allocator}>
+            <h2>Getting Started</h2>
+
+            <h3>Installation</h3>
+            <p>Install the ZX CLI tool to get started with building ZX applications.</p>
+
+            <Installation />
+
+            <h3>Creating a New Project</h3>
+            <p>
+                Create a new folder for your project, navigate into it, and run <code>zx init</code>:
+            </p>
+            <pre><code class="language-bash">mkdir my-project
+cd my-project
+zx init</code></pre>
+            <p>
+                Make sure to run <code>zx init</code> inside a clean project folder. After running the command, you'll see:
+            </p>
+            <pre><code class="language-bash">○ Initializing ZX project!  Template: default
+
+  + .vscode/extensions.json
+  + build.zig.zon
+  + build.zig
+  + README.md
+  + site/assets/style.css
+  + site/main.zig
+  + site/pages/about/page.zx
+  + site/pages/layout.zx
+  + site/pages/page.zx
+  + src/root.zig
+  + .gitignore
+
+Now run → 
+
+zig build serve</code></pre>
+            <p>
+                Then run the development server:
+            </p>
+            <pre><code class="language-bash">zig build serve</code></pre>
+            <p>
+                You'll see the server start:
+            </p>
+            <pre><code class="language-bash">ZX · 0.0.1-dev.90
+  - Local: http://localhost:3000</code></pre>
+
+            <h3 id="editor-setup">Editor Setup</h3>
+            <p>
+                Enhance your development experience with the official ZX extension for VSCode and Cursor. The
+                extension provides syntax highlighting, code completion, and other helpful features for working with
+                <code>.zx</code> files. Install it from <a href="https://open-vsx.org/extension/nurulhudaapon/zx"
+                    target="_blank" rel="noopener noreferrer">Open VSX</a>.
+            </p>
+        </section>
+    );
+}
+
+const Installation = @import("installation.zig").Installation;
+const zx = @import("zx");
+

@@ -9,10 +9,6 @@ pub const routes = [_]zx.App.Meta.Route{
         .page = @import(".zx/pages/about/page.zig").Page,
     },
     .{
-        .path = "/about/:id",
-        .page = @import(".zx/pages/about/[id]/page.zig").Page,
-    },
-    .{
         .path = "/docs",
         .page = @import(".zx/pages/docs/page.zig").Page,
         .layout = @import(".zx/pages/docs/layout.zig").Layout,

@@ -1,0 +1,25 @@
+pub fn Installation(allocator: zx.Allocator) zx.Component {
+    return (
+        <div @allocator={allocator}>
+            <div class="cli-install-section">
+                <h3 id="install-linux-macos">Linux/macOS</h3>
+                <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | bash</code></pre>
+            </div>
+            
+            <div class="cli-install-section">
+                <h3 id="install-windows">Windows</h3>
+                <pre><code class="language-powershell">powershell -c "irm ziex.dev/install.ps1 | iex"</code></pre>
+            </div>
+            
+            <div class="cli-install-section">
+                <h3 id="install-zig">Installing Zig</h3>
+                <pre><code class="language-bash">brew install zig # macOS
+winget install -e --id zig.zig # Windows</code></pre>
+                <p><a href="https://ziglang.org/learn/getting-started/" target="_blank" rel="noopener noreferrer">See for other platforms →</a></p>
+            </div>
+        </div>
+    );
+}
+
+const zx = @import("zx");
+

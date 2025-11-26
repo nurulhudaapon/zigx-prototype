@@ -1,0 +1,24 @@
+pub fn ExamplesSection(allocator: zx.Allocator) zx.Component {
+    return (
+        <section id="examples" class="section" @allocator={allocator}>
+            <h2>Examples</h2>
+            <ul>
+                <li>
+                    <strong>This Documentation Site: </strong>
+                    <a href="https://ziex.dev" target="_blank" rel="noopener noreferrer">Live</a> |
+                    <a href="https://github.com/nurulhudaapon/zx/tree/main/site" target="_blank"
+                        rel="noopener noreferrer">Source</a>
+                </li>
+                <li>
+                    <strong>A Portfolio Site with Blog: </strong>
+                    <a href="https://zigx.nuhu.dev" target="_blank" rel="noopener noreferrer">Live</a> |
+                    <a href="https://github.com/nurulhudaapon/zx-example-portfolio" target="_blank"
+                        rel="noopener noreferrer">Source</a>
+                </li>
+            </ul>
+        </section>
+    );
+}
+
+const zx = @import("zx");
+

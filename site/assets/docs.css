@@ -426,7 +426,210 @@ body {
     margin-left: 0;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 3rem 2rem;
+}
+
+/* CLI Command Cards */
+.cli-command {
+    background: var(--nav-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    transition: all 0.2s ease;
+    scroll-margin-top: 2rem;
+}
+
+.cli-command:hover {
+    border-color: var(--link-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .cli-command:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.cli-command-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cli-command-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--link-color);
+    margin: 0;
+}
+
+.cli-command-syntax {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--subtitle-color);
+    background: var(--code-bg);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid var(--code-border);
+    margin: 0;
+}
+
+.cli-command-description {
+    color: var(--text-color);
+    margin-bottom: 1.5rem;
+    line-height: 1.7;
+    font-size: 1rem;
+}
+
+.cli-command-section {
+    margin-top: 1.5rem;
+}
+
+.cli-command-section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--subtitle-color);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cli-command-section-title::before {
+    content: '';
+    width: 3px;
+    height: 1rem;
+    background: var(--link-color);
+    border-radius: 2px;
+}
+
+.cli-flag-list,
+.cli-arg-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cli-flag-item,
+.cli-arg-item {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    border-left: 3px solid var(--link-color);
+}
+
+.cli-flag-name,
+.cli-arg-name {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--link-color);
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.cli-flag-desc,
+.cli-arg-desc {
+    color: var(--text-color);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.cli-flag-options {
+    margin-top: 0.5rem;
+    padding-left: 1.25rem;
+    list-style: none;
+}
+
+.cli-flag-options li {
+    margin-bottom: 0.25rem;
+    color: var(--subtitle-color);
+    font-size: 0.875rem;
+}
+
+.cli-flag-options code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--link-color);
+    font-weight: 500;
+}
+
+.cli-example-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--subtitle-color);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cli-note {
+    padding: 1rem 1.25rem;
+    background: var(--code-bg);
+    border-left: 3px solid var(--link-color);
+    border-radius: 4px;
+    margin-top: 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.cli-note strong {
+    color: var(--link-color);
+    font-weight: 600;
+}
+
+.cli-install-section {
+    margin-bottom: 1.5rem;
+}
+
+.cli-install-section h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.cli-install-section pre {
+    margin: 0;
+}
+
+/* Improve main content spacing for CLI */
+.cli-content h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.cli-content > p {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: var(--subtitle-color);
+    margin-bottom: 3rem;
+}
+
+.cli-content h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-color);
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.cli-content h2:first-of-type {
+    margin-top: 0;
 }
 
 .section {
@@ -1336,5 +1539,55 @@ code[class*="language-"] {
     
     .section h4 {
         font-size: 1rem;
+    }
+    
+    /* CLI responsive styles */
+    .cli-content {
+        padding: 2rem 1.5rem;
+    }
+    
+    .cli-command {
+        padding: 1.75rem;
+    }
+    
+    .cli-content h1 {
+        font-size: 2rem;
+    }
+    
+    .cli-content h2 {
+        font-size: 1.5rem;
+    }
+    
+    .cli-command {
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .cli-command-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .cli-command-name {
+        font-size: 1.25rem;
+    }
+    
+    .cli-command-syntax {
+        font-size: 0.8125rem;
+        width: 100%;
+        overflow-x: auto;
+    }
+    
+    
+    .cli-flag-item,
+    .cli-arg-item {
+        padding: 0.625rem 0.75rem;
+    }
+    
+    .cli-flag-name,
+    .cli-arg-name {
+        font-size: 0.8125rem;
+        word-break: break-all;
     }
 }

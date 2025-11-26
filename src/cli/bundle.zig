@@ -150,8 +150,6 @@ fn bundle(ctx: zli.CommandContext) !void {
     } else {
         std.debug.print("\nNow run → \n\n\x1b[36m(cd {s} && ./{s} --rootdir ./)\x1b[0m\n\n", .{ outdir, bin_name });
     }
-
-    std.debug.print("\n", .{});
 }
 
 const std = @import("std");

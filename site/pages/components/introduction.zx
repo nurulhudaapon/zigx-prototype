@@ -1,0 +1,16 @@
+pub fn Introduction(allocator: zx.Allocator) zx.Component {
+    return (
+        <section id="introduction" class="section" @allocator={allocator}>
+            <h2>Introduction</h2>
+            <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
+                components using familiar JSX patterns, transpiled to efficient Zig code.</p>
+            <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
+                fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
+                <em>Currently 120X faster than Next.js at SSR</em>.
+            </p>
+        </section>
+    );
+}
+
+const zx = @import("zx");
+

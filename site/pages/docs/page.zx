@@ -88,73 +88,8 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
 
     return (
         <div @allocator={allocator}>
-            <section id="introduction" class="section">
-                <h2>Introduction</h2>
-                <p>ZX is a Zig library for building web applications with JSX-like syntax. Write declarative UI
-                    components using familiar JSX patterns, transpiled to efficient Zig code.</p>
-                <p>ZX combines the power and performance of Zig with the expressiveness of JSX, enabling you to build
-                    fast, type-safe web applications. ZX is significantly faster than frameworks like Next.js at SSR.
-                    <em>Currently 120X faster than Next.js at SSR</em>.
-                </p>
-            </section>
-        
-            <section id="getting-started" class="section">
-                        <h2>Getting Started</h2>
-        
-                        <h3>Installation</h3>
-                        <p>Install the ZX CLI tool to get started with building ZX applications.</p>
-        
-                        <h4>Linux/macOS</h4>
-                        <pre><code class="language-bash">curl -fsSL https://ziex.dev/install | bash</code></pre>
-        
-                        <h4>Windows</h4>
-                        <pre><code class="language-powershell">powershell -c "irm ziex.dev/install.ps1 | iex"</code></pre>
-        
-                        <h3>Creating a New Project</h3>
-                        <p>
-                            Create a new folder for your project, navigate into it, and run <code>zx init</code>:
-                        </p>
-                        <pre><code class="language-bash">mkdir my-project
-cd my-project
-zx init</code></pre>
-                        <p>
-                            Make sure to run <code>zx init</code> inside a clean project folder. After running the command, you'll see:
-                        </p>
-                        <pre><code class="language-bash">○ Initializing ZX project!  Template: default
-
-  + .vscode/extensions.json
-  + build.zig.zon
-  + build.zig
-  + README.md
-  + site/assets/style.css
-  + site/main.zig
-  + site/pages/about/page.zx
-  + site/pages/layout.zx
-  + site/pages/page.zx
-  + src/root.zig
-  + .gitignore
-
-Now run → 
-
-zig build serve</code></pre>
-                        <p>
-                            Then run the development server:
-                        </p>
-                        <pre><code class="language-bash">zig build serve</code></pre>
-                        <p>
-                            You'll see the server start:
-                        </p>
-                        <pre><code class="language-bash">ZX · 0.0.1-dev.90
-  - Local: http://localhost:3000</code></pre>
-        
-                        <h3 id="editor-setup">Editor Setup</h3>
-                        <p>
-                            Enhance your development experience with the official ZX extension for VSCode and Cursor. The
-                            extension provides syntax highlighting, code completion, and other helpful features for working with
-                            <code>.zx</code> files. Install it from <a href="https://open-vsx.org/extension/nurulhudaapon/zx"
-                                target="_blank" rel="noopener noreferrer">Open VSX</a>.
-                        </p>
-                    </section>
+            <Introduction />
+            <GettingStarted />
         
         
         
@@ -332,105 +267,15 @@ zig build serve</code></pre>
                         </ul>
                     </section>
         
-                    <section id="examples" class="section">
-                        <h2>Examples</h2>
-                        <ul>
-                            <li>
-                                <strong>This Documentation Site: </strong>
-                                <a href="https://ziex.dev" target="_blank" rel="noopener noreferrer">Live</a> |
-                                <a href="https://github.com/nurulhudaapon/zx/tree/main/site" target="_blank"
-                                    rel="noopener noreferrer">Source</a>
-                            </li>
-                            <li>
-                                <strong>A Portfolio Site with Blog: </strong>
-                                <a href="https://zigx.nuhu.dev" target="_blank" rel="noopener noreferrer">Live</a> |
-                                <a href="https://github.com/nurulhudaapon/zx-example-portfolio" target="_blank"
-                                    rel="noopener noreferrer">Source</a>
-                            </li>
-                        </ul>
-                    </section>
+            <ExamplesSection />
         </div>
 
-    );
-}
-
-const ExampleBlockProps = struct {
-    id: []const u8,
-    zx_code: []const u8,
-    zig_code: []const u8,
-    html_code: []const u8,
-};
-
-fn ExampleBlock(allocator: zx.Allocator, props: ExampleBlockProps) zx.Component {
-    // Extract and truncate ZX code
-    const zx_return_content = util.extractZxReturnContent(allocator, props.zx_code);
-    const truncated_zx_code = util.removeCommonIndentation(allocator, zx_return_content);
-    const escaped_full_zx = props.zx_code;
-
-    // Extract and truncate Zig code
-    const zig_return_content = util.extractZigReturnContent(allocator, props.zig_code);
-    const truncated_zig_code = util.removeCommonIndentation(allocator, zig_return_content);
-    const escaped_full_zig = props.zig_code;
-
-    // Wrap HTML with dark mode styles for iframe
-    const dark_mode_style = 
-        \\<style>
-        \\  * { color-scheme: light dark; }
-        \\  @media (prefers-color-scheme: dark) {
-        \\    body { background: #1a1a1a !important; color: #e0e0e0 !important; }
-        \\    * { color: #e0e0e0 !important; }
-        \\    p, div, span, h1, h2, h3, h4, h5, h6 { color: #e0e0e0 !important; }
-        \\  }
-        \\</style>
-    ;
-    const html_with_style = std.fmt.allocPrint(allocator, "{s}{s}", .{ dark_mode_style, props.html_code }) catch unreachable;
-
-    const preview_id = std.fmt.allocPrint(allocator, "tab-{s}-preview", .{props.id}) catch unreachable;
-    const html_id = std.fmt.allocPrint(allocator, "tab-{s}-html", .{props.id}) catch unreachable;
-    const zig_id = std.fmt.allocPrint(allocator, "tab-{s}-zig", .{props.id}) catch unreachable;
-    const name_id = std.fmt.allocPrint(allocator, "tab-{s}", .{props.id}) catch unreachable;
-    const preview_content_id = std.fmt.allocPrint(allocator, "tab-preview-{s}", .{props.id}) catch unreachable;
-    const html_content_id = std.fmt.allocPrint(allocator, "tab-html-{s}", .{props.id}) catch unreachable;
-    const zig_content_id = std.fmt.allocPrint(allocator, "tab-zig-{s}", .{props.id}) catch unreachable;
-    const zx_code_id = std.fmt.allocPrint(allocator, "zx-code-{s}", .{props.id}) catch unreachable;
-
-    return (
-        <div class="code-example" @allocator={allocator}>
-            <div class="example-code">
-                <span data-no-nav="true">ZX</span>
-                <pre><code id={zx_code_id} class="language-tsx" contenteditable="true" spellcheck="false" data-full-content={escaped_full_zx} data-truncated-content={truncated_zx_code} title="Click to view full code">{truncated_zx_code}</code></pre>
-            </div>
-            <div class="example-code">
-                <input type="radio" id={preview_id} name={name_id} class="tab-radio" checked>
-                <input type="radio" id={html_id} name={name_id} class="tab-radio">
-                <input type="radio" id={zig_id} name={name_id} class="tab-radio">
-                <div class="pane-header">
-                    <div class="tab-buttons">
-                        <label for={preview_id} class="tab-btn">Preview</label>
-                        <label for={html_id} class="tab-btn">HTML</label>
-                        <label for={zig_id} class="tab-btn">Zig</label>
-                    </div>
-                </div>
-                <div class="tab-content" id={preview_content_id}>
-                    <div class="preview-wrapper">
-                        <iframe class="preview-frame" srcdoc={html_with_style}></iframe>
-                    </div>
-                </div>
-                <div class="tab-content" id={html_content_id}>
-                    <div class="code-wrapper">
-                        <pre><code class="language-markup">{props.html_code}</code></pre>
-                    </div>
-                </div>
-                <div class="tab-content" id={zig_content_id}>
-                    <div class="code-wrapper">
-                        <pre><code class="language-zig" data-full-content={escaped_full_zig} data-truncated-content={truncated_zig_code}>{truncated_zig_code}</code></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
     );
 }
 
 const zx = @import("zx");
 const std = @import("std");
-const util = @import("util.zig");
+const Introduction = @import("../components/introduction.zig").Introduction;
+const GettingStarted = @import("../components/getting_started.zig").GettingStarted;
+const ExamplesSection = @import("../components/examples_section.zig").ExamplesSection;
+const ExampleBlock = @import("../components/example_block.zig").ExampleBlock;
