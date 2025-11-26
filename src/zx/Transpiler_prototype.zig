@@ -1144,21 +1144,317 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             const else_jsx_content = expr[else_start..else_end];
 
                             // Parse both JSX branches (wrap in fragment if needed)
-                            if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
-                                if (parseJsxOrFragment(allocator, else_jsx_content)) |else_elem| {
-                                    try parent.children.append(allocator, .{ .conditional_expr = .{
-                                        .condition = condition,
-                                        .if_branch = if_elem,
-                                        .else_branch = else_elem,
-                                    } });
-                                    continue;
+                            // Check if branches contain switch expressions
+                            var if_elem: *ZXElement = undefined;
+                            var else_elem: *ZXElement = undefined;
+                            var if_parsed = false;
+                            var else_parsed = false;
+                            
+                            // Try to parse if branch
+                            var if_trimmed = if_jsx_content;
+                            while (if_trimmed.len > 0 and std.ascii.isWhitespace(if_trimmed[0])) if_trimmed = if_trimmed[1..];
+                            while (if_trimmed.len > 0 and std.ascii.isWhitespace(if_trimmed[if_trimmed.len - 1])) if_trimmed = if_trimmed[0..if_trimmed.len - 1];
+                            
+                            if (std.mem.startsWith(u8, if_trimmed, "switch")) {
+                                // If branch contains a switch expression, parse it directly and create a fragment with switch_expr child
+                                // Parse the switch expression from the content
+                                var switch_parsed = true;
+                                var switch_expr_str = if_trimmed;
+                                
+                                // Find opening paren after "switch"
+                                var switch_pos: usize = 6; // Skip "switch"
+                                while (switch_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos])) switch_pos += 1;
+                                
+                                if (switch_pos < switch_expr_str.len and switch_expr_str[switch_pos] == '(') {
+                                    switch_pos += 1; // Skip opening paren
+                                    // Find switch expression (text between ( and ))
+                                    const switch_expr_start = switch_pos;
+                                    var switch_expr_end = switch_expr_start;
+                                    var switch_paren_depth2: i32 = 1;
+                                    while (switch_expr_end < switch_expr_str.len and switch_paren_depth2 > 0) {
+                                        if (switch_expr_str[switch_expr_end] == '(') switch_paren_depth2 += 1;
+                                        if (switch_expr_str[switch_expr_end] == ')') switch_paren_depth2 -= 1;
+                                        if (switch_paren_depth2 > 0) switch_expr_end += 1;
+                                    }
+                                    const switch_expr = switch_expr_str[switch_expr_start..switch_expr_end];
+                                    
+                                    // Skip closing paren and whitespace
+                                    var brace_pos = switch_expr_end + 1;
+                                    while (brace_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[brace_pos])) brace_pos += 1;
+                                    
+                                    // Find opening brace
+                                    if (brace_pos < switch_expr_str.len and switch_expr_str[brace_pos] == '{') {
+                                        brace_pos += 1; // Skip opening brace
+                                        
+                                        // Parse cases - reuse the switch parsing logic
+                                        var cases = std.ArrayList(ZXElement.SwitchCase){};
+                                        defer cases.deinit(allocator);
+                                        
+                                        var case_start = brace_pos;
+                                        while (case_start < switch_expr_str.len) {
+                                            // Skip whitespace
+                                            while (case_start < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[case_start])) case_start += 1;
+                                            if (case_start >= switch_expr_str.len) break;
+                                            
+                                            // Check for closing brace
+                                            if (switch_expr_str[case_start] == '}') break;
+                                            
+                                            // Parse pattern (e.g., ".admin")
+                                            const pattern_start = case_start;
+                                            var pattern_end = pattern_start;
+                                            while (pattern_end < switch_expr_str.len and switch_expr_str[pattern_end] != '=' and !std.ascii.isWhitespace(switch_expr_str[pattern_end])) {
+                                                pattern_end += 1;
+                                            }
+                                            const pattern = switch_expr_str[pattern_start..pattern_end];
+                                            
+                                            // Skip whitespace and =>
+                                            var arrow_pos = pattern_end;
+                                            while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
+                                            if (arrow_pos + 1 < switch_expr_str.len and switch_expr_str[arrow_pos] == '=' and switch_expr_str[arrow_pos + 1] == '>') {
+                                                arrow_pos += 2; // Skip =>
+                                            } else {
+                                                switch_parsed = false;
+                                                break;
+                                            }
+                                            
+                                            // Skip whitespace after =>
+                                            while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
+                                            
+                                            // Parse value - check for JSX element: (<p>Admin</p>)
+                                            if (arrow_pos < switch_expr_str.len and switch_expr_str[arrow_pos] == '(') {
+                                                arrow_pos += 1; // Skip opening paren
+                                                const value_start = arrow_pos;
+                                                
+                                                // JSX element: (<p>Admin</p>)
+                                                var jsx_paren_depth: i32 = 1;
+                                                var jsx_brace_depth: i32 = 0;
+                                                var jsx_end = arrow_pos;
+                                                while (jsx_end < switch_expr_str.len and jsx_paren_depth > 0) {
+                                                    if (switch_expr_str[jsx_end] == '(') jsx_paren_depth += 1;
+                                                    if (switch_expr_str[jsx_end] == ')') jsx_paren_depth -= 1;
+                                                    if (switch_expr_str[jsx_end] == '{') jsx_brace_depth += 1;
+                                                    if (switch_expr_str[jsx_end] == '}') jsx_brace_depth -= 1;
+                                                    if (jsx_paren_depth > 0) jsx_end += 1;
+                                                }
+                                                const jsx_content = switch_expr_str[value_start..jsx_end];
+                                                
+                                                if (parseJsx(allocator, jsx_content)) |jsx_elem| {
+                                                    try cases.append(allocator, .{
+                                                        .pattern = pattern,
+                                                        .value = .{ .jsx_element = jsx_elem },
+                                                    });
+                                                } else |_| {
+                                                    switch_parsed = false;
+                                                    break;
+                                                }
+                                                arrow_pos = jsx_end + 1; // Skip closing paren
+                                            } else {
+                                                switch_parsed = false;
+                                                break;
+                                            }
+                                            
+                                            // Skip whitespace and comma if present
+                                            while (arrow_pos < switch_expr_str.len and (std.ascii.isWhitespace(switch_expr_str[arrow_pos]) or switch_expr_str[arrow_pos] == ',')) {
+                                                arrow_pos += 1;
+                                            }
+                                            
+                                            case_start = arrow_pos;
+                                        }
+                                        
+                                        if (switch_parsed and cases.items.len > 0) {
+                                            // Create fragment with switch_expr child
+                                            var cases_owned = std.ArrayList(ZXElement.SwitchCase){};
+                                            try cases_owned.appendSlice(allocator, cases.items);
+                                            if_elem = try ZXElement.init(allocator, "fragment");
+                                            try if_elem.children.append(allocator, .{ .switch_expr = .{
+                                                .expr = switch_expr,
+                                                .cases = cases_owned,
+                                            } });
+                                            if_parsed = true;
+                                        }
+                                    }
+                                }
+                                
+                                if (!if_parsed) {
+                                    // Fallback: try to parse as JSX
+                                    if (parseJsxOrFragment(allocator, if_jsx_content)) |parsed| {
+                                        if_elem = parsed;
+                                        if_parsed = true;
+                                    } else |_| {
+                                        if_parsed = false;
+                                    }
+                                }
+                            } else {
+                                // Try to parse as JSX
+                                if (parseJsxOrFragment(allocator, if_jsx_content)) |parsed| {
+                                    if_elem = parsed;
+                                    if_parsed = true;
                                 } else |_| {
-                                    // Cleanup if branch on error
+                                    if_parsed = false;
+                                }
+                            }
+                            
+                            // Try to parse else branch
+                            var else_trimmed = else_jsx_content;
+                            while (else_trimmed.len > 0 and std.ascii.isWhitespace(else_trimmed[0])) else_trimmed = else_trimmed[1..];
+                            while (else_trimmed.len > 0 and std.ascii.isWhitespace(else_trimmed[else_trimmed.len - 1])) else_trimmed = else_trimmed[0..else_trimmed.len - 1];
+                            
+                            if (std.mem.startsWith(u8, else_trimmed, "switch")) {
+                                // Else branch contains a switch expression, parse it directly and create a fragment with switch_expr child
+                                // Parse the switch expression from the content (same logic as if branch)
+                                var switch_parsed = true;
+                                var switch_expr_str = else_trimmed;
+                                
+                                // Find opening paren after "switch"
+                                var switch_pos: usize = 6; // Skip "switch"
+                                while (switch_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos])) switch_pos += 1;
+                                
+                                if (switch_pos < switch_expr_str.len and switch_expr_str[switch_pos] == '(') {
+                                    switch_pos += 1; // Skip opening paren
+                                    // Find switch expression (text between ( and ))
+                                    const switch_expr_start = switch_pos;
+                                    var switch_expr_end = switch_expr_start;
+                                    var switch_paren_depth2: i32 = 1;
+                                    while (switch_expr_end < switch_expr_str.len and switch_paren_depth2 > 0) {
+                                        if (switch_expr_str[switch_expr_end] == '(') switch_paren_depth2 += 1;
+                                        if (switch_expr_str[switch_expr_end] == ')') switch_paren_depth2 -= 1;
+                                        if (switch_paren_depth2 > 0) switch_expr_end += 1;
+                                    }
+                                    const switch_expr = switch_expr_str[switch_expr_start..switch_expr_end];
+                                    
+                                    // Skip closing paren and whitespace
+                                    var brace_pos = switch_expr_end + 1;
+                                    while (brace_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[brace_pos])) brace_pos += 1;
+                                    
+                                    // Find opening brace
+                                    if (brace_pos < switch_expr_str.len and switch_expr_str[brace_pos] == '{') {
+                                        brace_pos += 1; // Skip opening brace
+                                        
+                                        // Parse cases
+                                        var cases = std.ArrayList(ZXElement.SwitchCase){};
+                                        defer cases.deinit(allocator);
+                                        
+                                        var case_start = brace_pos;
+                                        while (case_start < switch_expr_str.len) {
+                                            // Skip whitespace
+                                            while (case_start < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[case_start])) case_start += 1;
+                                            if (case_start >= switch_expr_str.len) break;
+                                            
+                                            // Check for closing brace
+                                            if (switch_expr_str[case_start] == '}') break;
+                                            
+                                            // Parse pattern (e.g., ".admin")
+                                            const pattern_start = case_start;
+                                            var pattern_end = pattern_start;
+                                            while (pattern_end < switch_expr_str.len and switch_expr_str[pattern_end] != '=' and !std.ascii.isWhitespace(switch_expr_str[pattern_end])) {
+                                                pattern_end += 1;
+                                            }
+                                            const pattern = switch_expr_str[pattern_start..pattern_end];
+                                            
+                                            // Skip whitespace and =>
+                                            var arrow_pos = pattern_end;
+                                            while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
+                                            if (arrow_pos + 1 < switch_expr_str.len and switch_expr_str[arrow_pos] == '=' and switch_expr_str[arrow_pos + 1] == '>') {
+                                                arrow_pos += 2; // Skip =>
+                                            } else {
+                                                switch_parsed = false;
+                                                break;
+                                            }
+                                            
+                                            // Skip whitespace after =>
+                                            while (arrow_pos < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[arrow_pos])) arrow_pos += 1;
+                                            
+                                            // Parse value - check for JSX element: (<p>Admin</p>)
+                                            if (arrow_pos < switch_expr_str.len and switch_expr_str[arrow_pos] == '(') {
+                                                arrow_pos += 1; // Skip opening paren
+                                                const value_start = arrow_pos;
+                                                
+                                                // JSX element: (<p>Admin</p>)
+                                                var jsx_paren_depth: i32 = 1;
+                                                var jsx_brace_depth: i32 = 0;
+                                                var jsx_end = arrow_pos;
+                                                while (jsx_end < switch_expr_str.len and jsx_paren_depth > 0) {
+                                                    if (switch_expr_str[jsx_end] == '(') jsx_paren_depth += 1;
+                                                    if (switch_expr_str[jsx_end] == ')') jsx_paren_depth -= 1;
+                                                    if (switch_expr_str[jsx_end] == '{') jsx_brace_depth += 1;
+                                                    if (switch_expr_str[jsx_end] == '}') jsx_brace_depth -= 1;
+                                                    if (jsx_paren_depth > 0) jsx_end += 1;
+                                                }
+                                                const jsx_content = switch_expr_str[value_start..jsx_end];
+                                                
+                                                if (parseJsx(allocator, jsx_content)) |jsx_elem| {
+                                                    try cases.append(allocator, .{
+                                                        .pattern = pattern,
+                                                        .value = .{ .jsx_element = jsx_elem },
+                                                    });
+                                                } else |_| {
+                                                    switch_parsed = false;
+                                                    break;
+                                                }
+                                                arrow_pos = jsx_end + 1; // Skip closing paren
+                                            } else {
+                                                switch_parsed = false;
+                                                break;
+                                            }
+                                            
+                                            // Skip whitespace and comma if present
+                                            while (arrow_pos < switch_expr_str.len and (std.ascii.isWhitespace(switch_expr_str[arrow_pos]) or switch_expr_str[arrow_pos] == ',')) {
+                                                arrow_pos += 1;
+                                            }
+                                            
+                                            case_start = arrow_pos;
+                                        }
+                                        
+                                        if (switch_parsed and cases.items.len > 0) {
+                                            // Create fragment with switch_expr child
+                                            var cases_owned = std.ArrayList(ZXElement.SwitchCase){};
+                                            try cases_owned.appendSlice(allocator, cases.items);
+                                            else_elem = try ZXElement.init(allocator, "fragment");
+                                            try else_elem.children.append(allocator, .{ .switch_expr = .{
+                                                .expr = switch_expr,
+                                                .cases = cases_owned,
+                                            } });
+                                            else_parsed = true;
+                                        }
+                                    }
+                                }
+                                
+                                if (!else_parsed) {
+                                    // Fallback: try to parse as JSX
+                                    if (parseJsxOrFragment(allocator, else_jsx_content)) |parsed| {
+                                        else_elem = parsed;
+                                        else_parsed = true;
+                                    } else |_| {
+                                        else_parsed = false;
+                                    }
+                                }
+                            } else {
+                                // Try to parse as JSX
+                                if (parseJsxOrFragment(allocator, else_jsx_content)) |parsed| {
+                                    else_elem = parsed;
+                                    else_parsed = true;
+                                } else |_| {
+                                    else_parsed = false;
+                                }
+                            }
+                            
+                            if (if_parsed and else_parsed) {
+                                try parent.children.append(allocator, .{ .conditional_expr = .{
+                                    .condition = condition,
+                                    .if_branch = if_elem,
+                                    .else_branch = else_elem,
+                                } });
+                                continue;
+                            } else {
+                                // Cleanup on error
+                                if (if_parsed) {
                                     if_elem.deinit();
                                     allocator.destroy(if_elem);
-                                    parsed_conditional = false;
                                 }
-                            } else |_| {
+                                if (else_parsed) {
+                                    else_elem.deinit();
+                                    allocator.destroy(else_elem);
+                                }
                                 parsed_conditional = false;
                             }
                         }
@@ -2724,15 +3020,321 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.r_paren, ")");
                         try output.addToken(.invalid, " ");
 
-                        // Render if branch
-                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                        // Render if branch - check if it's a fragment with a single switch expression
+                        if (std.mem.eql(u8, cond.if_branch.tag, "fragment") and cond.if_branch.children.items.len == 1 and cond.if_branch.children.items[0] == .switch_expr) {
+                            // Render switch directly without fragment wrapper - inline the switch rendering
+                            const switch_expr = cond.if_branch.children.items[0].switch_expr;
+                            try output.addToken(.invalid, "\n");
+                            try addIndentTokens(output, indent + 3);
+                            try output.addToken(.invalid, "switch");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, switch_expr.expr);
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                            for (switch_expr.cases.items) |switch_case| {
+                                try addIndentTokens(output, indent + 3);
+                                if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+                                    try output.addToken(.period, ".");
+                                    if (switch_case.pattern.len > 1) {
+                                        try output.addToken(.identifier, switch_case.pattern[1..]);
+                                    }
+                                } else {
+                                    try output.addToken(.identifier, switch_case.pattern);
+                                }
+                                try output.addToken(.invalid, " ");
+                                try output.addToken(.invalid, "=>");
+                                try output.addToken(.invalid, " ");
+
+                                switch (switch_case.value) {
+                                    .string_literal => |str| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "txt");
+                                        try output.addToken(.l_paren, "(");
+                                        const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                        defer allocator.free(str_buf);
+                                        try output.addToken(.string_literal, str_buf);
+                                        try output.addToken(.r_paren, ")");
+                                    },
+                                    .jsx_element => |jsx_elem| {
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .conditional_expr => |cond2| {
+                                        try output.addToken(.keyword_if, "if");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.invalid, cond2.condition);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_else, "else");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .for_loop_block => |for_loop| {
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_const, "const");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "getAllocator");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "alloc");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, "zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "Component");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "len");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_catch, "catch");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_unreachable, "unreachable");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_for, "for");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "0");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.identifier, for_loop.item_name);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 5);
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.l_bracket, "[");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.r_bracket, "]");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.r_brace, "}");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_break, "break");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 3);
+                                        try output.addToken(.r_brace, "}");
+                                    },
+                                }
+
+                                try output.addToken(.comma, ",");
+                                try output.addToken(.invalid, "\n");
+                            }
+
+                            try addIndentTokens(output, indent + 3);
+                            try output.addToken(.r_brace, "}");
+                            try output.addToken(.invalid, "\n");
+                        } else {
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                        }
 
                         try output.addToken(.invalid, " ");
                         try output.addToken(.keyword_else, "else");
                         try output.addToken(.invalid, " ");
 
-                        // Render else branch
-                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                        // Render else branch - check if it's a fragment with a single switch expression
+                        if (std.mem.eql(u8, cond.else_branch.tag, "fragment") and cond.else_branch.children.items.len == 1 and cond.else_branch.children.items[0] == .switch_expr) {
+                            // Render switch directly without fragment wrapper - inline the switch rendering
+                            const switch_expr = cond.else_branch.children.items[0].switch_expr;
+                            try output.addToken(.invalid, "switch");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, switch_expr.expr);
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                            for (switch_expr.cases.items) |switch_case| {
+                                try addIndentTokens(output, indent + 3);
+                                if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+                                    try output.addToken(.period, ".");
+                                    if (switch_case.pattern.len > 1) {
+                                        try output.addToken(.identifier, switch_case.pattern[1..]);
+                                    }
+                                } else {
+                                    try output.addToken(.identifier, switch_case.pattern);
+                                }
+                                try output.addToken(.invalid, " ");
+                                try output.addToken(.invalid, "=>");
+                                try output.addToken(.invalid, " ");
+
+                                switch (switch_case.value) {
+                                    .string_literal => |str| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "txt");
+                                        try output.addToken(.l_paren, "(");
+                                        const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                        defer allocator.free(str_buf);
+                                        try output.addToken(.string_literal, str_buf);
+                                        try output.addToken(.r_paren, ")");
+                                    },
+                                    .jsx_element => |jsx_elem| {
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .conditional_expr => |cond2| {
+                                        try output.addToken(.keyword_if, "if");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.invalid, cond2.condition);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_else, "else");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .for_loop_block => |for_loop| {
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_const, "const");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "getAllocator");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "alloc");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, "zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "Component");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "len");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_catch, "catch");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_unreachable, "unreachable");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_for, "for");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "0");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.identifier, for_loop.item_name);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 5);
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.l_bracket, "[");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.r_bracket, "]");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.r_brace, "}");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 4);
+                                        try output.addToken(.keyword_break, "break");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 3);
+                                        try output.addToken(.r_brace, "}");
+                                    },
+                                }
+
+                                try output.addToken(.comma, ",");
+                                try output.addToken(.invalid, "\n");
+                            }
+
+                            try addIndentTokens(output, indent + 3);
+                            try output.addToken(.r_brace, "}");
+                            try output.addToken(.invalid, "\n");
+                        } else {
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 3, loop_iterable, loop_item, js_imports, client_components);
+                        }
 
                         try output.addToken(.comma, ",");
                         try output.addToken(.invalid, "\n");
@@ -3149,6 +3751,158 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
 }
 
 /// Render nested elements recursively using _zx.zx() calls
+fn renderSwitchExpression(allocator: std.mem.Allocator, output: *TokenBuilder, switch_expr: @TypeOf(@as(ZXElement.Child, undefined).switch_expr), indent: usize, loop_iterable: ?[]const u8, loop_item: ?[]const u8, js_imports: *std.StringHashMap([]const u8), client_components: *std.ArrayList(ClientComponentMetadata)) !void {
+    // Switch expression: {switch (expr) { case => value, ... }}
+    // Render as: switch (expr) { case => value, ... }
+    try output.addToken(.invalid, "switch");
+    try output.addToken(.invalid, " ");
+    try output.addToken(.l_paren, "(");
+    try output.addToken(.identifier, switch_expr.expr);
+    try output.addToken(.r_paren, ")");
+    try output.addToken(.invalid, " ");
+    try output.addToken(.l_brace, "{");
+    try output.addToken(.invalid, "\n");
+
+    for (switch_expr.cases.items) |switch_case| {
+        try addIndentTokens(output, indent);
+        // Pattern (e.g., .admin)
+        if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+            try output.addToken(.period, ".");
+            if (switch_case.pattern.len > 1) {
+                try output.addToken(.identifier, switch_case.pattern[1..]);
+            }
+        } else {
+            try output.addToken(.identifier, switch_case.pattern);
+        }
+        try output.addToken(.invalid, " ");
+        try output.addToken(.invalid, "=>");
+        try output.addToken(.invalid, " ");
+
+        switch (switch_case.value) {
+            .string_literal => |str| {
+                try output.addToken(.identifier, "_zx");
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "txt");
+                try output.addToken(.l_paren, "(");
+                const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                defer allocator.free(str_buf);
+                try output.addToken(.string_literal, str_buf);
+                try output.addToken(.r_paren, ")");
+            },
+            .jsx_element => |jsx_elem| {
+                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent, loop_iterable, loop_item, js_imports, client_components);
+            },
+            .conditional_expr => |cond| {
+                try output.addToken(.keyword_if, "if");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.invalid, cond.condition);
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.invalid, " ");
+                try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent, loop_iterable, loop_item, js_imports, client_components);
+                try output.addToken(.invalid, " ");
+                try output.addToken(.keyword_else, "else");
+                try output.addToken(.invalid, " ");
+                try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent, loop_iterable, loop_item, js_imports, client_components);
+            },
+            .for_loop_block => |for_loop| {
+                try output.addToken(.identifier, "blk");
+                try output.addToken(.colon, ":");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent + 1);
+                try output.addToken(.keyword_const, "const");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.equal, "=");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, "_zx");
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "getAllocator");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "alloc");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.identifier, "zx");
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "Component");
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, for_loop.iterable);
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "len");
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.keyword_catch, "catch");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.keyword_unreachable, "unreachable");
+                try output.addToken(.semicolon, ";");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent + 1);
+                try output.addToken(.keyword_for, "for");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.identifier, for_loop.iterable);
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, "0");
+                try output.addToken(.period, ".");
+                try output.addToken(.period, ".");
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.pipe, "|");
+                try output.addToken(.identifier, for_loop.item_name);
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, "i");
+                try output.addToken(.pipe, "|");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent + 2);
+                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.l_bracket, "[");
+                try output.addToken(.identifier, "i");
+                try output.addToken(.r_bracket, "]");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.equal, "=");
+                try output.addToken(.invalid, " ");
+                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 2, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                try output.addToken(.semicolon, ";");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent + 1);
+                try output.addToken(.r_brace, "}");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent + 1);
+                try output.addToken(.keyword_break, "break");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.colon, ":");
+                try output.addToken(.identifier, "blk");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.identifier, "__zx_children");
+                try output.addToken(.semicolon, ";");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent);
+                try output.addToken(.r_brace, "}");
+            },
+        }
+
+        try output.addToken(.comma, ",");
+        try output.addToken(.invalid, "\n");
+    }
+
+    try addIndentTokens(output, indent - 1);
+    try output.addToken(.r_brace, "}");
+}
+
 fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder, elem: *ZXElement, indent: usize) !void {
     // Check if this is a custom component
     if (isCustomComponent(elem.tag)) {

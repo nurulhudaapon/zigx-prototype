@@ -60,8 +60,8 @@ test "if_for" {
     try test_render(@import("./../data/control_flow/if_for.zig").Page);
 }
 test "if_switch" {
-    return error.Todo;
-    // try test_transpile("control_flow/if_switch");
+    try test_transpile("control_flow/if_switch");
+    try test_render(@import("./../data/control_flow/if_switch.zig").Page);
 }
 test "for_if" {
     try test_transpile("control_flow/for_if");
@@ -218,7 +218,7 @@ const TestFileCache = struct {
         // Nested Control Flow (2-level nesting)
         "control_flow/if_if",
         "control_flow/if_for",
-        // "control_flow/if_switch",
+        "control_flow/if_switch",
         "control_flow/for_if",
         "control_flow/for_for",
         "control_flow/for_switch",
