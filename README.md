@@ -108,7 +108,7 @@ const zx = @import("zx");
 - [ ] Middleware
 - [ ] API Endpoints
 - [ ] Server Actions
-- [ ] CLI
+- [x] CLI
     - [x] `init` Project Template
     - [x] `transpile` Transpile .zx files to Zig source code
     - [x] `serve` Serve the project
