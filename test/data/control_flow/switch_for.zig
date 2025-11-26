@@ -1,42 +1,40 @@
-pub fn Page(ctx: zx.PageContext) zx.Component {
+pub fn Page(allocator: zx.Allocator) zx.Component {
     const user_type: UserType = .admin;
     const admin_users = [_][]const u8{ "John", "Jane" };
     const member_users = [_][]const u8{ "Jim", "Jill" };
-    var _zx = zx.initWithAllocator(ctx.arena);
+    var _zx = zx.initWithAllocator(allocator);
     return _zx.zx(
         .main,
         .{
-            .allocator = ctx.arena,
-            .children = &.{
-                switch (user_type) {
-                    .admin => blk: {
-                        const __zx_children = _zx.getAllocator().alloc(zx.Component, admin_users.len) catch unreachable;
-                        for (admin_users, 0..) |name, i| {
-                            __zx_children[i] = _zx.zx(
-                                .p,
-                                .{
-                                    .children = &.{
-                                        _zx.txt(name),
-                                    },
+            .allocator = allocator,
+            .children = switch (user_type) {
+                .admin => blk: {
+                    const __zx_children = _zx.getAllocator().alloc(zx.Component, admin_users.len) catch unreachable;
+                    for (admin_users, 0..) |name, i| {
+                        __zx_children[i] = _zx.zx(
+                            .p,
+                            .{
+                                .children = &.{
+                                    _zx.txt(name),
                                 },
-                            );
-                        }
-                        break :blk __zx_children;
-                    },
-                    .member => blk: {
-                        const __zx_children = _zx.getAllocator().alloc(zx.Component, member_users.len) catch unreachable;
-                        for (member_users, 0..) |name, i| {
-                            __zx_children[i] = _zx.zx(
-                                .p,
-                                .{
-                                    .children = &.{
-                                        _zx.txt(name),
-                                    },
+                            },
+                        );
+                    }
+                    break :blk __zx_children;
+                },
+                .member => blk: {
+                    const __zx_children = _zx.getAllocator().alloc(zx.Component, member_users.len) catch unreachable;
+                    for (member_users, 0..) |name, i| {
+                        __zx_children[i] = _zx.zx(
+                            .p,
+                            .{
+                                .children = &.{
+                                    _zx.txt(name),
                                 },
-                            );
-                        }
-                        break :blk __zx_children;
-                    },
+                            },
+                        );
+                    }
+                    break :blk __zx_children;
                 },
             },
         },

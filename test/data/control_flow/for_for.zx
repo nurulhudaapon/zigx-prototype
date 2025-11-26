@@ -5,12 +5,11 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
     };
     return (
         <main @allocator={ctx.arena}>
-            {for (groups) |group| {
-                (<div>
-                    <h2>{group.name}</h2>
+            {for (groups) |group| (
+                <div>
                     {for (group.members) |member| (<p>{member}</p>)}
-                </div>)
-            }}
+                </div>
+            )}
         </main>
     );
 }

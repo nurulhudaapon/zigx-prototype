@@ -2314,6 +2314,329 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.r_brace, "}");
             try output.addToken(.comma, ",");
             try output.addToken(.invalid, "\n");
+        } else if (elem.children.items.len == 1 and elem.children.items[0] == .switch_expr) {
+            // Special case: if the only child is a switch_expr with all for_loop_block cases, assign it directly
+            const switch_expr = elem.children.items[0].switch_expr;
+            
+            // Check if all cases have for_loop_block values
+            var all_for_loops = true;
+            for (switch_expr.cases.items) |switch_case| {
+                if (switch_case.value != .for_loop_block) {
+                    all_for_loops = false;
+                    break;
+                }
+            }
+            
+            if (all_for_loops and switch_expr.cases.items.len > 0) {
+                // Render switch directly without &.{ ... } wrapper
+                try output.addToken(.invalid, " ");
+                try output.addToken(.invalid, "switch");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.identifier, switch_expr.expr);
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.invalid, "\n");
+
+                for (switch_expr.cases.items) |switch_case| {
+                    try addIndentTokens(output, indent + 3);
+                    // Pattern (e.g., .admin)
+                    if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+                        try output.addToken(.period, ".");
+                        if (switch_case.pattern.len > 1) {
+                            try output.addToken(.identifier, switch_case.pattern[1..]);
+                        }
+                    } else {
+                        try output.addToken(.identifier, switch_case.pattern);
+                    }
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.invalid, "=>");
+                    try output.addToken(.invalid, " ");
+                    
+                    // Render for_loop_block
+                    const for_loop = switch_case.value.for_loop_block;
+                    try output.addToken(.identifier, "blk");
+                    try output.addToken(.colon, ":");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.invalid, "\n");
+
+                    // const __zx_children = _zx.getAllocator().alloc(zx.Component, iterable.len) catch unreachable;
+                    try addIndentTokens(output, indent + 4);
+                    try output.addToken(.keyword_const, "const");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.equal, "=");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "_zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "getAllocator");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "alloc");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, "zx");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "Component");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, for_loop.iterable);
+                    try output.addToken(.period, ".");
+                    try output.addToken(.identifier, "len");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.keyword_catch, "catch");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.keyword_unreachable, "unreachable");
+                    try output.addToken(.semicolon, ";");
+                    try output.addToken(.invalid, "\n");
+
+                    // for (iterable, 0..) |item, i| {
+                    try addIndentTokens(output, indent + 4);
+                    try output.addToken(.keyword_for, "for");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_paren, "(");
+                    try output.addToken(.identifier, for_loop.iterable);
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "0");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.period, ".");
+                    try output.addToken(.r_paren, ")");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.pipe, "|");
+                    try output.addToken(.identifier, for_loop.item_name);
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "i");
+                    try output.addToken(.pipe, "|");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.l_brace, "{");
+                    try output.addToken(.invalid, "\n");
+
+                    // __zx_children[i] = _zx.zx(...);
+                    try addIndentTokens(output, indent + 5);
+                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.l_bracket, "[");
+                    try output.addToken(.identifier, "i");
+                    try output.addToken(.r_bracket, "]");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.equal, "=");
+                    try output.addToken(.invalid, " ");
+                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 5, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                    try output.addToken(.semicolon, ";");
+                    try output.addToken(.invalid, "\n");
+
+                    // }
+                    try addIndentTokens(output, indent + 4);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.invalid, "\n");
+
+                    // break :blk __zx_children;
+                    try addIndentTokens(output, indent + 4);
+                    try output.addToken(.keyword_break, "break");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.colon, ":");
+                    try output.addToken(.identifier, "blk");
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.identifier, "__zx_children");
+                    try output.addToken(.semicolon, ";");
+                    try output.addToken(.invalid, "\n");
+
+                    // }
+                    try addIndentTokens(output, indent + 3);
+                    try output.addToken(.r_brace, "}");
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+                }
+
+                try addIndentTokens(output, indent + 2);
+                try output.addToken(.r_brace, "}");
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, "\n");
+            } else {
+                // Switch has non-for-loop cases, use array syntax
+                try output.addToken(.ampersand, "&");
+                try output.addToken(.period, ".");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.invalid, "\n");
+                
+                // Render switch inside array
+                try addIndentTokens(output, indent + 3);
+                try output.addToken(.invalid, "switch");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_paren, "(");
+                try output.addToken(.identifier, switch_expr.expr);
+                try output.addToken(.r_paren, ")");
+                try output.addToken(.invalid, " ");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.invalid, "\n");
+
+                for (switch_expr.cases.items) |switch_case| {
+                    try addIndentTokens(output, indent + 4);
+                    // Pattern (e.g., .admin)
+                    if (switch_case.pattern.len > 0 and switch_case.pattern[0] == '.') {
+                        try output.addToken(.period, ".");
+                        if (switch_case.pattern.len > 1) {
+                            try output.addToken(.identifier, switch_case.pattern[1..]);
+                        }
+                    } else {
+                        try output.addToken(.identifier, switch_case.pattern);
+                    }
+                    try output.addToken(.invalid, " ");
+                    try output.addToken(.invalid, "=>");
+                    try output.addToken(.invalid, " ");
+
+                    switch (switch_case.value) {
+                        .string_literal => |str| {
+                            // String literal: _zx.txt("Admin")
+                            try output.addToken(.identifier, "_zx");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "txt");
+                            try output.addToken(.l_paren, "(");
+                            const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                            defer allocator.free(str_buf);
+                            try output.addToken(.string_literal, str_buf);
+                            try output.addToken(.r_paren, ")");
+                        },
+                        .jsx_element => |jsx_elem| {
+                            // JSX element: _zx.zx(.p, .{ ... })
+                            try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                        },
+                        .conditional_expr => |cond| {
+                            // Conditional expression: if (condition) <render if_branch> else <render else_branch>
+                            try output.addToken(.keyword_if, "if");
+                            try output.addToken(.l_paren, "(");
+                            // Render condition as raw text (may contain dots, function calls, etc.)
+                            try output.addToken(.invalid, cond.condition);
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+
+                            // Render if branch
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.keyword_else, "else");
+                            try output.addToken(.invalid, " ");
+
+                            // Render else branch
+                            try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                        },
+                        .for_loop_block => |for_loop| {
+                            // For loop block: blk: { const children = ...; for (...) { ... }; break :blk children; }
+                            try output.addToken(.identifier, "blk");
+                            try output.addToken(.colon, ":");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                            // const __zx_children = _zx.getAllocator().alloc(zx.Component, iterable.len) catch unreachable;
+                            try addIndentTokens(output, indent + 5);
+                            try output.addToken(.keyword_const, "const");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, "__zx_children");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.equal, "=");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, "_zx");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "getAllocator");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "alloc");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, "zx");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "Component");
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, for_loop.iterable);
+                            try output.addToken(.period, ".");
+                            try output.addToken(.identifier, "len");
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.keyword_catch, "catch");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.keyword_unreachable, "unreachable");
+                            try output.addToken(.semicolon, ";");
+                            try output.addToken(.invalid, "\n");
+
+                            // for (iterable, 0..) |item, i| {
+                            try addIndentTokens(output, indent + 5);
+                            try output.addToken(.keyword_for, "for");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, for_loop.iterable);
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, "0");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.period, ".");
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.pipe, "|");
+                            try output.addToken(.identifier, for_loop.item_name);
+                            try output.addToken(.comma, ",");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, "i");
+                            try output.addToken(.pipe, "|");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                            // __zx_children[i] = _zx.zx(...);
+                            try addIndentTokens(output, indent + 6);
+                            try output.addToken(.identifier, "__zx_children");
+                            try output.addToken(.l_bracket, "[");
+                            try output.addToken(.identifier, "i");
+                            try output.addToken(.r_bracket, "]");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.equal, "=");
+                            try output.addToken(.invalid, " ");
+                            try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                            try output.addToken(.semicolon, ";");
+                            try output.addToken(.invalid, "\n");
+
+                            // }
+                            try addIndentTokens(output, indent + 5);
+                            try output.addToken(.r_brace, "}");
+                            try output.addToken(.invalid, "\n");
+
+                            // break :blk __zx_children;
+                            try addIndentTokens(output, indent + 5);
+                            try output.addToken(.keyword_break, "break");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.colon, ":");
+                            try output.addToken(.identifier, "blk");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.identifier, "__zx_children");
+                            try output.addToken(.semicolon, ";");
+                            try output.addToken(.invalid, "\n");
+
+                            // }
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.r_brace, "}");
+                        },
+                    }
+
+                    try output.addToken(.comma, ",");
+                    try output.addToken(.invalid, "\n");
+                }
+
+                try addIndentTokens(output, indent + 3);
+                try output.addToken(.r_brace, "}");
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, "\n");
+                
+                try addIndentTokens(output, indent + 2);
+                try output.addToken(.r_brace, "}");
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, "\n");
+            }
         } else {
             // Multiple children or non-for-loop child: use array syntax
             try output.addToken(.ampersand, "&");
