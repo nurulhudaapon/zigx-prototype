@@ -399,22 +399,23 @@ pub const ExpressionAst = struct {
                     if (is_multiline_case) {
                         fmtlog.debug("case: '{s}'", .{case.value.slice(self.source)});
 
-                        try indentContent(case_pattern, 3, w);
-                        try w.writeAll(" => ");
+                        try indentContent(case_pattern, 2, w);
+                        try w.writeAll("=> ");
 
                         try w.writeAll("(\n");
 
-                        try indentContent(case_content, 4, w);
-                        try indentContent(")", 3, w);
+                        try indentContent(case_content, 3, w);
+                        try indentContent("),", 2, w);
                     } else {
-                        try indentContent(case_pattern, 3, w);
-                        try w.writeAll(" => ");
+                        try indentContent(case_pattern, 2, w);
+                        try w.writeAll("=> ");
                         try w.writeAll(case_full_content);
+                        try w.writeAll(",");
                     }
                     try w.writeAll("\n");
                 }
 
-                try indentContent("}", 2, w);
+                try indentContent("}", 1, w);
             },
             .if_expr => |if_expr| {
                 const before_then = self.source[self.start..if_expr.then_branch.start];
@@ -462,10 +463,10 @@ pub const ExpressionAst = struct {
                     try w.writeAll(before_body);
                     try w.writeAll("\n");
 
-                    try indentContent(body_content, base_indent + 2, w);
+                    try indentContent(body_content, base_indent + 1, w);
 
                     // Write closing ) and } with proper indentation
-                    try w.writeAll("\n");
+                    // try w.writeAll("\n");
                     const indent = detectIndentAt(self.source, self.start);
                     for (0..indent) |_| {
                         try w.writeAll(" ");

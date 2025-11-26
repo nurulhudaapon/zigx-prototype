@@ -241,6 +241,200 @@ fn parseEsbuildOutput(stdout: []const u8) !EsbuildOutput {
     };
 }
 
+// TransformJS Zig bindings - provides a Zig interface to the TransformJS Rust library
+const transformjs_c = @cImport({
+    @cInclude("transformjs.h");
+});
+
+pub const TransformResult = struct {
+    output: []const u8,
+    err: ?[]const u8,
+    success: bool,
+
+    pub fn deinit(self: *TransformResult, allocator: std.mem.Allocator) void {
+        allocator.free(self.output);
+        if (self.err) |err| {
+            allocator.free(err);
+        }
+    }
+};
+
+/// Transform options
+/// Defaults are optimized for browser-compatible bundled output:
+/// - Helper loader mode: Runtime (helpers are inlined for bundling)
+/// - Module format: CommonJS (transformed from ES modules for bundling)
+/// - Target: ES2020 (modern browser compatibility)
+pub const TransformOptions = struct {
+    jsx_enabled: bool = false,
+    jsx_development: bool = false,
+    typescript_enabled: bool = false,
+    helper_loader_mode: TransformHelperLoaderMode = .Runtime, // Runtime = bundled helpers
+    target: ?[]const u8 = null, // Defaults to "es2020" in Rust for browser compatibility
+};
+
+/// Helper loader mode
+pub const TransformHelperLoaderMode = enum(u32) {
+    Runtime = 0,
+    External = 1,
+};
+
+/// Transform JavaScript/TypeScript source code
+///
+/// `source` - The source code to transform (must be null-terminated)
+/// `file_path` - Optional file path for source type detection (can be null)
+/// `options` - Optional transform options (can be null for defaults)
+/// `allocator` - Allocator for temporary allocations
+pub fn transform(
+    allocator: std.mem.Allocator,
+    source: []const u8,
+    file_path: ?[]const u8,
+    options: ?TransformOptions,
+) !TransformResult {
+    // Ensure source is null-terminated
+    const source_z = try allocator.dupeZ(u8, source);
+    defer allocator.free(source_z);
+
+    // Allocate file_path if provided, keep it alive during C call
+    var file_path_z: ?[:0]u8 = null;
+    if (file_path) |path| {
+        file_path_z = try allocator.dupeZ(u8, path);
+    }
+    defer if (file_path_z) |path_z| allocator.free(path_z);
+
+    const file_path_ptr = if (file_path_z) |path_z| path_z.ptr else null;
+
+    // Prepare C options struct if options provided
+    var c_options: ?transformjs_c.CTransformOptions = null;
+    var target_z: ?[:0]u8 = null;
+    if (options) |opts| {
+        if (opts.target) |target| {
+            target_z = try allocator.dupeZ(u8, target);
+        }
+        c_options = transformjs_c.CTransformOptions{
+            .jsx_enabled = if (opts.jsx_enabled) 1 else 0,
+            .jsx_development = if (opts.jsx_development) 1 else 0,
+            .typescript_enabled = if (opts.typescript_enabled) 1 else 0,
+            .helper_loader_mode = @intFromEnum(opts.helper_loader_mode),
+            .target = if (target_z) |tz| tz.ptr else null,
+        };
+    }
+    defer if (target_z) |tz| allocator.free(tz);
+
+    const c_options_ptr = if (c_options) |*opts| opts else null;
+    const c_result = transformjs_c.transformjs_transform(source_z.ptr, file_path_ptr, c_options_ptr);
+    defer transformjs_c.transformjs_free_result(c_result);
+
+    if (c_result == null) {
+        return error.TransformFailed;
+    }
+
+    const result_ptr = c_result.?;
+    const result = result_ptr.*;
+
+    if (result.success != 0) {
+        _ = if (result.@"error" != null)
+            std.mem.span(result.@"error")
+        else
+            "Unknown error";
+        return error.TransformError;
+    }
+
+    // Copy the output string before freeing the result
+    const output_slice = if (result.output != null)
+        std.mem.span(result.output)
+    else
+        "";
+
+    const output = try allocator.dupe(u8, output_slice);
+    // Note: We can't use defer here because we need to return it
+    // The caller is responsible for freeing it (though currently we don't have deinit)
+
+    return TransformResult{
+        .output = output,
+        .err = null,
+        .success = true,
+    };
+}
+
+/// Transform JavaScript/TypeScript source code with error details
+///
+/// Returns the error message if transformation fails
+pub fn transformWithError(
+    allocator: std.mem.Allocator,
+    source: []const u8,
+    file_path: ?[]const u8,
+    options: ?TransformOptions,
+) !struct { result: TransformResult, error_message: ?[]const u8 } {
+    // Ensure source is null-terminated
+    const source_z = try allocator.dupeZ(u8, source);
+    defer allocator.free(source_z);
+
+    // Allocate file_path if provided, keep it alive during C call
+    var file_path_z: ?[:0]u8 = null;
+    if (file_path) |path| {
+        file_path_z = try allocator.dupeZ(u8, path);
+    }
+    defer if (file_path_z) |path_z| allocator.free(path_z);
+
+    const file_path_ptr = if (file_path_z) |path_z| path_z.ptr else null;
+
+    // Prepare C options struct if options provided
+    var c_options: ?transformjs_c.CTransformOptions = null;
+    var target_z: ?[:0]u8 = null;
+    if (options) |opts| {
+        if (opts.target) |target| {
+            target_z = try allocator.dupeZ(u8, target);
+        }
+        c_options = transformjs_c.CTransformOptions{
+            .jsx_enabled = if (opts.jsx_enabled) 1 else 0,
+            .jsx_development = if (opts.jsx_development) 1 else 0,
+            .typescript_enabled = if (opts.typescript_enabled) 1 else 0,
+            .helper_loader_mode = @intFromEnum(opts.helper_loader_mode),
+            .target = if (target_z) |tz| tz.ptr else null,
+        };
+    }
+    defer if (target_z) |tz| allocator.free(tz);
+
+    const c_options_ptr = if (c_options) |*opts| opts else null;
+    const c_result = transformjs_c.transformjs_transform(source_z.ptr, file_path_ptr, c_options_ptr);
+    defer transformjs_c.transformjs_free_result(c_result);
+
+    if (c_result == null) {
+        return error.TransformFailed;
+    }
+
+    const result_ptr = c_result.?;
+    const result = result_ptr.*;
+
+    // Copy error message before freeing
+    const error_slice = if (result.@"error" != null)
+        std.mem.span(result.@"error")
+    else
+        null;
+    const error_message = if (error_slice) |err| try allocator.dupe(u8, err) else null;
+
+    // Copy output before freeing
+    const output_slice = if (result.output != null)
+        std.mem.span(result.output)
+    else
+        "";
+    const output = try allocator.dupe(u8, output_slice);
+
+    return .{
+        .result = TransformResult{
+            .output = output,
+            .err = error_message,
+            .success = result.success == 0,
+        },
+        .error_message = error_message,
+    };
+}
+
+pub const TransformError = error{
+    TransformFailed,
+    TransformError,
+};
+
 const std = @import("std");
 const zli = @import("zli");
 const util = @import("util.zig");

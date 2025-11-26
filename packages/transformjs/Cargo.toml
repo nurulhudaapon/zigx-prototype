@@ -1,0 +1,17 @@
+[package]
+name = "transformjs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "transformjs"
+crate-type = ["cdylib"]
+
+[dependencies]
+oxc = "0.98.0"
+oxc_allocator = "0.98.0"
+oxc_codegen = "0.98.0"
+oxc_parser = "0.98.0"
+oxc_semantic = "0.98.0"
+oxc_span = "0.98.0"
+oxc_transformer = "0.98.0"
