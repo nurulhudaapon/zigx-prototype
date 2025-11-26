@@ -13,6 +13,7 @@ pub fn build(writer: *std.Io.Writer, reader: *std.Io.Reader, allocator: std.mem.
         try transpile.register(writer, reader, allocator),
         try fmt.register(writer, reader, allocator),
         try @"export".register(writer, reader, allocator),
+        try bundle.register(writer, reader, allocator),
         try update.register(writer, reader, allocator),
         try upgrade.register(writer, reader, allocator),
     });
@@ -31,6 +32,7 @@ const version = @import("version.zig");
 const transpile = @import("transpile.zig");
 const fmt = @import("fmt.zig");
 const @"export" = @import("export.zig");
+const bundle = @import("bundle.zig");
 const update = @import("update.zig");
 const upgrade = @import("upgrade.zig");
 const zx = @import("zx");

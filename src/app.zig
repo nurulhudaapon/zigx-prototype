@@ -55,9 +55,7 @@ pub const App = struct {
             const route_data = try allocator.create(App.Meta.Route);
             route_data.* = route;
 
-            router.get(route.path, Handler.page, .{
-                .data = route_data,
-            });
+            router.get(route.path, Handler.page, .{ .data = route_data });
         }
 
         // Introspect the app, this will exit the program in some cases like --introspect flag
@@ -109,6 +107,9 @@ pub const App = struct {
 
             // --address: Override the configured/default address
             if (std.mem.eql(u8, arg, "--address")) address = args.next() orelse return error.MissingAddress;
+
+            // --rootdir: Override the configured/default root directory
+            if (std.mem.eql(u8, arg, "--rootdir")) self.meta.rootdir = args.next() orelse return error.MissingRootdir;
 
             // --cli-command: Override the CLI command
             if (std.mem.eql(u8, arg, "--cli-command")) {

@@ -45,6 +45,10 @@ fn @"export"(ctx: zli.CommandContext) !void {
 
     std.debug.print("\x1b[1m○ Building static ZX site!\x1b[0m\n\n", .{});
     std.debug.print("  - \x1b[90m{s}\x1b[0m\n", .{outdir});
+    // delete the outdir if it exists
+    std.fs.cwd().deleteTree(outdir) catch |err| switch (err) {
+        else => {},
+    };
 
     var aw = std.Io.Writer.Allocating.init(ctx.allocator);
     defer aw.deinit();
@@ -71,83 +75,21 @@ fn @"export"(ctx: zli.CommandContext) !void {
     }
 
     log.debug("Copying public directory! {s}", .{appoutdir});
-    copydirs(ctx.allocator, appoutdir, &.{ "public", "assets" }, outdir, &printer) catch |err| {
+
+    util.copydirs(ctx.allocator, appoutdir, &.{ "public", "assets" }, outdir, true, &printer) catch |err| {
         std.log.err("Failed to copy public directory: {any}", .{err});
         // return err;
     };
 
+    // Delete {outdir}/assets/_zx if it exists
+    const assets_zx_path = try std.fs.path.join(ctx.allocator, &.{ outdir, "assets", "_zx" });
+    defer ctx.allocator.free(assets_zx_path);
+    std.fs.cwd().deleteTree(assets_zx_path) catch |err| switch (err) {
+        else => {},
+    };
+
     // std.debug.print("\nNow run → \n\n\x1b[36mzig build serve\x1b[0m\n\n", .{});
     std.debug.print("\n", .{});
-}
-
-fn copydirs(
-    allocator: std.mem.Allocator,
-    base_dir: []const u8,
-    source_dirs: []const []const u8,
-    dest_dir: []const u8,
-    printer: *zx.Printer,
-) !void {
-    for (source_dirs) |source_dir| {
-        const source_path = try std.fs.path.join(allocator, &.{ base_dir, source_dir });
-        defer allocator.free(source_path);
-
-        var source = std.fs.cwd().openDir(source_path, .{ .iterate = true }) catch |err| switch (err) {
-            error.FileNotFound => continue,
-            error.NotDir => continue,
-            else => return err,
-        };
-        defer source.close();
-
-        // Create destination directory if it doesn't exist
-        std.fs.cwd().makePath(dest_dir) catch |err| switch (err) {
-            error.PathAlreadyExists => {},
-            else => return err,
-        };
-
-        var dest = try std.fs.cwd().openDir(dest_dir, .{});
-        defer dest.close();
-
-        var walker = try source.walk(allocator);
-        defer walker.deinit();
-
-        while (try walker.next()) |entry| {
-            const src_path = try std.fs.path.join(allocator, &.{ source_path, entry.path });
-            defer allocator.free(src_path);
-
-            const dst_rel_path = try std.fs.path.join(allocator, &.{
-                if (std.mem.eql(u8, source_dir, "public")) "" else source_dir,
-                entry.path,
-            });
-            defer allocator.free(dst_rel_path);
-
-            const dst_abs_path = try std.fs.path.join(allocator, &.{ dest_dir, dst_rel_path });
-            defer allocator.free(dst_abs_path);
-
-            switch (entry.kind) {
-                .file => {
-                    // Create parent directory if needed
-                    if (std.fs.path.dirname(dst_abs_path)) |parent| {
-                        std.fs.cwd().makePath(parent) catch |err| switch (err) {
-                            error.PathAlreadyExists => {},
-                            else => return err,
-                        };
-                    }
-
-                    // Copy file
-                    try std.fs.cwd().copyFile(src_path, std.fs.cwd(), dst_abs_path, .{});
-                    printer.printFilePath(dst_rel_path);
-                },
-                .directory => {
-                    // Create directory if needed
-                    std.fs.cwd().makePath(dst_abs_path) catch |err| switch (err) {
-                        error.PathAlreadyExists => {},
-                        else => return err,
-                    };
-                },
-                else => continue,
-            }
-        }
-    }
 }
 
 fn processRoute(
