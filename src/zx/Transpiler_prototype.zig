@@ -169,6 +169,114 @@ const TokenBuilder = struct {
     }
 };
 
+/// Helper function to skip whitespace in a string
+fn skipWhitespace(content: []const u8, start_pos: usize) usize {
+    var pos = start_pos;
+    while (pos < content.len and std.ascii.isWhitespace(content[pos])) pos += 1;
+    return pos;
+}
+
+/// Helper function to find matching closing paren/brace
+const MatchResult = struct {
+    end_pos: usize,
+    paren_depth: i32,
+    brace_depth: i32,
+};
+
+fn findMatchingParen(content: []const u8, start_pos: usize) MatchResult {
+    var pos = start_pos;
+    var paren_depth: i32 = 1;
+    var brace_depth: i32 = 0;
+    while (pos < content.len and paren_depth > 0) {
+        if (content[pos] == '(') paren_depth += 1;
+        if (content[pos] == ')') paren_depth -= 1;
+        if (content[pos] == '{') brace_depth += 1;
+        if (content[pos] == '}') brace_depth -= 1;
+        if (paren_depth > 0) pos += 1;
+    }
+    return .{ .end_pos = pos, .paren_depth = paren_depth, .brace_depth = brace_depth };
+}
+
+/// Helper function to render attribute value tokens (handles static/dynamic/format cases)
+fn renderAttributeValue(
+    allocator: std.mem.Allocator,
+    output: *TokenBuilder,
+    attr_value: ZXElement.AttributeValue,
+    indent: usize,
+    use_print_for_format: bool,
+) !void {
+    switch (attr_value) {
+        .static => |val| {
+            const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
+            defer allocator.free(value_buf);
+            try output.addToken(.string_literal, value_buf);
+        },
+        .dynamic => |expr| {
+            try output.addToken(.identifier, expr);
+        },
+        .format => |fmt| {
+            if (use_print_for_format) {
+                // For props: use _zx.print("{format}", .{expr})
+                try output.addToken(.identifier, "_zx");
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "print");
+                try output.addToken(.l_paren, "(");
+
+                const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                defer allocator.free(format_str);
+                try output.addToken(.string_literal, format_str);
+                try output.addToken(.comma, ",");
+
+                try output.addToken(.invalid, " ");
+                try output.addToken(.period, ".");
+                try output.addToken(.l_brace, "{");
+                try output.addToken(.identifier, fmt.expr);
+                try output.addToken(.r_brace, "}");
+                try output.addToken(.r_paren, ")");
+            } else {
+                // For attributes: set value = expr and format = "{format}"
+                try output.addToken(.identifier, fmt.expr);
+                try output.addToken(.comma, ",");
+                try output.addToken(.invalid, "\n");
+
+                try addIndentTokens(output, indent);
+                try output.addToken(.period, ".");
+                try output.addToken(.identifier, "format");
+                try output.addToken(.equal, "=");
+                const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
+                defer allocator.free(format_str);
+                try output.addToken(.string_literal, format_str);
+            }
+        },
+    }
+}
+
+/// Helper function to render props struct for custom components
+fn renderPropsStruct(
+    allocator: std.mem.Allocator,
+    output: *TokenBuilder,
+    attributes: []const ZXElement.Attribute,
+) !void {
+    if (attributes.len > 0) {
+        try output.addToken(.period, ".");
+        try output.addToken(.l_brace, "{");
+        for (attributes, 0..) |attr, i| {
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, attr.name);
+            try output.addToken(.equal, "=");
+            try renderAttributeValue(allocator, output, attr.value, 0, true);
+            if (i < attributes.len - 1) {
+                try output.addToken(.comma, ",");
+            }
+        }
+        try output.addToken(.r_brace, "}");
+    } else {
+        try output.addToken(.period, ".");
+        try output.addToken(.l_brace, "{");
+        try output.addToken(.r_brace, "}");
+    }
+}
+
 /// JSX Element representation
 const ZXElement = struct {
     tag: []const u8,
@@ -197,6 +305,7 @@ const ZXElement = struct {
             string_literal: []const u8, // For ("Admin")
             jsx_element: *ZXElement, // For (<p>Admin</p>)
             conditional_expr: struct { condition: []const u8, if_branch: *ZXElement, else_branch: *ZXElement }, // For if (cond) (<JSX>) else (<JSX>)
+            for_loop_block: struct { iterable: []const u8, item_name: []const u8, body: *ZXElement }, // For { for (iterable) |item| (<JSX>) }
         };
     };
 
@@ -258,6 +367,10 @@ const ZXElement = struct {
                             self.allocator.destroy(cond.if_branch);
                             cond.else_branch.deinit();
                             self.allocator.destroy(cond.else_branch);
+                        },
+                        .for_loop_block => |for_loop| {
+                            for_loop.body.deinit();
+                            self.allocator.destroy(for_loop.body);
                         },
                         .string_literal => {},
                     }
@@ -1331,7 +1444,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                 }
                             }
 
-                            // Parse value - either ("string") or (<JSX>)
+                            // Parse value - either ("string"), (<JSX>), or { for loop block }
                             if (arrow_pos < expr.len and expr[arrow_pos] == '(') {
                                 arrow_pos += 1; // Skip opening paren
                                 const value_start = arrow_pos;
@@ -1377,6 +1490,118 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                     }
                                     arrow_pos = jsx_end + 1; // Skip closing paren
                                 }
+                            } else if (arrow_pos < expr.len and expr[arrow_pos] == '{') {
+                                // Block: { for (iterable) |item| (<JSX>) }
+                                arrow_pos += 1; // Skip opening brace
+                                const block_start = arrow_pos;
+
+                                // Find matching closing brace
+                                var block_brace_depth: i32 = 1;
+                                var block_paren_depth: i32 = 0;
+                                var block_end = arrow_pos;
+                                while (block_end < expr.len and block_brace_depth > 0) {
+                                    if (expr[block_end] == '{') block_brace_depth += 1;
+                                    if (expr[block_end] == '}') block_brace_depth -= 1;
+                                    if (expr[block_end] == '(') block_paren_depth += 1;
+                                    if (expr[block_end] == ')') block_paren_depth -= 1;
+                                    if (block_brace_depth > 0) block_end += 1;
+                                }
+                                const block_content = expr[block_start..block_end];
+
+                                // Try to parse as for loop: for (iterable) |item| (<JSX>)
+                                var for_check_pos: usize = 0;
+                                while (for_check_pos < block_content.len and std.ascii.isWhitespace(block_content[for_check_pos])) for_check_pos += 1;
+
+                                if (for_check_pos + 3 < block_content.len and std.mem.startsWith(u8, block_content[for_check_pos..], "for")) {
+                                    var for_pos = for_check_pos + 3; // Skip "for"
+
+                                    // Skip whitespace
+                                    while (for_pos < block_content.len and std.ascii.isWhitespace(block_content[for_pos])) for_pos += 1;
+
+                                    // Check for opening paren
+                                    if (for_pos < block_content.len and block_content[for_pos] == '(') {
+                                        for_pos += 1;
+                                        // Find iterable
+                                        const iterable_start = for_pos;
+                                        var iterable_end = iterable_start;
+                                        var for_paren_depth: i32 = 1;
+                                        var for_brace_depth: i32 = 0;
+                                        while (iterable_end < block_content.len and for_paren_depth > 0) {
+                                            if (block_content[iterable_end] == '(') for_paren_depth += 1;
+                                            if (block_content[iterable_end] == ')') for_paren_depth -= 1;
+                                            if (block_content[iterable_end] == '{') for_brace_depth += 1;
+                                            if (block_content[iterable_end] == '}') for_brace_depth -= 1;
+                                            if (for_paren_depth > 0) iterable_end += 1;
+                                        }
+                                        const iterable = block_content[iterable_start..iterable_end];
+
+                                        // Skip closing paren and whitespace
+                                        var pipe_pos = iterable_end + 1;
+                                        while (pipe_pos < block_content.len and std.ascii.isWhitespace(block_content[pipe_pos])) pipe_pos += 1;
+
+                                        // Find |item| pattern
+                                        if (pipe_pos < block_content.len and block_content[pipe_pos] == '|') {
+                                            pipe_pos += 1; // Skip opening |
+                                            const item_start = pipe_pos;
+                                            while (pipe_pos < block_content.len and block_content[pipe_pos] != '|') pipe_pos += 1;
+
+                                            if (pipe_pos < block_content.len and block_content[pipe_pos] == '|') {
+                                                const item_name = block_content[item_start..pipe_pos];
+                                                pipe_pos += 1; // Skip closing |
+
+                                                // Skip whitespace after |
+                                                while (pipe_pos < block_content.len and std.ascii.isWhitespace(block_content[pipe_pos])) pipe_pos += 1;
+
+                                                // Check for opening paren: for (iterable) |item| (<JSX>)
+                                                if (pipe_pos < block_content.len and block_content[pipe_pos] == '(') {
+                                                    pipe_pos += 1; // Skip opening paren
+                                                    const jsx_content_start = pipe_pos;
+                                                    var jsx_content_end = pipe_pos;
+                                                    for_paren_depth = 1;
+                                                    for_brace_depth = 0;
+                                                    while (jsx_content_end < block_content.len and for_paren_depth > 0) {
+                                                        if (block_content[jsx_content_end] == '(') for_paren_depth += 1;
+                                                        if (block_content[jsx_content_end] == ')') for_paren_depth -= 1;
+                                                        if (block_content[jsx_content_end] == '{') for_brace_depth += 1;
+                                                        if (block_content[jsx_content_end] == '}') for_brace_depth -= 1;
+                                                        if (for_paren_depth > 0) jsx_content_end += 1;
+                                                    }
+                                                    const jsx_content = block_content[jsx_content_start..jsx_content_end];
+
+                                                    // Parse JSX body - wrap in fragment if needed
+                                                    var body_elem: *ZXElement = undefined;
+                                                    if (parseJsx(allocator, jsx_content)) |parsed_elem| {
+                                                        body_elem = parsed_elem;
+                                                    } else |_| {
+                                                        // Content doesn't start with <, so wrap it in a fragment and parse as children
+                                                        body_elem = try ZXElement.init(allocator, "fragment");
+                                                        try parseJsxChildren(allocator, body_elem, jsx_content);
+                                                    }
+
+                                                    try cases.append(allocator, .{
+                                                        .pattern = pattern,
+                                                        .value = .{ .for_loop_block = .{
+                                                            .iterable = iterable,
+                                                            .item_name = item_name,
+                                                            .body = body_elem,
+                                                        } },
+                                                    });
+                                                    arrow_pos = block_end + 1; // Skip closing brace
+                                                    // Skip whitespace and comma if present
+                                                    while (arrow_pos < expr.len and (std.ascii.isWhitespace(expr[arrow_pos]) or expr[arrow_pos] == ',')) {
+                                                        arrow_pos += 1;
+                                                    }
+                                                    case_start = arrow_pos;
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // If we couldn't parse as for loop block, fail
+                                parsed_switch = false;
+                                break;
                             } else {
                                 parsed_switch = false;
                                 break;
@@ -1889,56 +2114,8 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.identifier, elem.tag);
             try output.addToken(.comma, ",");
 
-            // Build props struct from attributes with explicit type
-            if (elem.attributes.items.len > 0) {
-                try output.addToken(.period, ".");
-                try output.addToken(.l_brace, "{");
-                for (elem.attributes.items, 0..) |attr, i| {
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, attr.name);
-                    try output.addToken(.equal, "=");
-                    switch (attr.value) {
-                        .static => |val| {
-                            const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                            defer allocator.free(value_buf);
-                            try output.addToken(.string_literal, value_buf);
-                        },
-                        .dynamic => |expr| {
-                            try output.addToken(.identifier, expr);
-                        },
-                        .format => |fmt| {
-                            // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
-                            try output.addToken(.identifier, "_zx");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.identifier, "print");
-                            try output.addToken(.l_paren, "(");
-
-                            // Format string: "{format}"
-                            const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                            defer allocator.free(format_str);
-                            try output.addToken(.string_literal, format_str);
-                            try output.addToken(.comma, ",");
-
-                            // Expression wrapped in tuple: .{expr}
-                            try output.addToken(.invalid, " ");
-                            try output.addToken(.period, ".");
-                            try output.addToken(.l_brace, "{");
-                            try output.addToken(.identifier, fmt.expr);
-                            try output.addToken(.r_brace, "}");
-                            try output.addToken(.r_paren, ")");
-                        },
-                    }
-                    if (i < elem.attributes.items.len - 1) {
-                        try output.addToken(.comma, ",");
-                    }
-                }
-                try output.addToken(.r_brace, "}");
-            } else {
-                // Empty props struct with explicit type
-                try output.addToken(.period, ".");
-                try output.addToken(.l_brace, "{");
-                try output.addToken(.r_brace, "}");
-            }
+            // Build props struct from attributes
+            try renderPropsStruct(allocator, output, elem.attributes.items);
 
             try output.addToken(.r_paren, ")");
             return;
@@ -2016,34 +2193,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.identifier, "value");
             try output.addToken(.equal, "=");
 
-            switch (attr.value) {
-                .static => |val| {
-                    // Static string value
-                    const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                    defer allocator.free(value_buf);
-                    try output.addToken(.string_literal, value_buf);
-                },
-                .dynamic => |expr| {
-                    // Dynamic expression - output as-is
-                    try output.addToken(.identifier, expr);
-                },
-                .format => |fmt| {
-                    // Format expression: pass expression directly and set format field
-                    // .value = expr (expression as-is)
-                    try output.addToken(.identifier, fmt.expr);
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-
-                    // .format = "{format}"
-                    try addIndentTokens(output, indent + 3);
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "format");
-                    try output.addToken(.equal, "=");
-                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                    defer allocator.free(format_str);
-                    try output.addToken(.string_literal, format_str);
-                },
-            }
+            try renderAttributeValue(allocator, output, attr.value, indent + 3, false);
 
             try output.addToken(.r_brace, "}");
             try output.addToken(.comma, ",");
@@ -2426,6 +2576,102 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                     // Render else branch
                                     try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
                                 },
+                                .for_loop_block => |for_loop| {
+                                    // For loop block: blk: { const children = ...; for (...) { ... }; break :blk children; }
+                                    try output.addToken(.identifier, "blk");
+                                    try output.addToken(.colon, ":");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.l_brace, "{");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // const __zx_children = _zx.getAllocator().alloc(zx.Component, iterable.len) catch unreachable;
+                                    try addIndentTokens(output, indent + 5);
+                                    try output.addToken(.keyword_const, "const");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, "__zx_children");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.equal, "=");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, "_zx");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, "getAllocator");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.r_paren, ")");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, "alloc");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.identifier, "zx");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, "Component");
+                                    try output.addToken(.comma, ",");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, for_loop.iterable);
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.identifier, "len");
+                                    try output.addToken(.r_paren, ")");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.keyword_catch, "catch");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.keyword_unreachable, "unreachable");
+                                    try output.addToken(.semicolon, ";");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // for (iterable, 0..) |item, i| {
+                                    try addIndentTokens(output, indent + 5);
+                                    try output.addToken(.keyword_for, "for");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.identifier, for_loop.iterable);
+                                    try output.addToken(.comma, ",");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, "0");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.period, ".");
+                                    try output.addToken(.r_paren, ")");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.pipe, "|");
+                                    try output.addToken(.identifier, for_loop.item_name);
+                                    try output.addToken(.comma, ",");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, "i");
+                                    try output.addToken(.pipe, "|");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.l_brace, "{");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // __zx_children[i] = _zx.zx(...);
+                                    try addIndentTokens(output, indent + 6);
+                                    try output.addToken(.identifier, "__zx_children");
+                                    try output.addToken(.l_bracket, "[");
+                                    try output.addToken(.identifier, "i");
+                                    try output.addToken(.r_bracket, "]");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.equal, "=");
+                                    try output.addToken(.invalid, " ");
+                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                    try output.addToken(.semicolon, ";");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // }
+                                    try addIndentTokens(output, indent + 5);
+                                    try output.addToken(.r_brace, "}");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // break :blk __zx_children;
+                                    try addIndentTokens(output, indent + 5);
+                                    try output.addToken(.keyword_break, "break");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.colon, ":");
+                                    try output.addToken(.identifier, "blk");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.identifier, "__zx_children");
+                                    try output.addToken(.semicolon, ";");
+                                    try output.addToken(.invalid, "\n");
+
+                                    // }
+                                    try addIndentTokens(output, indent + 4);
+                                    try output.addToken(.r_brace, "}");
+                                },
                             }
 
                             try output.addToken(.comma, ",");
@@ -2500,55 +2746,7 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                 try output.addToken(.comma, ",");
 
                                 // Second argument: props struct (anytype)
-                                if (child_elem.attributes.items.len > 0) {
-                                    try output.addToken(.period, ".");
-                                    try output.addToken(.l_brace, "{");
-                                    for (child_elem.attributes.items, 0..) |attr, i| {
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, attr.name);
-                                        try output.addToken(.equal, "=");
-                                        switch (attr.value) {
-                                            .static => |val| {
-                                                const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                                                defer allocator.free(value_buf);
-                                                try output.addToken(.string_literal, value_buf);
-                                            },
-                                            .dynamic => |expr| {
-                                                try output.addToken(.identifier, expr);
-                                            },
-                                            .format => |fmt| {
-                                                // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
-                                                try output.addToken(.identifier, "_zx");
-                                                try output.addToken(.period, ".");
-                                                try output.addToken(.identifier, "print");
-                                                try output.addToken(.l_paren, "(");
-
-                                                // Format string: "{format}"
-                                                const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                                                defer allocator.free(format_str);
-                                                try output.addToken(.string_literal, format_str);
-                                                try output.addToken(.comma, ",");
-
-                                                // Expression wrapped in tuple: .{expr}
-                                                try output.addToken(.invalid, " ");
-                                                try output.addToken(.period, ".");
-                                                try output.addToken(.l_brace, "{");
-                                                try output.addToken(.identifier, fmt.expr);
-                                                try output.addToken(.r_brace, "}");
-                                                try output.addToken(.r_paren, ")");
-                                            },
-                                        }
-                                        if (i < child_elem.attributes.items.len - 1) {
-                                            try output.addToken(.comma, ",");
-                                        }
-                                    }
-                                    try output.addToken(.r_brace, "}");
-                                } else {
-                                    // Empty props struct
-                                    try output.addToken(.period, ".");
-                                    try output.addToken(.l_brace, "{");
-                                    try output.addToken(.r_brace, "}");
-                                }
+                                try renderPropsStruct(allocator, output, child_elem.attributes.items);
 
                                 try output.addToken(.r_paren, ")");
                                 try output.addToken(.comma, ",");
@@ -2572,56 +2770,8 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             continue;
                         }
 
-                        // Build props struct from attributes with explicit type (for lazy components)
-                        if (child_elem.attributes.items.len > 0) {
-                            try output.addToken(.period, ".");
-                            try output.addToken(.l_brace, "{");
-                            for (child_elem.attributes.items, 0..) |attr, i| {
-                                try output.addToken(.period, ".");
-                                try output.addToken(.identifier, attr.name);
-                                try output.addToken(.equal, "=");
-                                switch (attr.value) {
-                                    .static => |val| {
-                                        const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                                        defer allocator.free(value_buf);
-                                        try output.addToken(.string_literal, value_buf);
-                                    },
-                                    .dynamic => |expr| {
-                                        try output.addToken(.identifier, expr);
-                                    },
-                                    .format => |fmt| {
-                                        // Format expression: use _zx.fmt("{format}", .{expr}) for attribute values
-                                        try output.addToken(.identifier, "_zx");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.identifier, "print");
-                                        try output.addToken(.l_paren, "(");
-
-                                        // Format string: "{format}"
-                                        const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                                        defer allocator.free(format_str);
-                                        try output.addToken(.string_literal, format_str);
-                                        try output.addToken(.comma, ",");
-
-                                        // Expression wrapped in tuple: .{expr}
-                                        try output.addToken(.invalid, " ");
-                                        try output.addToken(.period, ".");
-                                        try output.addToken(.l_brace, "{");
-                                        try output.addToken(.identifier, fmt.expr);
-                                        try output.addToken(.r_brace, "}");
-                                        try output.addToken(.r_paren, ")");
-                                    },
-                                }
-                                if (i < child_elem.attributes.items.len - 1) {
-                                    try output.addToken(.comma, ",");
-                                }
-                            }
-                            try output.addToken(.r_brace, "}");
-                        } else {
-                            // Empty props struct with explicit type
-                            try output.addToken(.period, ".");
-                            try output.addToken(.l_brace, "{");
-                            try output.addToken(.r_brace, "}");
-                        }
+                        // Build props struct from attributes (for lazy components)
+                        try renderPropsStruct(allocator, output, child_elem.attributes.items);
 
                         try output.addToken(.r_paren, ")");
                         try output.addToken(.comma, ",");
@@ -2789,32 +2939,7 @@ fn renderNestedElementAsCall(allocator: std.mem.Allocator, output: *TokenBuilder
             try output.addToken(.identifier, "value");
             try output.addToken(.equal, "=");
 
-            switch (attr.value) {
-                .static => |val| {
-                    const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                    defer allocator.free(value_buf);
-                    try output.addToken(.string_literal, value_buf);
-                },
-                .dynamic => |expr| {
-                    try output.addToken(.identifier, expr);
-                },
-                .format => |fmt| {
-                    // Format expression: pass expression directly and set format field
-                    // .value = expr (expression as-is)
-                    try output.addToken(.identifier, fmt.expr);
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-
-                    // .format = "{format}"
-                    try addIndentTokens(output, indent + 3);
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "format");
-                    try output.addToken(.equal, "=");
-                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                    defer allocator.free(format_str);
-                    try output.addToken(.string_literal, format_str);
-                },
-            }
+            try renderAttributeValue(allocator, output, attr.value, indent + 3, false);
 
             try output.addToken(.r_brace, "}");
             try output.addToken(.comma, ",");
@@ -3074,34 +3199,7 @@ fn renderElementAsStruct(allocator: std.mem.Allocator, output: *TokenBuilder, el
             try output.addToken(.identifier, "value");
             try output.addToken(.equal, "=");
 
-            switch (attr.value) {
-                .static => |val| {
-                    // Static string value
-                    const value_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{val});
-                    defer allocator.free(value_buf);
-                    try output.addToken(.string_literal, value_buf);
-                },
-                .dynamic => |expr| {
-                    // Dynamic expression - output as-is
-                    try output.addToken(.identifier, expr);
-                },
-                .format => |fmt| {
-                    // Format expression: pass expression directly and set format field
-                    // .value = expr (expression as-is)
-                    try output.addToken(.identifier, fmt.expr);
-                    try output.addToken(.comma, ",");
-                    try output.addToken(.invalid, "\n");
-
-                    // .format = "{format}"
-                    try addIndentTokens(output, indent + 3);
-                    try output.addToken(.period, ".");
-                    try output.addToken(.identifier, "format");
-                    try output.addToken(.equal, "=");
-                    const format_str = try std.fmt.allocPrint(allocator, "\"{{{s}}}\"", .{fmt.format});
-                    defer allocator.free(format_str);
-                    try output.addToken(.string_literal, format_str);
-                },
-            }
+            try renderAttributeValue(allocator, output, attr.value, indent + 3, false);
             try output.addToken(.r_brace, "}");
             try output.addToken(.comma, ",");
         }

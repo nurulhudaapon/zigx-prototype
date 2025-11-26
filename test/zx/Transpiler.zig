@@ -80,8 +80,9 @@ test "switch_if" {
     try test_render(@import("./../data/control_flow/switch_if.zig").Page);
 }
 test "switch_for" {
-    return error.Todo;
-    // try test_transpile("control_flow/switch_for");
+    try test_transpile("control_flow/switch_for");
+    // Note: Page uses PageContext, not Allocator, so we skip render test
+    // try test_render(@import("./../data/control_flow/switch_for.zig").Page);
 }
 test "switch_switch" {
     return error.Todo;
@@ -224,7 +225,7 @@ const TestFileCache = struct {
         // "control_flow/for_for",
         "control_flow/for_switch",
         "control_flow/switch_if",
-        // "control_flow/switch_for",
+        "control_flow/switch_for",
         // "control_flow/switch_switch",
         // "control_flow/while",
         // "control_flow/while_block",
