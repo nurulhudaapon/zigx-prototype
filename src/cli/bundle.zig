@@ -108,8 +108,8 @@ fn bundle(ctx: zli.CommandContext) !void {
     };
 
     if (docker or docker_compose) {
-        const dockerfile_content = @embedFile("bundle/template/Dockerfile");
-        const compose_content = @embedFile("bundle/template/compose.yml");
+        const dockerfile_content = @embedFile("./bundle/template/Dockerfile");
+        const compose_content = @embedFile("./bundle/template/compose.yml");
 
         // Replace $BIN_NAME
         const dockerfile_content_with_bin_name = try std.mem.replaceOwned(u8, ctx.allocator, dockerfile_content, "$BIN_NAME", bin_name);
