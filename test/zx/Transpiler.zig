@@ -26,6 +26,18 @@ test "if_block" {
     try test_transpile("control_flow/if_block");
     try test_render(@import("./../data/control_flow/if_block.zig").Page);
 }
+
+test "if_only" {
+    return error.Todo;
+    // try test_transpile("control_flow/if_only");
+    // try test_render(@import("./../data/control_flow/if_only.zig").Page);
+}
+
+test "if_only_block" {
+    return error.Todo;
+    // try test_transpile("control_flow/if_only_block");
+    // try test_render(@import("./../data/control_flow/if_only_block.zig").Page);
+}
 // For
 test "for" {
     try test_transpile("control_flow/for");
@@ -189,7 +201,7 @@ fn test_render(comptime cmp: fn (allocator: std.mem.Allocator) zx.Component) !vo
     const rendered = aw.written();
     try testing.expect(rendered.len > 0);
 
-    // std.debug.print("rendered: {s}\n", .{rendered});
+    // std.debug.print("\x1b[32m✓\x1b[0m Rendered: {s}\n", .{rendered});
 
     // try testing.expectEqualStrings(expected_source_z, rendered);
 }
@@ -211,6 +223,8 @@ const TestFileCache = struct {
         // Control Flow
         "control_flow/if",
         "control_flow/if_block",
+        // "control_flow/if_only",
+        // "control_flow/if_only_block",
         "control_flow/for",
         "control_flow/for_block",
         "control_flow/switch",
