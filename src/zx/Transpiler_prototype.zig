@@ -306,6 +306,7 @@ const ZXElement = struct {
             jsx_element: *ZXElement, // For (<p>Admin</p>)
             conditional_expr: struct { condition: []const u8, if_branch: *ZXElement, else_branch: *ZXElement }, // For if (cond) (<JSX>) else (<JSX>)
             for_loop_block: struct { iterable: []const u8, item_name: []const u8, body: *ZXElement }, // For { for (iterable) |item| (<JSX>) }
+            switch_expr_block: struct { expr: []const u8, cases: std.ArrayList(SwitchCase) }, // For { switch (expr) { case => value, ... } }
         };
     };
 
@@ -371,6 +372,53 @@ const ZXElement = struct {
                         .for_loop_block => |for_loop| {
                             for_loop.body.deinit();
                             self.allocator.destroy(for_loop.body);
+                        },
+                        .switch_expr_block => |switch_block| {
+                            // Recursively deinit switch cases
+                            for (switch_block.cases.items) |nested_switch_case_deinit| {
+                                switch (nested_switch_case_deinit.value) {
+                                    .jsx_element => |jsx_elem| {
+                                        jsx_elem.deinit();
+                                        self.allocator.destroy(jsx_elem);
+                                    },
+                                    .conditional_expr => |cond| {
+                                        cond.if_branch.deinit();
+                                        self.allocator.destroy(cond.if_branch);
+                                        cond.else_branch.deinit();
+                                        self.allocator.destroy(cond.else_branch);
+                                    },
+                                    .for_loop_block => |for_loop| {
+                                        for_loop.body.deinit();
+                                        self.allocator.destroy(for_loop.body);
+                                    },
+                                    .switch_expr_block => |nested_switch| {
+                                        // Recursively handle nested switches
+                                        for (nested_switch.cases.items) |nested_case_deinit| {
+                                            switch (nested_case_deinit.value) {
+                                                .jsx_element => |jsx_elem| {
+                                                    jsx_elem.deinit();
+                                                    self.allocator.destroy(jsx_elem);
+                                                },
+                                                .conditional_expr => |cond| {
+                                                    cond.if_branch.deinit();
+                                                    self.allocator.destroy(cond.if_branch);
+                                                    cond.else_branch.deinit();
+                                                    self.allocator.destroy(cond.else_branch);
+                                                },
+                                                .for_loop_block => |for_loop| {
+                                                    for_loop.body.deinit();
+                                                    self.allocator.destroy(for_loop.body);
+                                                },
+                                                .switch_expr_block => {},
+                                                .string_literal => {},
+                                            }
+                                        }
+                                        // Note: nested_switch is const, cases are owned by parent
+                                    },
+                                    .string_literal => {},
+                                }
+                            }
+                            // Note: switch_block is const, cases are owned by parent
                         },
                         .string_literal => {},
                     }
@@ -1895,10 +1943,151 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                     }
                                 }
 
-                                // If we couldn't parse as for loop block, fail
-                                parsed_switch = false;
-                                break;
-                            } else {
+                                // Try to parse as switch expression: switch (expr) { case => value, ... }
+                                var switch_check_pos: usize = 0;
+                                while (switch_check_pos < block_content.len and std.ascii.isWhitespace(block_content[switch_check_pos])) switch_check_pos += 1;
+
+                                if (switch_check_pos + 5 < block_content.len and std.mem.startsWith(u8, block_content[switch_check_pos..], "switch")) {
+                                    // Parse switch expression from block content
+                                    var switch_parsed_in_block = true;
+                                    var switch_expr_str = block_content[switch_check_pos..];
+                                    
+                                    // Find opening paren after "switch"
+                                    var switch_pos_inner: usize = 6; // Skip "switch"
+                                    while (switch_pos_inner < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_pos_inner])) switch_pos_inner += 1;
+                                    
+                                    if (switch_pos_inner < switch_expr_str.len and switch_expr_str[switch_pos_inner] == '(') {
+                                        switch_pos_inner += 1; // Skip opening paren
+                                        // Find switch expression (text between ( and ))
+                                        const switch_expr_start_inner = switch_pos_inner;
+                                        var switch_expr_end_inner = switch_expr_start_inner;
+                                        var switch_paren_depth_inner: i32 = 1;
+                                        while (switch_expr_end_inner < switch_expr_str.len and switch_paren_depth_inner > 0) {
+                                            if (switch_expr_str[switch_expr_end_inner] == '(') switch_paren_depth_inner += 1;
+                                            if (switch_expr_str[switch_expr_end_inner] == ')') switch_paren_depth_inner -= 1;
+                                            if (switch_paren_depth_inner > 0) switch_expr_end_inner += 1;
+                                        }
+                                        const switch_expr_in_block = switch_expr_str[switch_expr_start_inner..switch_expr_end_inner];
+                                        
+                                        // Skip closing paren and whitespace
+                                        var switch_brace_pos_inner = switch_expr_end_inner + 1;
+                                        while (switch_brace_pos_inner < switch_expr_str.len and std.ascii.isWhitespace(switch_expr_str[switch_brace_pos_inner])) switch_brace_pos_inner += 1;
+                                        
+                                        // Find opening brace
+                                        if (switch_brace_pos_inner < switch_expr_str.len and switch_expr_str[switch_brace_pos_inner] == '{') {
+                                            switch_brace_pos_inner += 1; // Skip opening brace
+                                            
+                                            // Parse cases manually
+                                            var switch_cases = std.ArrayList(ZXElement.SwitchCase){};
+                                            defer switch_cases.deinit(allocator);
+                                            
+                                            // Extract the switch cases content (everything between the braces)
+                                            const switch_case_start_inner = switch_brace_pos_inner;
+                                            var switch_case_brace_depth_inner: i32 = 1;
+                                            var switch_case_end_inner = switch_case_start_inner;
+                                            while (switch_case_end_inner < switch_expr_str.len and switch_case_brace_depth_inner > 0) {
+                                                if (switch_expr_str[switch_case_end_inner] == '{') switch_case_brace_depth_inner += 1;
+                                                if (switch_expr_str[switch_case_end_inner] == '}') switch_case_brace_depth_inner -= 1;
+                                                if (switch_case_brace_depth_inner > 0) switch_case_end_inner += 1;
+                                            }
+                                            
+                                            // Parse cases
+                                            var case_start_inner = switch_brace_pos_inner;
+                                            while (case_start_inner < switch_case_end_inner) {
+                                                // Skip whitespace
+                                                while (case_start_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_start_inner])) case_start_inner += 1;
+                                                if (case_start_inner >= switch_case_end_inner) break;
+                                                
+                                                // Check for closing brace
+                                                if (switch_expr_str[case_start_inner] == '}') break;
+                                                
+                                                // Parse pattern
+                                                const case_pattern_start_inner = case_start_inner;
+                                                var case_pattern_end_inner = case_pattern_start_inner;
+                                                while (case_pattern_end_inner < switch_case_end_inner and switch_expr_str[case_pattern_end_inner] != '=' and !std.ascii.isWhitespace(switch_expr_str[case_pattern_end_inner])) {
+                                                    case_pattern_end_inner += 1;
+                                                }
+                                                const case_pattern_inner = switch_expr_str[case_pattern_start_inner..case_pattern_end_inner];
+                                                
+                                                // Skip whitespace and =>
+                                                var case_arrow_pos_inner = case_pattern_end_inner;
+                                                while (case_arrow_pos_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner])) case_arrow_pos_inner += 1;
+                                                if (case_arrow_pos_inner + 1 < switch_case_end_inner and switch_expr_str[case_arrow_pos_inner] == '=' and switch_expr_str[case_arrow_pos_inner + 1] == '>') {
+                                                    case_arrow_pos_inner += 2; // Skip =>
+                                                } else {
+                                                    switch_parsed_in_block = false;
+                                                    break;
+                                                }
+                                                
+                                                // Skip whitespace after =>
+                                                while (case_arrow_pos_inner < switch_case_end_inner and std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner])) case_arrow_pos_inner += 1;
+                                                
+                                                // Parse value - JSX element: (<p>...</p>)
+                                                if (case_arrow_pos_inner < switch_case_end_inner and switch_expr_str[case_arrow_pos_inner] == '(') {
+                                                    case_arrow_pos_inner += 1; // Skip opening paren
+                                                    const case_value_start_inner = case_arrow_pos_inner;
+                                                    var case_jsx_paren_depth_inner: i32 = 1;
+                                                    var case_jsx_brace_depth_inner: i32 = 0;
+                                                    var case_jsx_end_inner = case_arrow_pos_inner;
+                                                    while (case_jsx_end_inner < switch_case_end_inner and case_jsx_paren_depth_inner > 0) {
+                                                        if (switch_expr_str[case_jsx_end_inner] == '(') case_jsx_paren_depth_inner += 1;
+                                                        if (switch_expr_str[case_jsx_end_inner] == ')') case_jsx_paren_depth_inner -= 1;
+                                                        if (switch_expr_str[case_jsx_end_inner] == '{') case_jsx_brace_depth_inner += 1;
+                                                        if (switch_expr_str[case_jsx_end_inner] == '}') case_jsx_brace_depth_inner -= 1;
+                                                        if (case_jsx_paren_depth_inner > 0) case_jsx_end_inner += 1;
+                                                    }
+                                                    const case_jsx_content_inner = switch_expr_str[case_value_start_inner..case_jsx_end_inner];
+                                                    
+                                                    if (parseJsx(allocator, case_jsx_content_inner)) |case_jsx_elem| {
+                                                        try switch_cases.append(allocator, .{
+                                                            .pattern = case_pattern_inner,
+                                                            .value = .{ .jsx_element = case_jsx_elem },
+                                                        });
+                                                    } else |_| {
+                                                        switch_parsed_in_block = false;
+                                                        break;
+                                                    }
+                                                    case_arrow_pos_inner = case_jsx_end_inner + 1; // Skip closing paren
+                                                } else {
+                                                    switch_parsed_in_block = false;
+                                                    break;
+                                                }
+                                                
+                                                // Skip whitespace and comma if present
+                                                while (case_arrow_pos_inner < switch_case_end_inner and (std.ascii.isWhitespace(switch_expr_str[case_arrow_pos_inner]) or switch_expr_str[case_arrow_pos_inner] == ',')) {
+                                                    case_arrow_pos_inner += 1;
+                                                }
+                                                
+                                                case_start_inner = case_arrow_pos_inner;
+                                            }
+                                            
+                                            if (switch_parsed_in_block and switch_cases.items.len > 0) {
+                                                // Create switch_expr_block
+                                                var switch_cases_owned = std.ArrayList(ZXElement.SwitchCase){};
+                                                try switch_cases_owned.appendSlice(allocator, switch_cases.items);
+                                                
+                                                try cases.append(allocator, .{
+                                                    .pattern = pattern,
+                                                    .value = .{ .switch_expr_block = .{
+                                                        .expr = switch_expr_in_block,
+                                                        .cases = switch_cases_owned,
+                                                    } },
+                                                });
+                                                arrow_pos = block_end + 1; // Skip closing brace
+                                                // Skip whitespace and comma if present
+                                                while (arrow_pos < expr.len and (std.ascii.isWhitespace(expr[arrow_pos]) or expr[arrow_pos] == ',')) {
+                                                    arrow_pos += 1;
+                                                }
+                                                case_start = arrow_pos;
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // If we couldn't parse as for loop or switch, fail
+                            if (!parsed_switch) {
                                 parsed_switch = false;
                                 break;
                             }
@@ -2917,6 +3106,157 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                             try addIndentTokens(output, indent + 4);
                             try output.addToken(.r_brace, "}");
                         },
+                        .switch_expr_block => |switch_block| {
+                            // Switch expression block: switch (expr) { case => value, ... }
+                            try output.addToken(.invalid, "switch");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_paren, "(");
+                            try output.addToken(.identifier, switch_block.expr);
+                            try output.addToken(.r_paren, ")");
+                            try output.addToken(.invalid, " ");
+                            try output.addToken(.l_brace, "{");
+                            try output.addToken(.invalid, "\n");
+
+                                    for (switch_block.cases.items) |nested_switch_case| {
+                                        try addIndentTokens(output, indent + 5);
+                                        // Pattern (e.g., .admin)
+                                        if (nested_switch_case.pattern.len > 0 and nested_switch_case.pattern[0] == '.') {
+                                            try output.addToken(.period, ".");
+                                            if (nested_switch_case.pattern.len > 1) {
+                                                try output.addToken(.identifier, nested_switch_case.pattern[1..]);
+                                            }
+                                        } else {
+                                            try output.addToken(.identifier, nested_switch_case.pattern);
+                                        }
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.invalid, "=>");
+                                        try output.addToken(.invalid, " ");
+
+                                        switch (nested_switch_case.value) {
+                                    .string_literal => |str| {
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "txt");
+                                        try output.addToken(.l_paren, "(");
+                                        const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                        defer allocator.free(str_buf);
+                                        try output.addToken(.string_literal, str_buf);
+                                        try output.addToken(.r_paren, ")");
+                                    },
+                                    .jsx_element => |jsx_elem| {
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .conditional_expr => |cond| {
+                                        try output.addToken(.keyword_if, "if");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.invalid, cond.condition);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.if_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_else, "else");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, cond.else_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                    },
+                                    .for_loop_block => |for_loop| {
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 6);
+                                        try output.addToken(.keyword_const, "const");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "_zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "getAllocator");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "alloc");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, "zx");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "Component");
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.identifier, "len");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_catch, "catch");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.keyword_unreachable, "unreachable");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 6);
+                                        try output.addToken(.keyword_for, "for");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, for_loop.iterable);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "0");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.period, ".");
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.identifier, for_loop.item_name);
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.pipe, "|");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 7);
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.l_bracket, "[");
+                                        try output.addToken(.identifier, "i");
+                                        try output.addToken(.r_bracket, "]");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.equal, "=");
+                                        try output.addToken(.invalid, " ");
+                                        try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 6);
+                                        try output.addToken(.r_brace, "}");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 6);
+                                        try output.addToken(.keyword_break, "break");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.colon, ":");
+                                        try output.addToken(.identifier, "blk");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.identifier, "__zx_children");
+                                        try output.addToken(.semicolon, ";");
+                                        try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 5);
+                                        try output.addToken(.r_brace, "}");
+                                    },
+                                    .switch_expr_block => {},
+                                }
+
+                                try output.addToken(.comma, ",");
+                                try output.addToken(.invalid, "\n");
+                            }
+
+                            try addIndentTokens(output, indent + 4);
+                            try output.addToken(.r_brace, "}");
+                        },
                     }
 
                     try output.addToken(.comma, ",");
@@ -3164,6 +3504,156 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try addIndentTokens(output, indent + 3);
                                         try output.addToken(.r_brace, "}");
                                     },
+                                    .switch_expr_block => |switch_block| {
+                                        // Switch expression block: switch (expr) { case => value, ... }
+                                        try output.addToken(.invalid, "switch");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, switch_block.expr);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        for (switch_block.cases.items) |nested_switch_case4| {
+                                            try addIndentTokens(output, indent + 4);
+                                            if (nested_switch_case4.pattern.len > 0 and nested_switch_case4.pattern[0] == '.') {
+                                                try output.addToken(.period, ".");
+                                                if (nested_switch_case4.pattern.len > 1) {
+                                                    try output.addToken(.identifier, nested_switch_case4.pattern[1..]);
+                                                }
+                                            } else {
+                                                try output.addToken(.identifier, nested_switch_case4.pattern);
+                                            }
+                                            try output.addToken(.invalid, " ");
+                                            try output.addToken(.invalid, "=>");
+                                            try output.addToken(.invalid, " ");
+
+                                            switch (nested_switch_case4.value) {
+                                                .string_literal => |str| {
+                                                    try output.addToken(.identifier, "_zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "txt");
+                                                    try output.addToken(.l_paren, "(");
+                                                    const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                                    defer allocator.free(str_buf);
+                                                    try output.addToken(.string_literal, str_buf);
+                                                    try output.addToken(.r_paren, ")");
+                                                },
+                                                .jsx_element => |jsx_elem| {
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                },
+                                                .conditional_expr => |cond2| {
+                                                    try output.addToken(.keyword_if, "if");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.invalid, cond2.condition);
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_else, "else");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond2.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                },
+                                                .for_loop_block => |for_loop| {
+                                                    try output.addToken(.identifier, "blk");
+                                                    try output.addToken(.colon, ":");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_brace, "{");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_const, "const");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.equal, "=");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "_zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "getAllocator");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "alloc");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.identifier, "zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "Component");
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, for_loop.iterable);
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "len");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_catch, "catch");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_unreachable, "unreachable");
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_for, "for");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.identifier, for_loop.iterable);
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "0");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.pipe, "|");
+                                                    try output.addToken(.identifier, for_loop.item_name);
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "i");
+                                                    try output.addToken(.pipe, "|");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_brace, "{");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 6);
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.l_bracket, "[");
+                                                    try output.addToken(.identifier, "i");
+                                                    try output.addToken(.r_bracket, "]");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.equal, "=");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.r_brace, "}");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_break, "break");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.colon, ":");
+                                                    try output.addToken(.identifier, "blk");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 4);
+                                                    try output.addToken(.r_brace, "}");
+                                                },
+                                                .switch_expr_block => {},
+                                            }
+
+                                            try output.addToken(.comma, ",");
+                                            try output.addToken(.invalid, "\n");
+                                        }
+
+                                        try addIndentTokens(output, indent + 3);
+                                        try output.addToken(.r_brace, "}");
+                                    },
                                 }
 
                                 try output.addToken(.comma, ",");
@@ -3319,6 +3809,156 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                         try output.addToken(.identifier, "__zx_children");
                                         try output.addToken(.semicolon, ";");
                                         try output.addToken(.invalid, "\n");
+
+                                        try addIndentTokens(output, indent + 3);
+                                        try output.addToken(.r_brace, "}");
+                                    },
+                                    .switch_expr_block => |switch_block| {
+                                        // Switch expression block: switch (expr) { case => value, ... }
+                                        try output.addToken(.invalid, "switch");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_paren, "(");
+                                        try output.addToken(.identifier, switch_block.expr);
+                                        try output.addToken(.r_paren, ")");
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.l_brace, "{");
+                                        try output.addToken(.invalid, "\n");
+
+                                        for (switch_block.cases.items) |nested_switch_case7| {
+                                            try addIndentTokens(output, indent + 4);
+                                            if (nested_switch_case7.pattern.len > 0 and nested_switch_case7.pattern[0] == '.') {
+                                                try output.addToken(.period, ".");
+                                                if (nested_switch_case7.pattern.len > 1) {
+                                                    try output.addToken(.identifier, nested_switch_case7.pattern[1..]);
+                                                }
+                                            } else {
+                                                try output.addToken(.identifier, nested_switch_case7.pattern);
+                                            }
+                                            try output.addToken(.invalid, " ");
+                                            try output.addToken(.invalid, "=>");
+                                            try output.addToken(.invalid, " ");
+
+                                            switch (nested_switch_case7.value) {
+                                                .string_literal => |str| {
+                                                    try output.addToken(.identifier, "_zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "txt");
+                                                    try output.addToken(.l_paren, "(");
+                                                    const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                                    defer allocator.free(str_buf);
+                                                    try output.addToken(.string_literal, str_buf);
+                                                    try output.addToken(.r_paren, ")");
+                                                },
+                                                .jsx_element => |jsx_elem| {
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                },
+                                                .conditional_expr => |cond3| {
+                                                    try output.addToken(.keyword_if, "if");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.invalid, cond3.condition);
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_else, "else");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 4, loop_iterable, loop_item, js_imports, client_components);
+                                                },
+                                                .for_loop_block => |for_loop| {
+                                                    try output.addToken(.identifier, "blk");
+                                                    try output.addToken(.colon, ":");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_brace, "{");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_const, "const");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.equal, "=");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "_zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "getAllocator");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "alloc");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.identifier, "zx");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "Component");
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, for_loop.iterable);
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.identifier, "len");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_catch, "catch");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.keyword_unreachable, "unreachable");
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_for, "for");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_paren, "(");
+                                                    try output.addToken(.identifier, for_loop.iterable);
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "0");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.period, ".");
+                                                    try output.addToken(.r_paren, ")");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.pipe, "|");
+                                                    try output.addToken(.identifier, for_loop.item_name);
+                                                    try output.addToken(.comma, ",");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "i");
+                                                    try output.addToken(.pipe, "|");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.l_brace, "{");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 6);
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.l_bracket, "[");
+                                                    try output.addToken(.identifier, "i");
+                                                    try output.addToken(.r_bracket, "]");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.equal, "=");
+                                                    try output.addToken(.invalid, " ");
+                                                    try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 6, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.r_brace, "}");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 5);
+                                                    try output.addToken(.keyword_break, "break");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.colon, ":");
+                                                    try output.addToken(.identifier, "blk");
+                                                    try output.addToken(.invalid, " ");
+                                                    try output.addToken(.identifier, "__zx_children");
+                                                    try output.addToken(.semicolon, ";");
+                                                    try output.addToken(.invalid, "\n");
+
+                                                    try addIndentTokens(output, indent + 4);
+                                                    try output.addToken(.r_brace, "}");
+                                                },
+                                                .switch_expr_block => {},
+                                            }
+
+                                            try output.addToken(.comma, ",");
+                                            try output.addToken(.invalid, "\n");
+                                        }
 
                                         try addIndentTokens(output, indent + 3);
                                         try output.addToken(.r_brace, "}");
@@ -3594,6 +4234,156 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                                     try output.addToken(.invalid, "\n");
 
                                     // }
+                                    try addIndentTokens(output, indent + 4);
+                                    try output.addToken(.r_brace, "}");
+                                },
+                                .switch_expr_block => |switch_block| {
+                                    // Switch expression block: switch (expr) { case => value, ... }
+                                    try output.addToken(.invalid, "switch");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.l_paren, "(");
+                                    try output.addToken(.identifier, switch_block.expr);
+                                    try output.addToken(.r_paren, ")");
+                                    try output.addToken(.invalid, " ");
+                                    try output.addToken(.l_brace, "{");
+                                    try output.addToken(.invalid, "\n");
+
+                                    for (switch_block.cases.items) |nested_switch_case11| {
+                                        try addIndentTokens(output, indent + 5);
+                                        if (nested_switch_case11.pattern.len > 0 and nested_switch_case11.pattern[0] == '.') {
+                                            try output.addToken(.period, ".");
+                                            if (nested_switch_case11.pattern.len > 1) {
+                                                try output.addToken(.identifier, nested_switch_case11.pattern[1..]);
+                                            }
+                                        } else {
+                                            try output.addToken(.identifier, nested_switch_case11.pattern);
+                                        }
+                                        try output.addToken(.invalid, " ");
+                                        try output.addToken(.invalid, "=>");
+                                        try output.addToken(.invalid, " ");
+
+                                        switch (nested_switch_case11.value) {
+                                            .string_literal => |str| {
+                                                try output.addToken(.identifier, "_zx");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.identifier, "txt");
+                                                try output.addToken(.l_paren, "(");
+                                                const str_buf = try std.fmt.allocPrint(allocator, "\"{s}\"", .{str});
+                                                defer allocator.free(str_buf);
+                                                try output.addToken(.string_literal, str_buf);
+                                                try output.addToken(.r_paren, ")");
+                                            },
+                                            .jsx_element => |jsx_elem| {
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, jsx_elem, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                            },
+                                            .conditional_expr => |cond3| {
+                                                try output.addToken(.keyword_if, "if");
+                                                try output.addToken(.l_paren, "(");
+                                                try output.addToken(.invalid, cond3.condition);
+                                                try output.addToken(.r_paren, ")");
+                                                try output.addToken(.invalid, " ");
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.if_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.keyword_else, "else");
+                                                try output.addToken(.invalid, " ");
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, cond3.else_branch, indent + 5, loop_iterable, loop_item, js_imports, client_components);
+                                            },
+                                            .for_loop_block => |for_loop| {
+                                                try output.addToken(.identifier, "blk");
+                                                try output.addToken(.colon, ":");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.l_brace, "{");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 6);
+                                                try output.addToken(.keyword_const, "const");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, "__zx_children");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.equal, "=");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, "_zx");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.identifier, "getAllocator");
+                                                try output.addToken(.l_paren, "(");
+                                                try output.addToken(.r_paren, ")");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.identifier, "alloc");
+                                                try output.addToken(.l_paren, "(");
+                                                try output.addToken(.identifier, "zx");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.identifier, "Component");
+                                                try output.addToken(.comma, ",");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, for_loop.iterable);
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.identifier, "len");
+                                                try output.addToken(.r_paren, ")");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.keyword_catch, "catch");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.keyword_unreachable, "unreachable");
+                                                try output.addToken(.semicolon, ";");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 6);
+                                                try output.addToken(.keyword_for, "for");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.l_paren, "(");
+                                                try output.addToken(.identifier, for_loop.iterable);
+                                                try output.addToken(.comma, ",");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, "0");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.period, ".");
+                                                try output.addToken(.r_paren, ")");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.pipe, "|");
+                                                try output.addToken(.identifier, for_loop.item_name);
+                                                try output.addToken(.comma, ",");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, "i");
+                                                try output.addToken(.pipe, "|");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.l_brace, "{");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 7);
+                                                try output.addToken(.identifier, "__zx_children");
+                                                try output.addToken(.l_bracket, "[");
+                                                try output.addToken(.identifier, "i");
+                                                try output.addToken(.r_bracket, "]");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.equal, "=");
+                                                try output.addToken(.invalid, " ");
+                                                try renderJsxAsTokensWithLoopContext(allocator, output, for_loop.body, indent + 7, for_loop.iterable, for_loop.item_name, js_imports, client_components);
+                                                try output.addToken(.semicolon, ";");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 6);
+                                                try output.addToken(.r_brace, "}");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 6);
+                                                try output.addToken(.keyword_break, "break");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.colon, ":");
+                                                try output.addToken(.identifier, "blk");
+                                                try output.addToken(.invalid, " ");
+                                                try output.addToken(.identifier, "__zx_children");
+                                                try output.addToken(.semicolon, ";");
+                                                try output.addToken(.invalid, "\n");
+
+                                                try addIndentTokens(output, indent + 5);
+                                                try output.addToken(.r_brace, "}");
+                                            },
+                                            .switch_expr_block => {},
+                                        }
+
+                                        try output.addToken(.comma, ",");
+                                        try output.addToken(.invalid, "\n");
+                                    }
+
                                     try addIndentTokens(output, indent + 4);
                                     try output.addToken(.r_brace, "}");
                                 },

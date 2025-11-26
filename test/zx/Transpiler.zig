@@ -83,8 +83,8 @@ test "switch_for" {
     try test_render(@import("./../data/control_flow/switch_for.zig").Page);
 }
 test "switch_switch" {
-    return error.Todo;
-    // try test_transpile("control_flow/switch_switch");
+    try test_transpile("control_flow/switch_switch");
+    try test_render(@import("./../data/control_flow/switch_switch.zig").Page);
 }
 // While
 // TODO: Implement while loop
@@ -224,7 +224,7 @@ const TestFileCache = struct {
         "control_flow/for_switch",
         "control_flow/switch_if",
         "control_flow/switch_for",
-        // "control_flow/switch_switch",
+        "control_flow/switch_switch",
         // "control_flow/while",
         // "control_flow/while_block",
         // Expression
