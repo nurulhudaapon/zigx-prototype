@@ -50,8 +50,7 @@ fn serve(ctx: zli.CommandContext) !void {
     defer program_meta.deinit(ctx.allocator);
 
     jsutil.buildjs(ctx, binpath, false, false) catch |err| {
-        try ctx.writer.print("Error building JS! {any}\n", .{err});
-        return err;
+        log.debug("Error building JS! {any}", .{err});
     };
 
     const term = try system.wait();
@@ -63,3 +62,4 @@ const zli = @import("zli");
 const util = @import("shared/util.zig");
 const flags = @import("shared/flag.zig");
 const jsutil = @import("shared/js.zig");
+const log = std.log.scoped(.cli);
