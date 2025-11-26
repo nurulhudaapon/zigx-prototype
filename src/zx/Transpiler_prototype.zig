@@ -317,6 +317,7 @@ const ZXElement = struct {
         format_expr: struct { expr: []const u8, format: []const u8 }, // For {[expr:fmt]}
         conditional_expr: struct { condition: []const u8, if_branch: *ZXElement, else_branch: *ZXElement }, // For {if (cond) (<JSX>) else (<JSX>)}
         for_loop_expr: struct { iterable: []const u8, item_name: []const u8, body: *ZXElement }, // For {for (iterable) |item| (<JSX>)}
+        while_loop_expr: struct { condition: []const u8, continue_expr: []const u8, body: *ZXElement }, // For {while (condition) : (continue_expr) (<JSX>)}
         switch_expr: struct { expr: []const u8, cases: std.ArrayList(SwitchCase) }, // For {switch (expr) { case => value, ... }}
         element: *ZXElement,
         raw_svg_content: []const u8, // For SVG tags - raw unescaped content
@@ -355,6 +356,9 @@ const ZXElement = struct {
             } else if (child == .for_loop_expr) {
                 child.for_loop_expr.body.deinit();
                 self.allocator.destroy(child.for_loop_expr.body);
+            } else if (child == .while_loop_expr) {
+                child.while_loop_expr.body.deinit();
+                self.allocator.destroy(child.while_loop_expr.body);
             } else if (child == .switch_expr) {
                 var switch_expr = child.switch_expr;
                 for (switch_expr.cases.items) |switch_case| {
@@ -1613,6 +1617,106 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                     try parent.children.append(allocator, .{ .text_expr = expr });
                 }
             }
+            // Check for while loop expression: {while (condition) : (continue_expr) (<JSX>)}
+            else if (std.mem.startsWith(u8, expr, "while")) {
+                // Pattern: while (condition) : (continue_expr) (<JSX>)
+                var parsed_while_loop = true;
+
+                // Find opening paren after "while"
+                var while_pos: usize = 5; // Skip "while"
+                while (while_pos < expr.len and std.ascii.isWhitespace(expr[while_pos])) while_pos += 1;
+
+                if (while_pos < expr.len and expr[while_pos] == '(') {
+                    while_pos += 1; // Skip opening paren
+                    // Find condition (text between ( and ))
+                    const condition_start = while_pos;
+                    var condition_end = condition_start;
+                    var paren_depth: i32 = 1;
+                    while (condition_end < expr.len and paren_depth > 0) {
+                        if (expr[condition_end] == '(') paren_depth += 1;
+                        if (expr[condition_end] == ')') paren_depth -= 1;
+                        if (paren_depth > 0) condition_end += 1;
+                    }
+                    const condition = expr[condition_start..condition_end];
+
+                    // Skip closing paren and whitespace
+                    var colon_pos = condition_end + 1;
+                    while (colon_pos < expr.len and std.ascii.isWhitespace(expr[colon_pos])) colon_pos += 1;
+
+                    // Find : (continue_expr) pattern
+                    if (colon_pos < expr.len and expr[colon_pos] == ':') {
+                        colon_pos += 1; // Skip :
+                        while (colon_pos < expr.len and std.ascii.isWhitespace(expr[colon_pos])) colon_pos += 1;
+
+                        // Check for opening paren for continue expression
+                        if (colon_pos < expr.len and expr[colon_pos] == '(') {
+                            colon_pos += 1; // Skip opening paren
+                            // Find continue expression (text between ( and ))
+                            const continue_start = colon_pos;
+                            var continue_end = continue_start;
+                            paren_depth = 1;
+                            while (continue_end < expr.len and paren_depth > 0) {
+                                if (expr[continue_end] == '(') paren_depth += 1;
+                                if (expr[continue_end] == ')') paren_depth -= 1;
+                                if (paren_depth > 0) continue_end += 1;
+                            }
+                            const continue_expr = expr[continue_start..continue_end];
+
+                            // Skip closing paren and whitespace
+                            var jsx_pos = continue_end + 1;
+                            while (jsx_pos < expr.len and std.ascii.isWhitespace(expr[jsx_pos])) jsx_pos += 1;
+
+                            // Check for opening paren: {while (condition) : (continue_expr) (<JSX>)}
+                            if (jsx_pos < expr.len and expr[jsx_pos] == '(') {
+                                jsx_pos += 1; // Skip opening paren
+                                // Find matching closing paren
+                                const jsx_content_start = jsx_pos;
+                                var jsx_content_end = jsx_pos;
+                                paren_depth = 1;
+                                var while_brace_depth: i32 = 0;
+                                while (jsx_content_end < expr.len and paren_depth > 0) {
+                                    if (expr[jsx_content_end] == '(') paren_depth += 1;
+                                    if (expr[jsx_content_end] == ')') paren_depth -= 1;
+                                    if (expr[jsx_content_end] == '{') while_brace_depth += 1;
+                                    if (expr[jsx_content_end] == '}') while_brace_depth -= 1;
+                                    if (paren_depth > 0) jsx_content_end += 1;
+                                }
+                                const jsx_content = expr[jsx_content_start..jsx_content_end];
+
+                                // Parse JSX body - wrap in a fragment if needed
+                                var body_elem: *ZXElement = undefined;
+                                if (parseJsx(allocator, jsx_content)) |parsed_elem| {
+                                    body_elem = parsed_elem;
+                                } else |_| {
+                                    // Content doesn't start with <, so wrap it in a fragment and parse as children
+                                    body_elem = try ZXElement.init(allocator, "fragment");
+                                    try parseJsxChildren(allocator, body_elem, jsx_content);
+                                }
+
+                                try parent.children.append(allocator, .{ .while_loop_expr = .{
+                                    .condition = condition,
+                                    .continue_expr = continue_expr,
+                                    .body = body_elem,
+                                } });
+                                continue;
+                            } else {
+                                parsed_while_loop = false;
+                            }
+                        } else {
+                            parsed_while_loop = false;
+                        }
+                    } else {
+                        parsed_while_loop = false;
+                    }
+                } else {
+                    parsed_while_loop = false;
+                }
+
+                // If we couldn't parse as while loop, treat as regular expression
+                if (!parsed_while_loop) {
+                    try parent.children.append(allocator, .{ .text_expr = expr });
+                }
+            }
             // Check for switch expression: {switch (expr) { case => value, ... }}
             else if (std.mem.startsWith(u8, expr, "switch")) {
                 var parsed_switch = true;
@@ -2791,6 +2895,132 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
             try output.addToken(.identifier, "blk");
             try output.addToken(.invalid, " ");
             try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // }
+            try addIndentTokens(output, indent + 2);
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, "\n");
+        } else if (elem.children.items.len == 1 and elem.children.items[0] == .while_loop_expr) {
+            const while_loop = elem.children.items[0].while_loop_expr;
+
+            // Render the blk directly without &.{ ... } wrapper
+            // Use a fixed-size array allocation with a reasonable maximum
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "blk");
+            try output.addToken(.colon, ":");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.invalid, "\n");
+
+            // var __zx_count: usize = 0;
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_var, "var");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.colon, ":");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "usize");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "0");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // const __zx_children = _zx.getAllocator().alloc(zx.Component, 1024) catch unreachable;
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_const, "const");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "_zx");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "getAllocator");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "alloc");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.identifier, "zx");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "Component");
+            try output.addToken(.comma, ",");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "1024");
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.keyword_catch, "catch");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.keyword_unreachable, "unreachable");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // while (condition) : (continue_expr) {
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_while, "while");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.identifier, while_loop.condition);
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.colon, ":");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_paren, "(");
+            try output.addToken(.identifier, while_loop.continue_expr);
+            try output.addToken(.r_paren, ")");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.l_brace, "{");
+            try output.addToken(.invalid, "\n");
+
+            // __zx_children[__zx_count] = _zx.zx(...);
+            try addIndentTokens(output, indent + 4);
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.l_bracket, "[");
+            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.r_bracket, "]");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, js_imports, client_components);
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // __zx_count += 1;
+            try addIndentTokens(output, indent + 4);
+            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.plus, "+");
+            try output.addToken(.equal, "=");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "1");
+            try output.addToken(.semicolon, ";");
+            try output.addToken(.invalid, "\n");
+
+            // }
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.r_brace, "}");
+            try output.addToken(.invalid, "\n");
+
+            // break :blk __zx_children[0..__zx_count];
+            try addIndentTokens(output, indent + 3);
+            try output.addToken(.keyword_break, "break");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.colon, ":");
+            try output.addToken(.identifier, "blk");
+            try output.addToken(.invalid, " ");
+            try output.addToken(.identifier, "__zx_children");
+            try output.addToken(.l_bracket, "[");
+            try output.addToken(.identifier, "0");
+            try output.addToken(.period, ".");
+            try output.addToken(.period, ".");
+            try output.addToken(.identifier, "__zx_count");
+            try output.addToken(.r_bracket, "]");
             try output.addToken(.semicolon, ";");
             try output.addToken(.invalid, "\n");
 
@@ -4069,6 +4299,130 @@ fn renderJsxAsTokensWithLoopContext(allocator: std.mem.Allocator, output: *Token
                         try output.addToken(.identifier, "blk");
                         try output.addToken(.invalid, " ");
                         try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // }
+                        try addIndentTokens(output, indent + 2);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, "\n");
+                    },
+                    .while_loop_expr => |while_loop| {
+                        // While loop expression: {while (condition) : (continue_expr) (<JSX>)}
+                        // Render as: blk: { var count = 0; const children = alloc(...); while (...) { ... }; break :blk children[0..count]; }
+                        try output.addToken(.identifier, "blk");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+
+                        // var __zx_count: usize = 0;
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.keyword_var, "var");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "__zx_count");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "usize");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "0");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // const __zx_children = _zx.getAllocator().alloc(zx.Component, 1024) catch unreachable;
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.keyword_const, "const");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "_zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "getAllocator");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "alloc");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, "zx");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "Component");
+                        try output.addToken(.comma, ",");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "1024");
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.keyword_catch, "catch");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.keyword_unreachable, "unreachable");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // while (condition) : (continue_expr) {
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.keyword_while, "while");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, while_loop.condition);
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_paren, "(");
+                        try output.addToken(.identifier, while_loop.continue_expr);
+                        try output.addToken(.r_paren, ")");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.l_brace, "{");
+                        try output.addToken(.invalid, "\n");
+
+                        // __zx_children[__zx_count] = _zx.zx(...);
+                        try addIndentTokens(output, indent + 4);
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.l_bracket, "[");
+                        try output.addToken(.identifier, "__zx_count");
+                        try output.addToken(.r_bracket, "]");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try renderJsxAsTokensWithLoopContext(allocator, output, while_loop.body, indent + 4, null, null, js_imports, client_components);
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // __zx_count += 1;
+                        try addIndentTokens(output, indent + 4);
+                        try output.addToken(.identifier, "__zx_count");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.plus, "+");
+                        try output.addToken(.equal, "=");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "1");
+                        try output.addToken(.semicolon, ";");
+                        try output.addToken(.invalid, "\n");
+
+                        // }
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.r_brace, "}");
+                        try output.addToken(.invalid, "\n");
+
+                        // break :blk __zx_children[0..__zx_count];
+                        try addIndentTokens(output, indent + 3);
+                        try output.addToken(.keyword_break, "break");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.colon, ":");
+                        try output.addToken(.identifier, "blk");
+                        try output.addToken(.invalid, " ");
+                        try output.addToken(.identifier, "__zx_children");
+                        try output.addToken(.l_bracket, "[");
+                        try output.addToken(.identifier, "0");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.period, ".");
+                        try output.addToken(.identifier, "__zx_count");
+                        try output.addToken(.r_bracket, "]");
                         try output.addToken(.semicolon, ";");
                         try output.addToken(.invalid, "\n");
 

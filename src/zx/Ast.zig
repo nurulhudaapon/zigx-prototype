@@ -29,6 +29,8 @@ pub fn parse(gpa: std.mem.Allocator, zx_source: [:0]const u8) !ParseResult {
     const transpilation_result = try Transpiler.transpile(arena, zx_source);
     const zig_source = transpilation_result.zig_source;
 
+    // astlog.warn("Zig Source: \n{s}\n", .{zig_source});
+
     // Post-process to comment out @jsImport declarations
     const processed_zig_source = try commentOutJsImports(arena, zig_source);
     defer arena.free(processed_zig_source);
