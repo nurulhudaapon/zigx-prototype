@@ -134,10 +134,10 @@ fn bundle(ctx: zli.CommandContext) !void {
         defer ctx.allocator.free(compose_path);
 
         try std.fs.cwd().writeFile(.{ .sub_path = dockerfile_path, .data = dockerfile_content_with_build_args });
-        printer.printFilePath(dockerfile_path);
+        printer.printFilePath(std.fs.path.basename(dockerfile_path));
         if (docker_compose) {
             try std.fs.cwd().writeFile(.{ .sub_path = compose_path, .data = compose_content_with_port });
-            printer.printFilePath(compose_path);
+            printer.printFilePath(std.fs.path.basename(compose_path));
         }
     }
 
