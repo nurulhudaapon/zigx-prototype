@@ -12,7 +12,8 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
 ```
 
 ## Changelog
-- feat: path segment support
+- feat: more nested control flow support
+- feat: if only support
 
 ## Feature Checklist
 
@@ -27,7 +28,7 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
     - [x] Path Segments
 - [x] Components
 - [x] Control Flow
-    - [ ] `if`
+    - [x] `if`
     - [ ] `if` nested
     - [x] `if/else`
     - [x] `if/else` nested
@@ -35,8 +36,8 @@ powershell -c "irm ziex.dev/install.ps1 | iex"
     - [x] `for` nested
     - [x] `switch`
     - [x] `switch` nested
-    - [ ] `while`
-    - [ ] `while` nested
+    - [x] `while`
+    - [x] `while` nested
 - [x] Assets
     - [x] Copying
     - [x] Serving

@@ -27,16 +27,25 @@ test "if_block" {
     try test_render(@import("./../data/control_flow/if_block.zig").Page);
 }
 
-test "if_only" {
+test "if_if_only" {
     return error.Todo;
-    // try test_transpile("control_flow/if_only");
-    // try test_render(@import("./../data/control_flow/if_only.zig").Page);
+    // try test_transpile("control_flow/if_if_only");
+    // try test_render(@import("./../data/control_flow/if_if_only.zig").Page);
+}
+
+test "if_if_only_block" {
+    return error.Todo;
+    // try test_transpile("control_flow/if_if_only_block");
+    // try test_render(@import("./../data/control_flow/if_if_only_block.zig").Page);
+}
+test "if_only" {
+    try test_transpile("control_flow/if_only");
+    try test_render(@import("./../data/control_flow/if_only.zig").Page);
 }
 
 test "if_only_block" {
-    return error.Todo;
-    // try test_transpile("control_flow/if_only_block");
-    // try test_render(@import("./../data/control_flow/if_only_block.zig").Page);
+    try test_transpile("control_flow/if_only_block");
+    try test_render(@import("./../data/control_flow/if_only_block.zig").Page);
 }
 // For
 test "for" {
@@ -223,8 +232,8 @@ const TestFileCache = struct {
         // Control Flow
         "control_flow/if",
         "control_flow/if_block",
-        // "control_flow/if_only",
-        // "control_flow/if_only_block",
+        "control_flow/if_only",
+        "control_flow/if_only_block",
         "control_flow/for",
         "control_flow/for_block",
         "control_flow/switch",
@@ -233,6 +242,8 @@ const TestFileCache = struct {
         "control_flow/if_if",
         "control_flow/if_for",
         "control_flow/if_switch",
+        // "control_flow/if_if_only_block",
+        // "control_flow/if_only_block",
         "control_flow/for_if",
         "control_flow/for_for",
         "control_flow/for_switch",

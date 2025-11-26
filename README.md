@@ -42,7 +42,7 @@ winget install -e --id zig.zig # Windows
     - [x] Path Segments
 - [x] Components
 - [x] Control Flow
-    - [ ] `if`
+    - [x] `if`
     - [ ] `if` nested
     - [x] `if/else`
     - [x] `if/else` nested

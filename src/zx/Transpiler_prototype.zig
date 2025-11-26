@@ -1121,7 +1121,7 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                     try parent.children.append(allocator, .{ .format_expr = .{ .expr = inner, .format = "d" } });
                 }
             }
-            // Check for conditional expression with JSX: {if (cond) (<JSX>) else (<JSX>)}
+            // Check for conditional expression with JSX: {if (cond) (<JSX>) else (<JSX>)} or {if (cond) (<JSX>)}
             else if (std.mem.startsWith(u8, expr, "if")) {
                 var parsed_conditional = true;
                 if (std.mem.indexOf(u8, expr, "else")) |else_pos| {
@@ -1511,6 +1511,79 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                             }
                         }
                     }
+                } else {
+                    // No "else" found - parse if branch and create fragment as else branch
+                    log.debug("No 'else' found in conditional expression, creating conditional with fragment as else branch", .{});
+                    
+                    // Extract condition: everything from "if" to opening paren of if branch
+                    var condition_start: usize = 2; // Skip "if"
+                    // Skip whitespace after "if"
+                    while (condition_start < expr.len and std.ascii.isWhitespace(expr[condition_start])) condition_start += 1;
+                    
+                    // Find the start of the condition (usually a '(')
+                    var condition_end = condition_start;
+                    var paren_depth: i32 = 0;
+                    while (condition_end < expr.len) {
+                        if (expr[condition_end] == '(') paren_depth += 1;
+                        if (expr[condition_end] == ')') {
+                            paren_depth -= 1;
+                            if (paren_depth == 0) {
+                                condition_end += 1;
+                                break;
+                            }
+                        }
+                        condition_end += 1;
+                    }
+                    
+                    // If no parens found, try to find opening paren for if branch
+                    if (condition_end == condition_start) {
+                        // Look for opening paren after condition
+                        while (condition_end < expr.len and (std.ascii.isWhitespace(expr[condition_end]) or expr[condition_end] == ')')) condition_end += 1;
+                        // Take everything up to the opening paren of if branch
+                        while (condition_end < expr.len and expr[condition_end] != '(') condition_end += 1;
+                    }
+                    
+                    const condition = if (condition_start < condition_end) expr[condition_start..condition_end] else "";
+                    
+                    // Extract if branch: after condition, skip whitespace, find opening paren
+                    var if_start = condition_end;
+                    while (if_start < expr.len and (std.ascii.isWhitespace(expr[if_start]) or expr[if_start] == ')')) if_start += 1;
+                    // Find opening paren for JSX
+                    while (if_start < expr.len and expr[if_start] != '(') if_start += 1;
+                    if (if_start < expr.len and expr[if_start] == '(') {
+                        if_start += 1; // Skip opening paren
+                        // Find matching closing paren
+                        var if_end = if_start;
+                        paren_depth = 1;
+                        var if_brace_depth: i32 = 0;
+                        while (if_end < expr.len and paren_depth > 0) {
+                            if (expr[if_end] == '(') paren_depth += 1;
+                            if (expr[if_end] == ')') paren_depth -= 1;
+                            if (expr[if_end] == '{') if_brace_depth += 1;
+                            if (expr[if_end] == '}') if_brace_depth -= 1;
+                            if (paren_depth > 0) if_end += 1;
+                        }
+                        const if_jsx_content = expr[if_start..if_end];
+                        
+                        // Parse if branch (wrap in fragment if needed)
+                        if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
+                            log.debug("Successfully parsed if branch", .{});
+                            // Create empty fragment for else branch
+                            const else_elem = try ZXElement.init(allocator, "fragment");
+                            log.debug("Created fragment for else branch, adding conditional_expr", .{});
+                            try parent.children.append(allocator, .{ .conditional_expr = .{
+                                .condition = condition,
+                                .if_branch = if_elem,
+                                .else_branch = else_elem,
+                            } });
+                            parsed_conditional = true;
+                        } else |err| {
+                            log.err("Failed to parse if branch JSX: {any}", .{err});
+                            parsed_conditional = false;
+                        }
+                    } else {
+                        parsed_conditional = false;
+                    }
                 }
                 // If we couldn't parse as conditional with JSX, fall through to regular text expression
                 if (!parsed_conditional) {
@@ -1886,6 +1959,33 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                                     parsed_switch = false;
                                                     break;
                                                 }
+                                            }
+                                        } else {
+                                            // No "else" found - create conditional with fragment as else branch
+                                            const if_jsx_content = expr[if_start..if_end];
+                                            
+                                            // Parse if branch (wrap in fragment if needed)
+                                            if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
+                                                // Create empty fragment for else branch
+                                                const else_elem = try ZXElement.init(allocator, "fragment");
+                                                try cases.append(allocator, .{
+                                                    .pattern = pattern,
+                                                    .value = .{ .conditional_expr = .{
+                                                        .condition = condition_str,
+                                                        .if_branch = if_elem,
+                                                        .else_branch = else_elem,
+                                                    } },
+                                                });
+                                                arrow_pos = cond_pos; // Update arrow_pos to end of conditional
+                                                // Skip whitespace and comma
+                                                while (arrow_pos < expr.len and (std.ascii.isWhitespace(expr[arrow_pos]) or expr[arrow_pos] == ',')) {
+                                                    arrow_pos += 1;
+                                                }
+                                                case_start = arrow_pos;
+                                                continue;
+                                            } else |_| {
+                                                parsed_switch = false;
+                                                break;
                                             }
                                         }
                                     }
@@ -2443,6 +2543,50 @@ fn parseJsxChildren(allocator: std.mem.Allocator, parent: *ZXElement, content: [
                                 } else |err| {
                                     log.err("Failed to parse if branch JSX: {any}", .{err});
                                 }
+                            }
+                        }
+                    } else {
+                        // No "else" found - create conditional with fragment as else branch
+                        log.debug("No 'else' found, creating conditional with fragment as else branch", .{});
+                        
+                        // Extract condition properly
+                        var cond_start2 = cond_start + 2; // Skip "if"
+                        while (cond_start2 < content.len and std.ascii.isWhitespace(content[cond_start2])) cond_start2 += 1;
+                        if (cond_start2 < content.len and content[cond_start2] == '(') {
+                            cond_start2 += 1;
+                            var cond_end2 = cond_start2;
+                            var cond_paren_depth3: i32 = 1;
+                            var cond_brace_depth3: i32 = 0;
+                            while (cond_end2 < content.len and cond_paren_depth3 > 0) {
+                                if (content[cond_end2] == '(') cond_paren_depth3 += 1;
+                                if (content[cond_end2] == ')') cond_paren_depth3 -= 1;
+                                if (content[cond_end2] == '{') cond_brace_depth3 += 1;
+                                if (content[cond_end2] == '}') cond_brace_depth3 -= 1;
+                                if (cond_paren_depth3 > 0) cond_end2 += 1;
+                            }
+                            // cond_end2 is now at the closing paren, so the condition is from cond_start2 to cond_end2 (exclusive)
+                            const condition_str = content[cond_start2..cond_end2];
+                            const if_jsx_content = content[if_start..if_end];
+
+                            log.debug("Extracted condition: '{s}'", .{condition_str});
+                            log.debug("Extracted if branch JSX: '{s}'", .{if_jsx_content});
+
+                            // Parse if branch (wrap in fragment if needed)
+                            if (parseJsxOrFragment(allocator, if_jsx_content)) |if_elem| {
+                                log.debug("Successfully parsed if branch", .{});
+                                // Create empty fragment for else branch
+                                const else_elem = try ZXElement.init(allocator, "fragment");
+                                log.debug("Created fragment for else branch, adding conditional_expr", .{});
+                                try parent.children.append(allocator, .{ .conditional_expr = .{
+                                    .condition = condition_str,
+                                    .if_branch = if_elem,
+                                    .else_branch = else_elem,
+                                } });
+                                log.debug("Setting i from {d} to {d} (cond_pos), remaining content: '{s}'", .{ i, cond_pos, if (cond_pos < content.len) content[cond_pos..] else "" });
+                                i = cond_pos;
+                                continue;
+                            } else |err| {
+                                log.err("Failed to parse if branch JSX: {any}", .{err});
                             }
                         }
                     }
