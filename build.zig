@@ -163,8 +163,7 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     const zx_dep = b.dependency("zx", .{ .target = target, .optimize = optimize });
 
     // --- ZX Transpilation ---
-    const zx_exe = zx_dep.artifact("zx");
-    const transpile_cmd = b.addRunArtifact(zx_exe);
+    const transpile_cmd = b.addSystemCommand(&.{"zx"}); // ZX CLI must installed and in the PATH
     transpile_cmd.addArg("transpile");
     transpile_cmd.addArg(b.pathJoin(&.{"site"}));
     transpile_cmd.addArg("--outdir");
