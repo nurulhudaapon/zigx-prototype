@@ -1,5 +1,6 @@
 #!/bin/bash
 cd src/cli/init/template
-zig fetch --save 'git+https://github.com/nurulhudaapon/zx'
+LATEST_ZX_VERSION=$(curl -s https://api.github.com/repos/nurulhudaapon/zx/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p')
+zig fetch --save "git+https://github.com/nurulhudaapon/zx#${LATEST_ZX_VERSION}"
 npx --yes npm-check-updates -u
 # git commit -m"feat: update template to latest zx"
