@@ -158,10 +158,24 @@ pub const Token = union(enum) {
 
     comment: Span,
     text: Span,
+    expression: Expression,
     parse_error: struct {
         tag: TokenError,
         span: Span,
     },
+
+    pub const Expression = struct {
+        span: Span,
+        kind: ExpressionKind,
+
+        pub const ExpressionKind = enum {
+            switch_expr,
+            if_expr,
+            for_expr,
+            while_expr,
+            text_expr, // Regular {expr}
+        };
+    };
 
     pub const Doctype = struct {
         span: Span,
@@ -256,6 +270,13 @@ const State = union(enum) {
     hexadecimal_character_reference: NumericCharacterReferenceState,
     decimal_character_reference: NumericCharacterReferenceState,
     numeric_character_reference_end: NumericCharacterReferenceState,
+
+    expression: struct {
+        start: u32,
+        brace_depth: i32 = 1,
+        paren_depth: i32 = 0,
+        kind: ?Token.Expression.ExpressionKind = null,
+    },
 
     markup_declaration_open: u32,
     doctype: u32,
@@ -450,6 +471,90 @@ fn next2(self: *Tokenizer, src: []const u8) ?struct {
                             };
                         }
                     },
+                    '{' => {
+                        // Check if this might be an expression
+                        const expr_start = self.idx - 1;
+                        log.debug("found opening brace at idx {}, checking if expression", .{expr_start});
+                        // Look ahead to see if it's a control flow expression
+                        var lookahead_idx = self.idx;
+                        var found_keyword = false;
+                        var expr_kind: ?Token.Expression.ExpressionKind = null;
+
+                        // Skip whitespace after {
+                        while (lookahead_idx < src.len and lookahead_idx < expr_start + 50 and std.ascii.isWhitespace(src[lookahead_idx])) {
+                            lookahead_idx += 1;
+                        }
+
+                        if (lookahead_idx < src.len) {
+                            const remaining = src[lookahead_idx..];
+                            log.debug("checking remaining: '{s}'", .{if (remaining.len > 20) remaining[0..20] else remaining});
+                            if (std.mem.startsWith(u8, remaining, "switch")) {
+                                found_keyword = true;
+                                expr_kind = .switch_expr;
+                                log.debug("detected switch expression", .{});
+                            } else if (std.mem.startsWith(u8, remaining, "if")) {
+                                found_keyword = true;
+                                expr_kind = .if_expr;
+                                log.debug("detected if expression", .{});
+                            } else if (std.mem.startsWith(u8, remaining, "for")) {
+                                found_keyword = true;
+                                expr_kind = .for_expr;
+                                log.debug("detected for expression", .{});
+                            } else if (std.mem.startsWith(u8, remaining, "while")) {
+                                found_keyword = true;
+                                expr_kind = .while_expr;
+                                log.debug("detected while expression", .{});
+                            }
+                        }
+
+                        if (found_keyword) {
+                            // It's an expression, switch to expression parsing
+                            if (!state.whitespace_only) {
+                                const text_span = Span{
+                                    .start = state.start,
+                                    .end = expr_start - state.whitespace_streak,
+                                };
+                                log.debug("switching to expression state, returning text token [{}, {}]", .{ text_span.start, text_span.end });
+                                self.state = .{
+                                    .expression = .{
+                                        .start = expr_start,
+                                        .brace_depth = 1,
+                                        .paren_depth = 0,
+                                        .kind = expr_kind,
+                                    },
+                                };
+                                return .{
+                                    .token = .{
+                                        .text = text_span,
+                                    },
+                                };
+                            } else {
+                                log.debug("switching to expression state (whitespace only)", .{});
+                                self.state = .{
+                                    .expression = .{
+                                        .start = expr_start,
+                                        .brace_depth = 1,
+                                        .paren_depth = 0,
+                                        .kind = expr_kind,
+                                    },
+                                };
+                                continue;
+                            }
+                        } else {
+                            // Not an expression, continue as normal text
+                            log.debug("not an expression, treating as text", .{});
+                            if (state.whitespace_only) {
+                                self.state.text.start = self.idx - 1;
+                                self.state.text.whitespace_only = false;
+                            } else {
+                                if (std.ascii.isWhitespace(self.current)) {
+                                    self.state.text.whitespace_streak += 1;
+                                } else {
+                                    self.state.text.whitespace_streak = 0;
+                                }
+                            }
+                        }
+                    },
                     0 => {
                         self.state = .data;
                         return .{
@@ -478,6 +583,130 @@ fn next2(self: *Tokenizer, src: []const u8) ?struct {
                             }
                         }
                     },
+                }
+            },
+
+            .expression => |*expr_state| {
+                log.debug("expression state: idx={}, brace_depth={}, paren_depth={}, kind={?}, current_char={c}", .{
+                    self.idx,
+                    expr_state.brace_depth,
+                    expr_state.paren_depth,
+                    expr_state.kind,
+                    if (self.idx <= src.len) src[self.idx - 1] else 0,
+                });
+
+                // Safety check: prevent infinite loops
+                if (self.idx >= src.len) {
+                    log.err("expression parsing: reached end of source without closing brace", .{});
+                    self.state = .{ .text = .{ .start = expr_state.start, .whitespace_only = false } };
+                    return .{
+                        .token = .{
+                            .text = .{
+                                .start = expr_state.start,
+                                .end = self.idx,
+                            },
+                        },
+                    };
+                }
+
+                if (!self.consume(src)) {
+                    // EOF in expression - treat as text
+                    log.debug("EOF in expression, treating as text", .{});
+                    self.state = .{ .text = .{ .start = expr_state.start, .whitespace_only = false } };
+                    return .{
+                        .token = .{
+                            .text = .{
+                                .start = expr_state.start,
+                                .end = self.idx,
+                            },
+                        },
+                    };
+                }
+
+                // Determine expression kind on first non-whitespace after {
+                if (expr_state.kind == null) {
+                    var check_idx = expr_state.start + 1;
+                    while (check_idx < self.idx and check_idx < src.len and std.ascii.isWhitespace(src[check_idx])) {
+                        check_idx += 1;
+                    }
+                    if (check_idx < src.len) {
+                        const remaining = src[check_idx..];
+                        if (std.mem.startsWith(u8, remaining, "switch")) {
+                            expr_state.kind = .switch_expr;
+                            log.debug("detected switch expression", .{});
+                        } else if (std.mem.startsWith(u8, remaining, "if")) {
+                            expr_state.kind = .if_expr;
+                            log.debug("detected if expression", .{});
+                        } else if (std.mem.startsWith(u8, remaining, "for")) {
+                            expr_state.kind = .for_expr;
+                            log.debug("detected for expression", .{});
+                        } else if (std.mem.startsWith(u8, remaining, "while")) {
+                            expr_state.kind = .while_expr;
+                            log.debug("detected while expression", .{});
+                        } else {
+                            expr_state.kind = .text_expr;
+                            log.debug("detected text expression", .{});
+                        }
+                    }
+                }
+
+                // Track brace and paren depth
+                switch (self.current) {
+                    '{' => {
+                        expr_state.brace_depth += 1;
+                        log.debug("found opening brace, brace_depth now {}", .{expr_state.brace_depth});
+                    },
+                    '}' => {
+                        expr_state.brace_depth -= 1;
+                        log.debug("found closing brace, brace_depth now {}", .{expr_state.brace_depth});
+                        if (expr_state.brace_depth == 0) {
+                            // Expression complete
+                            const expr_end = self.idx;
+                            const kind = expr_state.kind orelse .text_expr;
+                            const expr_span = Span{ .start = expr_state.start, .end = expr_end };
+                            log.debug("expression complete: kind={}, span=[{}..{}], creating token", .{
+                                kind,
+                                expr_span.start,
+                                expr_span.end,
+                            });
+                            const expr_token = Token{
+                                .expression = .{
+                                    .span = expr_span,
+                                    .kind = kind,
+                                },
+                            };
+                            log.debug("created expression token: span=[{}..{}]", .{ expr_token.expression.span.start, expr_token.expression.span.end });
+                            self.state = .{ .text = .{ .start = expr_end, .whitespace_only = true } };
+                            return .{
+                                .token = expr_token,
+                            };
+                        }
+                    },
+                    '(' => {
+                        expr_state.paren_depth += 1;
+                        log.debug("found opening paren, paren_depth now {}", .{expr_state.paren_depth});
+                    },
+                    ')' => {
+                        if (expr_state.paren_depth > 0) {
+                            expr_state.paren_depth -= 1;
+                            log.debug("found closing paren, paren_depth now {}", .{expr_state.paren_depth});
+                        }
+                    },
+                    else => {},
+                }
+
+                // Safety check: prevent infinite loops
+                if (self.idx > src.len) {
+                    log.err("expression parsing: idx exceeded src.len, breaking", .{});
+                    self.state = .{ .text = .{ .start = expr_state.start, .whitespace_only = false } };
+                    return .{
+                        .token = .{
+                            .text = .{
+                                .start = expr_state.start,
+                                .end = @min(self.idx, src.len),
+                            },
+                        },
+                    };
                 }
             },
 

@@ -1,8 +1,6 @@
 const std = @import("std");
-// const htmlz = @import("htmlz");
-const expr = @import("expr.zig");
+const htmlx = @import("html/Ast.zig");
 const fmtlog = std.log.scoped(.cli);
-const htmlz_ast = @import("html/Ast.zig");
 
 const stderr_buffer_size = 4096;
 var stderr_buffer: [stderr_buffer_size]u8 = undefined;
@@ -27,23 +25,16 @@ pub fn formatHtml(
     src: [:0]const u8,
     syntax_only: bool,
 ) !?[]const u8 {
-    const html_ast = try htmlz_ast.init(arena, src, .html, syntax_only);
+    const html_ast = try htmlx.init(arena, src, .html, syntax_only);
     try html_ast.printErrors(src, path, stderr);
     if (html_ast.has_syntax_errors) {
         return null;
     }
 
     var w: std.io.Writer.Allocating = .init(arena);
-    try html_ast.render(src, &w.writer);
-    const fmtted_html = w.written();
-
-    fmtlog.debug("fmtted_html: \n```\n{s}\n```", .{fmtted_html});
-    // Parse expressions from the formatted HTML
-    const expressions = try expr.parse(arena, fmtted_html);
-
-    // Render with expressions formatted
-    const formatted = try expr.render(arena, fmtted_html, expressions);
-    return formatted;
+    try html_ast.render(arena, src, &w.writer);
+    const formatted = w.written();
+    return try arena.dupe(u8, formatted);
 }
 
 fn findLeadingWhitespaceStart(source: []const u8, jsx_start: usize) usize {

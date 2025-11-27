@@ -577,7 +577,7 @@ const KindMap = std.StaticStringMapWithEql(
 );
 
 pub const elements: KindMap = blk: {
-    const fields = std.meta.fields(Ast.Kind)[8..];
+    const fields = std.meta.fields(Ast.Kind)[13..]; // Skip: root, doctype, comment, text, switch_expr, if_expr, for_expr, while_expr, text_expr, extend, super, ctx, ___
     assert(std.mem.eql(u8, fields[0].name, "a"));
 
     const KV = struct { []const u8, Ast.Kind };

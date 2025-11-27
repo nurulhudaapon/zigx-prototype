@@ -13,6 +13,7 @@ const Tokenizer = @import("Tokenizer.zig");
 const Element = @import("Element.zig");
 // const elements = Element.all;
 const kinds = Element.elements;
+const expr = @import("../expr.zig");
 
 const log = std.log.scoped(.@"html/ast");
 const fmtlog = std.log.scoped(.@"html/ast/fmt");
@@ -27,6 +28,9 @@ pub const Kind = enum {
     // zig fmt: off
     // Basic nodes
     root, doctype, comment, text,
+
+    // Expressions
+    switch_expr, if_expr, for_expr, while_expr, text_expr,
 
     // superhtml
     extend, super, ctx,
@@ -151,7 +155,7 @@ pub const Node = struct {
     pub fn isClosed(n: Node) bool {
         return switch (n.kind) {
             .root => unreachable,
-            .doctype, .text, .comment => true,
+            .doctype, .text, .comment, .switch_expr, .if_expr, .for_expr, .while_expr, .text_expr => true,
             else => if (n.kind.isVoid() or n.self_closing) true else n.close.start > 0,
         };
     }
@@ -163,7 +167,7 @@ pub const Node = struct {
                 std.debug.assert(n.first_child_idx == 0);
                 return .in;
             },
-            .doctype, .text, .comment => return .after,
+            .doctype, .text, .comment, .switch_expr, .if_expr, .for_expr, .while_expr, .text_expr => return .after,
             else => {
                 if (n.kind.isVoid() or n.self_closing) return .after;
                 if (n.close.start == 0) {
@@ -516,6 +520,57 @@ pub fn init(
         });
         switch (t) {
             .tag_name, .attr => unreachable,
+            .expression => |expr_token| {
+                log.debug("AST: processing expression token: kind={s}, span.start={}, span.end={}", .{
+                    @tagName(expr_token.kind),
+                    expr_token.span.start,
+                    expr_token.span.end,
+                });
+                const expr_kind: Kind = switch (expr_token.kind) {
+                    .switch_expr => .switch_expr,
+                    .if_expr => .if_expr,
+                    .for_expr => .for_expr,
+                    .while_expr => .while_expr,
+                    .text_expr => .text_expr,
+                };
+
+                var new: Node = .{
+                    .kind = expr_kind,
+                    .open = expr_token.span,
+                    .model = .{
+                        .categories = .{
+                            .flow = true,
+                            .phrasing = true,
+                        },
+                        .content = .none,
+                    },
+                    .self_closing = false,
+                };
+
+                log.debug("AST: created expression node: kind={s}, open.start={}, open.end={}", .{
+                    @tagName(new.kind),
+                    new.open.start,
+                    new.open.end,
+                });
+
+                switch (current.direction()) {
+                    .in => {
+                        new.parent_idx = current_idx;
+                        std.debug.assert(current.first_child_idx == 0);
+                        current_idx = @intCast(nodes.items.len);
+                        current.first_child_idx = current_idx;
+                    },
+                    .after => {
+                        new.parent_idx = current.parent_idx;
+                        current_idx = @intCast(nodes.items.len);
+                        current.next_idx = current_idx;
+                    },
+                }
+
+                try nodes.append(new);
+                current = &nodes.items[current_idx];
+                continue;
+            },
             .doctype => |dt| {
                 var new: Node = .{
                     .kind = .doctype,
@@ -959,7 +1014,457 @@ pub fn init(
     };
 }
 
-pub fn render(ast: Ast, src: []const u8, w: *Writer) !void {
+/// Normalize whitespace by converting tabs to spaces
+fn normalizeWhitespace(ws: []const u8, w: *Writer) !void {
+    for (ws) |c| {
+        if (c == '\t') {
+            // Convert tab to 4 spaces
+            for (0..4) |_| try w.writeAll(" ");
+        } else {
+            // Preserve spaces, newlines, etc.
+            try w.writeAll(&.{c});
+        }
+    }
+}
+
+/// Render text content with expression formatting
+fn renderTextWithExpressions(
+    arena: std.mem.Allocator,
+    text: []const u8,
+    indentation: u32,
+    w: *Writer,
+) !void {
+    // Parse expressions from text
+    const expressions = expr.parse(arena, text) catch {
+        // If parsing fails, just write the text as-is
+        try w.writeAll(text);
+        return;
+    };
+    defer {
+        for (expressions) |expr_ast| {
+            if (expr_ast.kind == .switch_expr) {
+                arena.free(expr_ast.kind.switch_expr.cases);
+            }
+        }
+        arena.free(expressions);
+    }
+
+    if (expressions.len == 0) {
+        // No expressions, just write the text
+        try w.writeAll(text);
+        return;
+    }
+
+    // Render text with expressions formatted
+    var last_pos: usize = 0;
+    for (expressions) |expr_ast| {
+        // Write everything before this expression
+        if (expr_ast.start > last_pos) {
+            const before = text[last_pos..expr_ast.start];
+            // Normalize whitespace: convert tabs to spaces while preserving indentation level
+            // If the before text is all whitespace, normalize it
+            const trimmed = std.mem.trim(u8, before, &std.ascii.whitespace);
+            if (trimmed.len == 0) {
+                // All whitespace - normalize tabs to spaces
+                try normalizeWhitespace(before, w);
+            } else {
+                // Has non-whitespace content, write as-is
+                try w.writeAll(before);
+            }
+        }
+
+        // Render the expression with proper indentation
+        try renderExpression(expr_ast, indentation, arena, w);
+
+        last_pos = expr_ast.end;
+    }
+
+    // Write remaining content
+    if (last_pos < text.len) {
+        try w.writeAll(text[last_pos..]);
+    }
+}
+
+/// Render an expression with proper indentation using tabs
+fn renderExpression(expr_ast: expr.ExpressionAst, base_indent: u32, arena: Allocator, w: *Writer) !void {
+    fmtlog.debug("renderExpression: kind={s}, start={}, end={}, source_len={}", .{
+        @tagName(expr_ast.kind),
+        expr_ast.start,
+        expr_ast.end,
+        expr_ast.source.len,
+    });
+    switch (expr_ast.kind) {
+        .switch_expr => |switch_expr| {
+            fmtlog.debug("rendering switch_expr, condition.end={}", .{switch_expr.condition.end});
+            // Find the opening brace after condition
+            var i = switch_expr.condition.end;
+            while (i < expr_ast.source.len and expr_ast.source[i] != '{') {
+                i += 1;
+            }
+            const brace_start = i;
+            fmtlog.debug("found brace_start at {}", .{brace_start});
+
+            // Write opening: {switch (...) {
+            const opening_text = expr_ast.source[expr_ast.start .. brace_start + 1];
+            fmtlog.debug("writing opening: '{s}'", .{if (opening_text.len > 50) opening_text[0..50] else opening_text});
+            try w.writeAll(opening_text);
+            try w.writeAll("\n");
+
+            // Render each case
+            for (switch_expr.cases) |case| {
+                const case_pattern_raw = case.pattern.slice(expr_ast.source);
+                // Trim leading/trailing whitespace from pattern
+                const case_pattern = std.mem.trim(u8, case_pattern_raw, &std.ascii.whitespace);
+                const case_value_span = case.value;
+                const case_value_full = case_value_span.slice(expr_ast.source);
+
+                // Check if value is wrapped in parentheses
+                const is_paren_wrapped = case_value_full.len >= 2 and
+                    case_value_full[0] == '(' and
+                    case_value_full[case_value_full.len - 1] == ')';
+
+                const case_content = if (is_paren_wrapped)
+                    case_value_full[1 .. case_value_full.len - 1]
+                else
+                    case_value_full;
+
+                const is_multiline = std.mem.count(u8, case_content, "\n") > 0;
+
+                // Indent case pattern - cases are one level deeper than the switch
+                // base_indent is the indentation of the switch expression itself
+                for (0..(base_indent + 1) * 4) |_| try w.writeAll(" ");
+                try w.writeAll(case_pattern);
+                try w.writeAll(" => ");
+
+                if (is_multiline) {
+                    // Multiline case: pattern => (\n content \n),
+                    // try w.writeAll("(\n");
+                    // The content should be indented one more level than the case
+                    // base_indent + 1 is for the case itself, so content should be base_indent + 2
+                    try renderMultilineContent(case_content, base_indent + 2, arena, w);
+                    for (0..(base_indent + 1) * 4) |_| try w.writeAll(" ");
+                    try w.writeAll("),\n");
+                } else {
+                    // Single line case: pattern => value,
+                    try w.writeAll(case_value_full);
+                    try w.writeAll(",\n");
+                }
+            }
+
+            // Closing brace
+            for (0..base_indent * 4) |_| try w.writeAll(" ");
+            try w.writeAll("}}");
+        },
+        .if_expr => |if_expr| {
+            // Write: {if (...) (
+            const before_then = expr_ast.source[expr_ast.start..if_expr.then_branch.start];
+            // Normalize before_then: remove leading and trailing whitespace
+            // The indentation is handled by the text before the expression, so we just write the normalized content
+            const trimmed_before = std.mem.trim(u8, before_then, &std.ascii.whitespace);
+            try w.writeAll(trimmed_before);
+
+            // Render then branch
+            const then_content = if_expr.then_branch.slice(expr_ast.source);
+            const is_multiline_then = std.mem.count(u8, then_content, "\n") > 0;
+            if (is_multiline_then) {
+                // Check if content starts with whitespace/newlines - if so, we already have the newline
+                const starts_with_newline = then_content.len > 0 and then_content[0] == '\n';
+                if (!starts_with_newline) {
+                    try w.writeAll("\n");
+                }
+                fmtlog.debug("renderMultilineContent: base_indent={}, then_content len={}", .{ base_indent + 1, then_content.len });
+                try renderMultilineContent(then_content, base_indent + 1, arena, w);
+            } else {
+                try w.writeAll(" ");
+                try w.writeAll(std.mem.trim(u8, then_content, &std.ascii.whitespace));
+            }
+
+            // Closing paren for then
+            for (0..base_indent * 4) |_| try w.writeAll(" ");
+            try w.writeAll(")");
+
+            // Else branch if present
+            if (if_expr.else_branch) |else_branch| {
+                try w.writeAll(" else (");
+
+                const else_content = else_branch.slice(expr_ast.source);
+                const is_multiline_else = std.mem.count(u8, else_content, "\n") > 0;
+                if (is_multiline_else) {
+                    // Check if content starts with whitespace/newlines - if so, we already have the newline
+                    const starts_with_newline = else_content.len > 0 and else_content[0] == '\n';
+                    if (!starts_with_newline) {
+                        try w.writeAll("\n");
+                    }
+                    try renderMultilineContent(else_content, base_indent + 1, arena, w);
+                } else {
+                    try w.writeAll(" ");
+                    try w.writeAll(std.mem.trim(u8, else_content, &std.ascii.whitespace));
+                }
+
+                for (0..base_indent * 4) |_| try w.writeAll(" ");
+                try w.writeAll(")");
+            }
+
+            try w.writeAll("}");
+        },
+        .for_expr => |for_expr| {
+            // Write: {for (...) |...| (
+            const before_body = expr_ast.source[expr_ast.start..for_expr.body.start];
+            try w.writeAll(before_body);
+            const body_content = for_expr.body.slice(expr_ast.source);
+            const is_multiline = std.mem.count(u8, body_content, "\n") > 0;
+
+            if (is_multiline) {
+                // try w.writeAll("\n");
+                try renderMultilineContent(body_content, base_indent + 1, arena, w);
+                for (0..base_indent * 4) |_| try w.writeAll(" ");
+                // try w.writeAll(")");
+            } else {
+                try w.writeAll(body_content);
+            }
+
+            // Closing }
+            const after_body = expr_ast.source[for_expr.body.end..expr_ast.end];
+            try w.writeAll(after_body);
+        },
+        .while_expr => |while_expr| {
+            // Write: {while (...) (
+            const before_body = expr_ast.source[expr_ast.start..while_expr.body.start];
+            try w.writeAll(before_body);
+            try w.writeAll("\n");
+
+            const body_content = while_expr.body.slice(expr_ast.source);
+            const is_multiline = std.mem.count(u8, body_content, "\n") > 0;
+            if (is_multiline) {
+                try renderMultilineContent(body_content, base_indent + 1, arena, w);
+            } else {
+                for (0..(base_indent + 1) * 4) |_| try w.writeAll(" ");
+                try w.writeAll(body_content);
+            }
+
+            // Closing ) }
+            for (0..base_indent * 4) |_| try w.writeAll(" ");
+            const after_body = expr_ast.source[while_expr.body.end..expr_ast.end];
+            try w.writeAll(after_body);
+        },
+        .text_expr => {
+            // Regular expression, just write as-is
+            try w.writeAll(expr_ast.source[expr_ast.start..expr_ast.end]);
+        },
+    }
+}
+
+/// Render multiline content with proper indentation, normalizing to base_indent level
+/// Normalizes consecutive blank lines to at most one blank line
+/// If content contains HTML elements, renders them using the HTML AST renderer
+fn renderMultilineContent(content: []const u8, base_indent: u32, arena: Allocator, w: *Writer) !void {
+    if (content.len == 0) return;
+
+    fmtlog.debug("renderMultilineContent called: base_indent={}, will write {} spaces", .{ base_indent, base_indent * 4 });
+
+    // Check if content contains HTML tags
+    const has_html_tags = blk: {
+        var i: usize = 0;
+        while (i < content.len) {
+            if (content[i] == '<') {
+                i += 1;
+                // Skip whitespace after <
+                while (i < content.len and std.ascii.isWhitespace(content[i])) i += 1;
+                if (i < content.len) {
+                    const c = content[i];
+                    // Check if it's a tag name character (letter, /, or !)
+                    if (std.ascii.isAlphabetic(c) or c == '/' or c == '!') {
+                        break :blk true;
+                    }
+                }
+            }
+            i += 1;
+        }
+        break :blk false;
+    };
+
+    if (has_html_tags) {
+        // Content contains HTML - parse and render using HTML AST renderer
+        // Create a temporary wrapper source with root element, parse it, then render
+        // We'll extract just the content part (without the wrapper)
+        const wrapper_prefix = "<root>";
+        const wrapper_suffix = "</root>";
+        var wrapped_content = try arena.alloc(u8, wrapper_prefix.len + content.len + wrapper_suffix.len);
+        @memcpy(wrapped_content[0..wrapper_prefix.len], wrapper_prefix);
+        @memcpy(wrapped_content[wrapper_prefix.len .. wrapper_prefix.len + content.len], content);
+        @memcpy(wrapped_content[wrapper_prefix.len + content.len ..], wrapper_suffix);
+
+        const wrapped_ast = Ast.init(arena, wrapped_content, .html, false) catch |e| {
+            fmtlog.debug("Failed to parse wrapped HTML: {}, falling back to text rendering", .{e});
+            return renderMultilineContentAsText(content, base_indent, w);
+        };
+
+        // Render to a buffer at indentation 0 (HTML renderer will add its own indentation)
+        var buffer_writer: std.io.Writer.Allocating = .init(arena);
+        defer buffer_writer.deinit();
+        const buffer_writer_ptr: *Writer = @ptrCast(&buffer_writer.writer);
+        const render_result: anyerror!void = wrapped_ast.render(arena, wrapped_content, buffer_writer_ptr);
+        render_result catch |e| {
+            fmtlog.debug("Failed to render HTML AST: {}, falling back to text rendering", .{e});
+            return renderMultilineContentAsText(content, base_indent, w);
+        };
+        var rendered = buffer_writer.written();
+
+        // Extract the content between <root> and </root>, skipping the wrapper tags
+        // Find the start of content (after <root>)
+        const content_start = std.mem.indexOf(u8, rendered, ">") orelse {
+            return renderMultilineContentAsText(content, base_indent, w);
+        };
+        const after_root_tag = content_start + 1;
+        // Find the end of content (before </root>)
+        const root_end_tag = std.mem.lastIndexOf(u8, rendered, "</root>") orelse {
+            return renderMultilineContentAsText(content, base_indent, w);
+        };
+        const inner_content = rendered[after_root_tag..root_end_tag];
+
+        // The HTML renderer renders at indentation 0, so we need to:
+        // 1. Detect the minimum indentation in the rendered content
+        // 2. Preserve relative indentation between lines
+        // 3. Add our base_indent to each line
+
+        // First, find the minimum indentation (in spaces, treating tabs as 4 spaces)
+        var min_indent: u32 = std.math.maxInt(u32);
+        var content_it = std.mem.splitScalar(u8, inner_content, '\n');
+        while (content_it.next()) |line| {
+            if (line.len == 0) continue;
+            var line_indent: u32 = 0;
+            for (line) |c| {
+                if (c == ' ') {
+                    line_indent += 1;
+                } else if (c == '\t') {
+                    line_indent += 4;
+                } else {
+                    break;
+                }
+            }
+            // Only consider lines with actual content
+            const trimmed = std.mem.trimLeft(u8, line, &std.ascii.whitespace);
+            if (trimmed.len > 0 and line_indent < min_indent) {
+                min_indent = line_indent;
+            }
+        }
+        if (min_indent == std.math.maxInt(u32)) min_indent = 0;
+
+        // Now render each line, preserving relative indentation
+        var buffer_it = std.mem.splitScalar(u8, inner_content, '\n');
+        var first_line = true;
+        while (buffer_it.next()) |line| {
+            if (!first_line) try w.writeAll("\n");
+
+            const trimmed_line = std.mem.trimLeft(u8, line, &std.ascii.whitespace);
+            if (trimmed_line.len > 0) {
+                // Calculate current line's indentation
+                var line_indent: u32 = 0;
+                for (line) |c| {
+                    if (c == ' ') {
+                        line_indent += 1;
+                    } else if (c == '\t') {
+                        line_indent += 4;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Calculate relative indentation (how much more than minimum)
+                const relative_indent = if (line_indent >= min_indent) line_indent - min_indent else 0;
+
+                // Write: base_indent + relative_indent
+                const total_indent = base_indent * 4 + relative_indent;
+                for (0..total_indent) |_| try w.writeAll(" ");
+                try w.writeAll(trimmed_line);
+            }
+            first_line = false;
+        }
+    } else {
+        // No HTML tags - render as plain text
+        try renderMultilineContentAsText(content, base_indent, w);
+    }
+}
+
+/// Render multiline content as plain text with proper indentation
+fn renderMultilineContentAsText(content: []const u8, base_indent: u32, w: *Writer) !void {
+    if (content.len == 0) return;
+
+    // Render lines with normalized indentation (4 spaces per level)
+    // Normalize consecutive blank lines to at most one
+    var it = std.mem.splitScalar(u8, content, '\n');
+    var first = true;
+    var last_was_empty = false;
+    while (it.next()) |line| {
+        const trimmed = std.mem.trimLeft(u8, line, &std.ascii.whitespace);
+        const is_empty = trimmed.len == 0;
+
+        // Skip consecutive empty lines (keep at most one)
+        if (is_empty and last_was_empty) {
+            continue;
+        }
+
+        if (!first) try w.writeAll("\n");
+
+        if (trimmed.len > 0) {
+            // Write base indentation (4 spaces per level)
+            // Normalize content to start at base_indent level, ignoring original indentation
+            const spaces_to_write = base_indent * 4;
+            fmtlog.debug("writing {} spaces for line starting with: '{s}'", .{ spaces_to_write, if (trimmed.len > 20) trimmed[0..20] else trimmed });
+            for (0..spaces_to_write) |_| try w.writeAll(" ");
+
+            try w.writeAll(trimmed);
+        }
+        // Empty lines are preserved (just newline, no indentation) but consecutive ones are normalized
+
+        last_was_empty = is_empty;
+        first = false;
+    }
+}
+
+/// Writer wrapper that adds base indentation at the start of each line
+const LineIndentWriter = struct {
+    base_indent: u32,
+    inner: *Writer,
+    at_line_start: bool,
+
+    const Self = @This();
+
+    fn write(context: *anyopaque, bytes: []const u8) !usize {
+        const self: *Self = @ptrCast(@alignCast(context));
+        var written: usize = 0;
+        var i: usize = 0;
+        while (i < bytes.len) {
+            if (self.at_line_start) {
+                // Write base indentation
+                for (0..self.base_indent * 4) |_| {
+                    _ = try self.inner.writeAll(" ");
+                }
+                self.at_line_start = false;
+            }
+
+            // Find the next newline
+            const newline_idx = std.mem.indexOfScalar(u8, bytes[i..], '\n');
+            if (newline_idx) |idx| {
+                // Write up to and including the newline
+                const chunk = bytes[i .. i + idx + 1];
+                _ = try self.inner.writeAll(chunk);
+                written += chunk.len;
+                i += idx + 1;
+                self.at_line_start = true;
+            } else {
+                // Write the rest
+                const chunk = bytes[i..];
+                _ = try self.inner.writeAll(chunk);
+                written += chunk.len;
+                break;
+            }
+        }
+        return written;
+    }
+};
+
+pub fn render(ast: Ast, arena: Allocator, src: []const u8, w: *Writer) !void {
     assert(!ast.has_syntax_errors);
 
     if (ast.nodes.len < 2) return;
@@ -992,8 +1497,22 @@ pub fn render(ast: Ast, src: []const u8, w: *Writer) !void {
 
                 const maybe_ws = src[last_rbracket..current.open.start];
                 fmtlog.debug("maybe_ws = '{s}'", .{maybe_ws});
+                // Normalize whitespace in maybe_ws if it's all whitespace (convert tabs to spaces)
+                const trimmed_ws = std.mem.trim(u8, maybe_ws, &std.ascii.whitespace);
+                const is_all_whitespace = trimmed_ws.len == 0;
+                const is_expression = switch (current.kind) {
+                    .switch_expr, .if_expr, .for_expr, .while_expr, .text_expr => true,
+                    else => false,
+                };
+
                 if (pre > 0) {
-                    try w.writeAll(maybe_ws);
+                    if (is_all_whitespace) {
+                        // All whitespace - normalize tabs to spaces
+                        try normalizeWhitespace(maybe_ws, w);
+                    } else {
+                        // Has non-whitespace content, write as-is
+                        try w.writeAll(maybe_ws);
+                    }
                 } else {
                     const vertical = if (last_was_text and current.kind != .text)
                         std.mem.indexOfScalar(u8, maybe_ws, '\n') != null
@@ -1011,11 +1530,17 @@ pub fn render(ast: Ast, src: []const u8, w: *Writer) !void {
                             }
                         }
 
-                        for (0..indentation) |_| {
-                            try w.writeAll("\t");
+                        // Write indentation (convert tabs to spaces for consistency)
+                        for (0..indentation * 4) |_| {
+                            try w.writeAll(" ");
                         }
                     } else if ((last_was_text or current.kind == .text) and maybe_ws.len > 0) {
-                        try w.writeAll(" ");
+                        if (is_expression and is_all_whitespace) {
+                            // Normalize whitespace for expression nodes (convert tabs to spaces)
+                            try normalizeWhitespace(maybe_ws, w);
+                        } else {
+                            try w.writeAll(" ");
+                        }
                     }
                 }
 
@@ -1114,6 +1639,7 @@ pub fn render(ast: Ast, src: []const u8, w: *Writer) !void {
                             try w.writeAll(txt);
                             break :blk;
                         }
+                        // Regular text rendering (expressions are now separate nodes)
                         var it = std.mem.splitScalar(u8, txt, '\n');
                         var first = true;
                         var empty_line = false;
@@ -1177,6 +1703,62 @@ pub fn render(ast: Ast, src: []const u8, w: *Writer) !void {
 
                 if (current.next_idx != 0) {
                     fmtlog.debug("text next: {}", .{current.next_idx});
+                    current = ast.nodes[current.next_idx];
+                } else {
+                    current = ast.nodes[current.parent_idx];
+                    direction = .exit;
+                }
+            },
+
+            .switch_expr, .if_expr, .for_expr, .while_expr, .text_expr => {
+                std.debug.assert(direction == .enter);
+
+                const expr_text = current.open.slice(src);
+                fmtlog.debug("rendering expression node: kind={s}, span=[{}..{}], text='{s}'", .{
+                    @tagName(current.kind),
+                    current.open.start,
+                    current.open.end,
+                    if (expr_text.len > 50) expr_text[0..50] else expr_text,
+                });
+
+                // Parse the expression to get detailed structure
+                fmtlog.debug("calling expr.parse...", .{});
+                const expressions = expr.parse(arena, expr_text) catch |e| {
+                    fmtlog.debug("expr.parse failed: {}, writing as-is", .{e});
+                    // If parsing fails, just write as-is
+                    try w.writeAll(expr_text);
+                    last_rbracket = current.open.end;
+                    if (current.next_idx != 0) {
+                        current = ast.nodes[current.next_idx];
+                    } else {
+                        current = ast.nodes[current.parent_idx];
+                        direction = .exit;
+                    }
+                    continue;
+                };
+                fmtlog.debug("expr.parse succeeded, got {} expressions", .{expressions.len});
+                defer {
+                    for (expressions) |expr_ast| {
+                        if (expr_ast.kind == .switch_expr) {
+                            arena.free(expr_ast.kind.switch_expr.cases);
+                        }
+                    }
+                    arena.free(expressions);
+                }
+
+                if (expressions.len > 0) {
+                    // Render the expression with proper formatting
+                    fmtlog.debug("calling renderExpression with kind={s}, indentation={}", .{ @tagName(expressions[0].kind), indentation });
+                    try renderExpression(expressions[0], indentation, arena, w);
+                    fmtlog.debug("renderExpression completed", .{});
+                } else {
+                    fmtlog.debug("no expressions, writing as-is", .{});
+                    try w.writeAll(expr_text);
+                }
+
+                last_rbracket = current.open.end;
+
+                if (current.next_idx != 0) {
                     current = ast.nodes[current.next_idx];
                 } else {
                     current = ast.nodes[current.parent_idx];
@@ -1531,15 +2113,16 @@ pub fn child(ast: Ast, n: Node) ?Node {
     return ast.at(n.first_child_idx);
 }
 
-pub fn formatter(ast: Ast, src: []const u8) Formatter {
-    return .{ .ast = ast, .src = src };
+pub fn formatter(ast: Ast, arena: Allocator, src: []const u8) Formatter {
+    return .{ .ast = ast, .arena = arena, .src = src };
 }
 const Formatter = struct {
     ast: Ast,
+    arena: Allocator,
     src: []const u8,
 
     pub fn format(f: Formatter, w: *Writer) !void {
-        try f.ast.render(f.src, w);
+        try f.ast.render(f.arena, f.src, w);
     }
 };
 
@@ -1600,7 +2183,7 @@ test "basics" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "basics - attributes" {
@@ -1611,7 +2194,7 @@ test "basics - attributes" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "newlines" {
@@ -1638,7 +2221,7 @@ test "newlines" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "tight tags inner indentation" {
@@ -1657,7 +2240,7 @@ test "tight tags inner indentation" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "bad html" {
@@ -1674,7 +2257,7 @@ test "bad html" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "formatting - simple" {
@@ -1696,7 +2279,7 @@ test "formatting - simple" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "formatting - attributes" {
@@ -1728,7 +2311,7 @@ test "formatting - attributes" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "pre" {
@@ -1746,7 +2329,7 @@ test "pre" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "pre text" {
@@ -1765,7 +2348,7 @@ test "pre text" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "what" {
@@ -1803,7 +2386,7 @@ test "what" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "spans" {
@@ -1840,7 +2423,7 @@ test "spans" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 test "arrow span" {
     const case =
@@ -1851,7 +2434,7 @@ test "arrow span" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "self-closing tag complex example" {
@@ -1877,7 +2460,7 @@ test "self-closing tag complex example" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "respect empty lines" {
@@ -1930,7 +2513,7 @@ test "respect empty lines" {
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(expected, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 test "pre formatting" {
@@ -1952,7 +2535,7 @@ test "pre formatting" {
 
     const ast = try Ast.init(std.testing.allocator, case, .html, false);
     defer ast.deinit(std.testing.allocator);
-    try std.testing.expectFmt(case, "{f}", .{ast.formatter(case)});
+    try std.testing.expectFmt(case, "{f}", .{ast.formatter(std.testing.allocator, case)});
 }
 
 pub const Cursor = struct {
