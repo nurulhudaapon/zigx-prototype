@@ -114,12 +114,12 @@ test "expression_component" {
 }
 
 test "component_basic" {
-    return error.Todo;
-    // try test_fmt("component/basic");
+    // return error.Todo;
+    try test_fmt("component/basic", false);
 }
 test "component_multiple" {
-    return error.Todo;
-    // try test_fmt("component/multiple");
+    // return error.Todo;
+    try test_fmt("component/multiple", false);
 }
 test "component_csr_react" {
     return error.Todo;

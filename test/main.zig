@@ -5,6 +5,7 @@ test {
 }
 test "cli" {
     _ = @import("cli/fmt.zig");
+    // _ = @import("cli.zig");
 }
 
 pub const std_options = std.Options{

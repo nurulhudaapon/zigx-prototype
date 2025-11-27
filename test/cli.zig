@@ -15,6 +15,37 @@ fn getTestDirPath() ![]const u8 {
     return test_dir_abs;
 }
 
+fn killPort(port: []const u8) !void {
+    const builtin = @import("builtin");
+    const target_os = builtin.target.os.tag;
+
+    if (target_os == .windows) {
+        // Windows: Use PowerShell to find and kill process on port
+        const ps_command = try std.fmt.allocPrint(
+            allocator,
+            "Get-NetTCPConnection -LocalPort {s} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force }}",
+            .{port},
+        );
+        defer allocator.free(ps_command);
+
+        var kill_child = std.process.Child.init(&.{ "powershell", "-Command", ps_command }, allocator);
+        kill_child.stdout_behavior = .Pipe;
+        kill_child.stderr_behavior = .Pipe;
+        _ = kill_child.spawn() catch return;
+        _ = kill_child.wait() catch {};
+    } else {
+        // Unix-like: Use lsof and kill
+        const kill_command = try std.fmt.allocPrint(allocator, "kill -9 $(lsof -t -i:{s})", .{port});
+        defer allocator.free(kill_command);
+
+        var kill_child = std.process.Child.init(&.{ "sh", "-c", kill_command }, allocator);
+        kill_child.stdout_behavior = .Pipe;
+        kill_child.stderr_behavior = .Pipe;
+        _ = kill_child.spawn() catch return;
+        _ = kill_child.wait() catch {};
+    }
+}
+
 test "cli > init" {
 
     // Create test/tmp directory
@@ -63,20 +94,15 @@ test "cli > serve" {
     const port_colon = try std.fmt.allocPrint(allocator, ":{s}", .{port});
     defer allocator.free(port_colon);
 
-    // Kill anything on that port
-    const kill_command = try std.fmt.allocPrint(allocator, "kill -9 $(lsof -t -i :{s})", .{port});
-    defer allocator.free(kill_command);
-
-    var kill_child = std.process.Child.init(&.{ "bash", "-c", kill_command }, allocator);
-    kill_child.stdout_behavior = .Pipe;
-    kill_child.stderr_behavior = .Pipe;
-    try kill_child.spawn();
-    _ = try kill_child.wait();
+    // Kill anything on that port (cross-platform)
+    killPort(port) catch {};
 
     var build_child = std.process.Child.init(&.{ "zig", "build" }, allocator);
     build_child.cwd = test_dir_abs;
+    build_child.stdout_behavior = .Ignore;
+    build_child.stderr_behavior = .Ignore;
     try build_child.spawn();
-    _ = try build_child.wait();
+    _ = build_child.wait() catch {};
 
     var child = std.process.Child.init(&.{ zx_bin_abs, "serve", "--port", port }, allocator);
     child.cwd = test_dir_abs;
