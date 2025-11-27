@@ -103,6 +103,25 @@ fn getBasename(path: []const u8) []const u8 {
     return path;
 }
 
+/// Escapes backslashes in a path string for use in Zig string literals.
+/// On Windows, backslashes need to be escaped as \\ in string literals.
+fn escapePathForZigString(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
+    var result = std.array_list.Managed(u8).init(allocator);
+    errdefer result.deinit();
+    const writer = result.writer();
+
+    for (path) |byte| {
+        if (byte == '\\') {
+            // Escape backslash for Zig string literal
+            try writer.writeAll("\\\\");
+        } else {
+            try writer.writeByte(byte);
+        }
+    }
+
+    return result.toOwnedSlice();
+}
+
 /// Resolve a relative path against a base directory
 fn resolvePath(allocator: std.mem.Allocator, base_dir: []const u8, relative_path: []const u8) ![]const u8 {
     if (std.fs.path.isAbsolute(relative_path)) {
@@ -518,9 +537,24 @@ fn generateFiles(allocator: std.mem.Allocator, output_dir: []const u8, verbose: 
     }
     try writer.writeAll("};\n\n");
 
+    // Convert to relative path using std.fs.path.relative and escape for Zig string literal
+    var path_to_use: []const u8 = output_dir;
+    var path_allocated = false;
+    if (std.fs.cwd().realpathAlloc(allocator, ".")) |cwd| {
+        defer allocator.free(cwd);
+        if (std.fs.path.relative(allocator, cwd, output_dir)) |relative| {
+            path_to_use = relative;
+            path_allocated = true;
+        } else |_| {}
+    } else |_| {}
+    defer if (path_allocated) allocator.free(path_to_use);
+
+    const escaped_path = try escapePathForZigString(allocator, path_to_use);
+    defer allocator.free(escaped_path);
+
     try writer.writeAll("pub const meta = zx.App.Meta{\n");
     try writer.writeAll("    .routes = &routes,\n");
-    try writer.print("    .rootdir = \"{s}\",\n", .{output_dir});
+    try writer.print("    .rootdir = \"{s}\",\n", .{escaped_path});
     try writer.writeAll("};\n\n");
     try writer.writeAll("const zx = @import(\"zx\");\n");
 

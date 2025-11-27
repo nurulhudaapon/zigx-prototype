@@ -85,7 +85,7 @@ pub const App = struct {
     }
 
     fn introspect(self: *App) !void {
-        var args = std.process.args();
+        var args = try std.process.argsWithAllocator(self.allocator);
         defer args.deinit();
 
         // --- Flags --- //

@@ -2,6 +2,7 @@ const std = @import("std");
 
 test {
     _ = @import("zx/Transpiler.zig");
+    _ = @import("cli/cli.zig");
 }
 
 pub const std_options = std.Options{
