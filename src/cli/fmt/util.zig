@@ -1,7 +1,8 @@
 const std = @import("std");
-const htmlz = @import("htmlz");
+// const htmlz = @import("htmlz");
 const expr = @import("expr.zig");
 const fmtlog = std.log.scoped(.cli);
+const htmlz_ast = @import("html/Ast.zig");
 
 const stderr_buffer_size = 4096;
 var stderr_buffer: [stderr_buffer_size]u8 = undefined;
@@ -26,7 +27,7 @@ pub fn formatHtml(
     src: [:0]const u8,
     syntax_only: bool,
 ) !?[]const u8 {
-    const html_ast = try htmlz.html.Ast.init(arena, src, .html, syntax_only);
+    const html_ast = try htmlz_ast.init(arena, src, .html, syntax_only);
     try html_ast.printErrors(src, path, stderr);
     if (html_ast.has_syntax_errors) {
         return null;
