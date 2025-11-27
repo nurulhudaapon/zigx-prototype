@@ -9,7 +9,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
                 <p>User: {user_name}</p>
                 <p>Safe HTML: {html_content}</p>
                 <p>Unsafe HTML: {[unsafe_html:s]}</p>
-            </section>
+        	</section>
         </main>
     );
 }

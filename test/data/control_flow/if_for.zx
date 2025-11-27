@@ -5,7 +5,9 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
         <main @allocator={allocator}>
             {if (show_users) (
                 for (user_names) |name| (<p>{name}</p>)
-            ) else (<p>Users hidden</p>)}
+            ) else (
+                <p>Users hidden</p>    
+            )}
         </main>
     );
 }

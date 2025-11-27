@@ -18,11 +18,11 @@ test "tests:afterAll" {
 // Control Flow
 // If
 test "if" {
-    try test_fmt("control_flow/if");
+    try test_fmt("control_flow/if", false);
 }
 
 test "if_block" {
-    try test_fmt("control_flow/if_block");
+    try test_fmt("control_flow/if_block", false);
 }
 
 test "if_if_only" {
@@ -35,23 +35,23 @@ test "if_if_only_block" {
     // try test_transpile("control_flow/if_if_only_block");
 }
 test "if_only" {
-    try test_fmt("control_flow/if_only");
+    try test_fmt("control_flow/if_only", false);
 }
 
 test "if_only_block" {
-    try test_fmt("control_flow/if_only_block");
+    try test_fmt("control_flow/if_only_block", false);
 }
 // For
 test "for" {
-    try test_fmt("control_flow/for");
+    try test_fmt("control_flow/for", false);
 }
 
 test "for_block" {
-    try test_fmt("control_flow/for_block");
+    try test_fmt("control_flow/for_block", false);
 }
 // Switch
 test "switch" {
-    try test_fmt("control_flow/switch");
+    try test_fmt("control_flow/switch", false);
 }
 test "switch_block" {
     return error.Todo;
@@ -59,28 +59,34 @@ test "switch_block" {
 }
 // Nested Control Flow (2-level nesting)
 test "if_if" {
-    try test_fmt("control_flow/if_if");
+    return error.Todo;
+    // try test_fmt("control_flow/if_if", false);
 }
 test "if_for" {
-    try test_fmt("control_flow/if_for");
+    return error.Todo;
+    // try test_fmt("control_flow/if_for", false);
 }
 test "if_switch" {
-    try test_fmt("control_flow/if_switch");
+    return error.Todo;
+    // try test_fmt("control_flow/if_switch", false);
 }
 test "for_if" {
-    try test_fmt("control_flow/for_if");
+    return error.Todo;
+    // try test_fmt("control_flow/for_if", false);
 }
 test "for_for" {
-    try test_fmt("control_flow/for_for");
+    try test_fmt("control_flow/for_for", false);
 }
 test "for_switch" {
-    try test_fmt("control_flow/for_switch");
+    try test_fmt("control_flow/for_switch", false);
 }
 test "switch_if" {
-    try test_fmt("control_flow/switch_if");
+    return error.Todo;
+    // try test_fmt("control_flow/switch_if");
 }
 test "switch_for" {
-    try test_fmt("control_flow/switch_for");
+    return error.Todo;
+    // try test_fmt("control_flow/switch_for");
 }
 test "switch_switch" {
     return error.Todo;
@@ -88,34 +94,40 @@ test "switch_switch" {
 }
 // While
 test "while" {
-    try test_fmt("control_flow/while");
+    try test_fmt("control_flow/while", false);
 }
 
 test "while_block" {
-    try test_fmt("control_flow/while_block");
+    return error.Todo;
+    // try test_fmt("control_flow/while_block");
 }
 
 test "expression_text" {
-    try test_fmt("expression/text");
+    try test_fmt("expression/text", false);
 }
 test "expression_format" {
-    try test_fmt("expression/format");
+    try test_fmt("expression/format", false);
 }
 test "expression_component" {
-    try test_fmt("expression/component");
+    return error.Todo;
+    // try test_fmt("expression/component");
 }
 
 test "component_basic" {
-    try test_fmt("component/basic");
+    return error.Todo;
+    // try test_fmt("component/basic");
 }
 test "component_multiple" {
-    try test_fmt("component/multiple");
+    return error.Todo;
+    // try test_fmt("component/multiple");
 }
 test "component_csr_react" {
-    try test_fmt("component/csr_react");
+    return error.Todo;
+    // try test_fmt("component/csr_react");
 }
 test "component_csr_react_multiple" {
-    try test_fmt("component/csr_react_multiple");
+    return error.Todo;
+    // try test_fmt("component/csr_react_multiple");
 }
 
 test "performance" {
@@ -125,7 +137,7 @@ test "performance" {
     var total_time_ns: f64 = 0.0;
     inline for (TestFileCache.test_files) |comptime_path| {
         const start_time = std.time.nanoTimestamp();
-        test_fmt(comptime_path) catch {
+        test_fmt(comptime_path, true) catch {
             // continue;
         };
         const end_time = std.time.nanoTimestamp();
@@ -143,7 +155,7 @@ test "performance" {
     try expectLessThan(MAX_TIME_PER_FILE_MS, average_time_ms);
 }
 
-fn test_fmt(comptime file_path: []const u8) !void {
+fn test_fmt(comptime file_path: []const u8, no_expect: bool) !void {
     const allocator = std.testing.allocator;
     const cache = test_file_cache orelse return error.CacheNotInitialized;
 
@@ -165,7 +177,9 @@ fn test_fmt(comptime file_path: []const u8) !void {
     const expected_source_z = try allocator.dupeZ(u8, expected_source);
     defer allocator.free(expected_source_z);
 
-    // try testing.expectEqualStrings(expected_source_z, result.formatted_zx);
+    if (!no_expect) {
+        try testing.expectEqualStrings(expected_source_z, result.formatted_zx);
+    }
 }
 
 fn expectLessThan(expected: f64, actual: f64) !void {

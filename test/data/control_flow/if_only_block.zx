@@ -2,7 +2,7 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
     const is_logged_in = true;
     return (
         <main @allocator={allocator}>
-        	{if (is_logged_in) (
+            {if (is_logged_in) (
                 <div>
                     <p>Welcome, User</p>
                 </div>

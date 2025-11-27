@@ -23,4 +23,3 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 const zx = @import("zx");
 
 const UserRole = enum { admin, member, guest };
-

@@ -1,11 +1,11 @@
 pub fn Page(allocator: zx.Allocator) zx.Component {
     return (
         <main @allocator={allocator}>
-            <Button title="Submit" />
-            <Button title="Cancel" />
-            <AsyncScore index={1} label="Score" />
-            <AsyncScore index={2} label="Points" />
-            <AsyncScore index={3} label="Rating" />
+            <Button title="Submit"/>
+            <Button title="Cancel"/>
+            <AsyncScore index={1} label="Score"/>
+            <AsyncScore index={2} label="Points"/>
+            <AsyncScore index={3} label="Rating"/>
         </main>
     );
 }

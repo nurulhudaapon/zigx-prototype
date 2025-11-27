@@ -3,8 +3,8 @@ pub fn Page(allocator: zx.Allocator) zx.Component {
 
     return (
         <main @allocator={allocator}>
-            <CounterComponent @rendering={.csr} max_count={max_count} />
-            <AnotherComponent @rendering={.csr} />
+            <CounterComponent @rendering={.csr} max_count={max_count}/>
+            <AnotherComponent @rendering={.csr}/>
         </main>
     );
 }
