@@ -608,7 +608,8 @@ pub fn init(
                     var new: Node = node: switch (tag.kind) {
                         else => unreachable,
                         .start_self => {
-                            if (svg_lvl != 0 or math_lvl != 0 or language == .xml) {
+                            const is_starting_with_uppercase = std.ascii.isUpper(name[0]);
+                            if (svg_lvl != 0 or math_lvl != 0 or language == .xml or is_starting_with_uppercase) {
                                 break :node .{
                                     .kind = .___,
                                     .open = tag.span,
@@ -1287,8 +1288,8 @@ fn renderMultilineContent(content: []const u8, base_indent: u32, arena: Allocato
         // Content contains HTML - parse and render using HTML AST renderer
         // Create a temporary wrapper source with root element, parse it, then render
         // We'll extract just the content part (without the wrapper)
-        const wrapper_prefix = "<root>";
-        const wrapper_suffix = "</root>";
+        const wrapper_prefix = "<i>";
+        const wrapper_suffix = "</i>";
         var wrapped_content = try arena.alloc(u8, wrapper_prefix.len + content.len + wrapper_suffix.len);
         @memcpy(wrapped_content[0..wrapper_prefix.len], wrapper_prefix);
         @memcpy(wrapped_content[wrapper_prefix.len .. wrapper_prefix.len + content.len], content);
@@ -1310,14 +1311,14 @@ fn renderMultilineContent(content: []const u8, base_indent: u32, arena: Allocato
         };
         var rendered = buffer_writer.written();
 
-        // Extract the content between <root> and </root>, skipping the wrapper tags
-        // Find the start of content (after <root>)
+        // Extract the content between <i> and </i>, skipping the wrapper tags
+        // Find the start of content (after <i>)
         const content_start = std.mem.indexOf(u8, rendered, ">") orelse {
             return renderMultilineContentAsText(content, base_indent, w);
         };
         const after_root_tag = content_start + 1;
-        // Find the end of content (before </root>)
-        const root_end_tag = std.mem.lastIndexOf(u8, rendered, "</root>") orelse {
+        // Find the end of content (before </i>)
+        const root_end_tag = std.mem.lastIndexOf(u8, rendered, "</i>") orelse {
             return renderMultilineContentAsText(content, base_indent, w);
         };
         const inner_content = rendered[after_root_tag..root_end_tag];
@@ -1465,6 +1466,14 @@ const LineIndentWriter = struct {
 };
 
 pub fn render(ast: Ast, arena: Allocator, src: []const u8, w: *Writer) !void {
+    var aw = std.io.Writer.Allocating.init(arena);
+    defer aw.deinit();
+    try ast.printErrors(src, null, &aw.writer);
+    const errors = aw.written();
+    if (errors.len > 0) {
+        // std.debug.print("{s}\n", .{errors});
+        return error.SyntaxError;
+    }
     assert(!ast.has_syntax_errors);
 
     if (ast.nodes.len < 2) return;

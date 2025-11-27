@@ -1,7 +1,7 @@
 const std = @import("std");
 const zli = @import("zli");
-const util = @import("fmt/util.zig");
 const log = std.log.scoped(.cli);
+const zx = @import("zx");
 
 const stdio_flag = zli.Flag{
     .name = "stdio",
@@ -79,7 +79,7 @@ fn formatFromStdin(allocator: std.mem.Allocator, writer: *std.Io.Writer) !void {
     const input = try buffer.toOwnedSliceSentinel(0);
     defer allocator.free(input);
 
-    var format_result = try util.format(allocator, input);
+    var format_result = try zx.Ast.fmt(allocator, input);
     defer format_result.deinit(allocator);
 
     try writer.writeAll(format_result.formatted_zx);
@@ -107,7 +107,7 @@ fn formatFile(
     const source_z = try allocator.dupeZ(u8, source);
     defer allocator.free(source_z);
 
-    var format_result = try util.format(allocator, source_z);
+    var format_result = try zx.Ast.fmt(allocator, source_z);
     defer format_result.deinit(allocator);
 
     if (use_stdout) {
@@ -164,7 +164,7 @@ fn formatDir(
         const source_z = try allocator.dupeZ(u8, source);
         defer allocator.free(source_z);
 
-        var format_result = util.format(allocator, source_z) catch |err| switch (err) {
+        var format_result = zx.Ast.fmt(allocator, source_z) catch |err| switch (err) {
             error.ParseError => {
                 log.err("Error formatting {s}: {}\n", .{ full_path, err });
                 continue;
