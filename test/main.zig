@@ -4,7 +4,7 @@ test {
     _ = @import("zx/Transpiler.zig");
 }
 test "cli" {
-    _ = @import("cli.zig");
+    _ = @import("cli/fmt.zig");
 }
 
 pub const std_options = std.Options{
