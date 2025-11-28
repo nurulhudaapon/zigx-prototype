@@ -1,4 +1,6 @@
 const std = @import("std");
+const builtin = @import("builtin");
+const Colors = @import("Colors.zig");
 
 pub const Printer = @This();
 
@@ -29,7 +31,7 @@ pub fn deinit(self: *Printer) void {
     self.arena.deinit();
 }
 
-pub fn printFilePath(self: *Printer, file_path: []const u8) void {
+pub fn filepath(self: *Printer, file_path: []const u8) void {
     switch (self.options.file_path_mode) {
         .flat => {
             // Show as single flat path like before
@@ -92,4 +94,28 @@ pub fn printFilePath(self: *Printer, file_path: []const u8) void {
             std.debug.print("+ \x1b[90m{s}\x1b[0m\n", .{filename});
         },
     }
+}
+
+pub fn header(self: *Printer, comptime fmt: []const u8, emoji: ?[]const u8, args: anytype) void {
+    _ = self;
+    const is_windows = builtin.os.tag == .windows;
+
+    if (is_windows) {
+        std.debug.print("{s}", .{Colors.cyan});
+        std.debug.print(fmt, args);
+        std.debug.print("{s}\n\n", .{Colors.reset});
+    } else {
+        if (emoji) |e| {
+            std.debug.print("{s} ", .{e});
+        }
+        std.debug.print(fmt, args);
+        std.debug.print("\n\n", .{});
+    }
+}
+
+pub fn footer(self: *Printer, comptime fmt: []const u8, args: anytype) void {
+    _ = self;
+    std.debug.print("\n", .{});
+    std.debug.print(fmt, args);
+    std.debug.print("\n\n", .{});
 }

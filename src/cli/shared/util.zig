@@ -81,7 +81,7 @@ pub fn copydirs(
     source_dirs: []const []const u8,
     dest_dir: []const u8,
     public_to_root: bool,
-    printer: *zx.Printer,
+    printer: *tui.Printer,
 ) !void {
     for (source_dirs) |source_dir| {
         const source_path = try std.fs.path.join(allocator, &.{ base_dir, source_dir });
@@ -132,7 +132,7 @@ pub fn copydirs(
 
                     // Copy file
                     try std.fs.cwd().copyFile(src_path, std.fs.cwd(), dst_abs_path, .{});
-                    printer.printFilePath(dst_rel_path);
+                    printer.filepath(dst_rel_path);
                 },
                 .directory => {
                     if (shouldIgnorePath(dst_abs_path)) continue;
@@ -150,4 +150,5 @@ pub fn copydirs(
 
 const std = @import("std");
 const zx = @import("zx");
+const tui = @import("../../tui/main.zig");
 const log = std.log.scoped(.cli);

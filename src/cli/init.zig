@@ -30,9 +30,11 @@ fn init(ctx: zli.CommandContext) !void {
         return;
     };
 
-    std.debug.print("○ Initializing ZX project!", .{});
-    std.debug.print(" Template: \x1b[90m{s}\x1b[0m\n\n", .{@tagName(template_name)});
+    var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
+    defer printer.deinit();
 
+    printer.header("Initializing ZX project!", "○", .{});
+    std.debug.print("  - {s}[{s}]{s}\n", .{ tui.Colors.gray, @tagName(template_name), tui.Colors.reset });
     const output_dir = ".";
 
     try std.fs.cwd().makePath(output_dir);
@@ -47,7 +49,6 @@ fn init(ctx: zli.CommandContext) !void {
         std.debug.print("\x1b[33m⚠ Warning: build.zig.zon already exists in {s}/. Skipping template initialization.\x1b[0m\n", .{output_dir});
         return;
     } else |err| {
-        // File doesn't exist, which is what we want - continue
         switch (err) {
             error.FileNotFound => {},
             else => return err,
@@ -66,12 +67,12 @@ fn init(ctx: zli.CommandContext) !void {
 
         var file = try std.fs.cwd().createFile(output_path, .{ .truncate = true });
 
-        std.debug.print("  + \x1b[90m{s}\x1b[0m\n", .{template.path});
+        printer.filepath(template.path);
         defer file.close();
         try file.writeAll(template.content);
     }
 
-    std.debug.print("\nNow run → \n\n\x1b[36mzig build serve\x1b[0m\n\n", .{});
+    printer.footer("Now run →\n\n{s}zig build serve{s}", .{ tui.Colors.cyan, tui.Colors.reset });
 }
 
 const TemplateFile = struct {
@@ -112,3 +113,4 @@ const templates = [_]TemplateFile{
 
 const std = @import("std");
 const zli = @import("zli");
+const tui = @import("../tui/main.zig");

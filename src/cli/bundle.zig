@@ -59,16 +59,16 @@ fn bundle(ctx: zli.CommandContext) !void {
     const appoutdir = app_meta.rootdir orelse "site/.zx";
     const final_binpath = app_meta.binpath orelse binpath;
 
-    std.debug.print("\x1b[1m○ Bundling ZX site!\x1b[0m\n\n", .{});
-    std.debug.print("  - \x1b[90m{s}\x1b[0m\n", .{outdir});
+    var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
+    defer printer.deinit();
+
+    printer.header("Bundling ZX site!", "○", .{});
+    std.debug.print("  - {s}{s}{s}\n", .{ tui.Colors.gray, outdir, tui.Colors.reset });
 
     var aw = std.Io.Writer.Allocating.init(ctx.allocator);
     defer aw.deinit();
     try app_meta.serialize(&aw.writer);
     log.debug("Bundling ZX site! {s}", .{aw.written()});
-
-    var printer = zx.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
-    defer printer.deinit();
 
     log.debug("Outdir: {s}", .{outdir});
 
@@ -91,7 +91,7 @@ fn bundle(ctx: zli.CommandContext) !void {
 
     if (!(docker or docker_compose)) {
         try std.fs.cwd().copyFile(final_binpath, std.fs.cwd(), dest_binpath, .{});
-        printer.printFilePath(bin_name);
+        printer.filepath(bin_name);
     }
 
     log.debug("Copying public directory! {s}", .{appoutdir});
@@ -134,21 +134,21 @@ fn bundle(ctx: zli.CommandContext) !void {
         defer ctx.allocator.free(compose_path);
 
         try std.fs.cwd().writeFile(.{ .sub_path = dockerfile_path, .data = dockerfile_content_with_build_args });
-        printer.printFilePath(std.fs.path.basename(dockerfile_path));
+        printer.filepath(std.fs.path.basename(dockerfile_path));
         if (docker_compose) {
             try std.fs.cwd().writeFile(.{ .sub_path = compose_path, .data = compose_content_with_port });
-            printer.printFilePath(std.fs.path.basename(compose_path));
+            printer.filepath(std.fs.path.basename(compose_path));
         }
     }
 
     if (docker or docker_compose) {
         if (docker_compose) {
-            std.debug.print("\nNow run → \n\n\x1b[36m(cd {s} && docker compose up --build)\x1b[0m\n\n", .{outdir});
+            printer.footer("Now run →\n\n{s}(cd {s} && docker compose up --build){s}", .{ tui.Colors.cyan, outdir, tui.Colors.reset });
         } else {
-            std.debug.print("\nNow run → \n\n\x1b[36mdocker build -t {s} . -f {s}/Dockerfile \ndocker run -p {s}:{s} {s}\x1b[0m\n\n", .{ bin_name, outdir, port_str, port_str, bin_name });
+            printer.footer("Now run →\n\n{s}docker build -t {s} . -f {s}/Dockerfile \ndocker run -p {d}:{d} {s}{s}", .{ tui.Colors.cyan, bin_name, outdir, port, port, bin_name, tui.Colors.reset });
         }
     } else {
-        std.debug.print("\nNow run → \n\n\x1b[36m(cd {s} && ./{s} --rootdir ./)\x1b[0m\n\n", .{ outdir, bin_name });
+        printer.footer("Now run →\n\n{s}(cd {s} && ./{s} --rootdir ./){s}", .{ tui.Colors.cyan, outdir, bin_name, tui.Colors.reset });
     }
 }
 
@@ -157,4 +157,5 @@ const zli = @import("zli");
 const util = @import("shared/util.zig");
 const flag = @import("shared/flag.zig");
 const zx = @import("zx");
+const tui = @import("../tui/main.zig");
 const log = std.log.scoped(.cli);

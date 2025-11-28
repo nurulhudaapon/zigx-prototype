@@ -110,9 +110,12 @@ fn dev(ctx: zli.CommandContext) !void {
 
 const std = @import("std");
 const zli = @import("zli");
+const zx = @import("zx");
+
 const util = @import("shared/util.zig");
 const flag = @import("shared/flag.zig");
-const log = std.log.scoped(.cli);
-const zx = @import("zx");
 const jsutil = @import("shared/js.zig");
-const Colors = @import("../tui/Colors.zig");
+const tui = @import("../tui/main.zig");
+
+const Colors = tui.Colors;
+const log = std.log.scoped(.cli);

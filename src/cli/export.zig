@@ -43,8 +43,11 @@ fn @"export"(ctx: zli.CommandContext) !void {
     defer _ = app_child.kill() catch {};
     errdefer _ = app_child.kill() catch {};
 
-    std.debug.print("\x1b[1m○ Building static ZX site!\x1b[0m\n\n", .{});
-    std.debug.print("  - \x1b[90m{s}\x1b[0m\n", .{outdir});
+    var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
+    defer printer.deinit();
+
+    printer.header("Building static ZX site!", "○", .{});
+    std.debug.print("  - {s}{s}{s}\n", .{ tui.Colors.gray, outdir, tui.Colors.reset });
     // delete the outdir if it exists
     std.fs.cwd().deleteTree(outdir) catch |err| switch (err) {
         else => {},
@@ -54,9 +57,6 @@ fn @"export"(ctx: zli.CommandContext) !void {
     defer aw.deinit();
     try app_meta.serialize(&aw.writer);
     log.debug("Building static ZX site! {s}", .{aw.written()});
-
-    var printer = zx.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
-    defer printer.deinit();
 
     log.debug("Port: {d}, Outdir: {s}", .{ port, appoutdir });
 
@@ -88,8 +88,7 @@ fn @"export"(ctx: zli.CommandContext) !void {
         else => {},
     };
 
-    // std.debug.print("\nNow run → \n\n\x1b[36mzig build serve\x1b[0m\n\n", .{});
-    std.debug.print("\n", .{});
+    // printer.footer("", .{});
 }
 
 fn processRoute(
@@ -98,7 +97,7 @@ fn processRoute(
     port: u16,
     route: zx.App.SerilizableAppMeta.Route,
     outdir: []const u8,
-    printer: *zx.Printer,
+    printer: *tui.Printer,
 ) !void {
     // Fetch the route's HTML content
     var client = std.http.Client{ .allocator = allocator };
@@ -157,7 +156,7 @@ fn processRoute(
         .data = response_text,
     });
 
-    printer.printFilePath(file_path);
+    printer.filepath(file_path);
 }
 
 const std = @import("std");
@@ -165,4 +164,5 @@ const zli = @import("zli");
 const util = @import("shared/util.zig");
 const flag = @import("shared/flag.zig");
 const zx = @import("zx");
+const tui = @import("../tui/main.zig");
 const log = std.log.scoped(.cli);
