@@ -44,19 +44,19 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     // --- ZX LSP ---
-    const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
-    const zxls_exe = b.addExecutable(.{
-        .name = "zxls",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/lsp/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "zls", .module = zls_dep.module("zls") },
-            },
-        }),
-    });
-    _ = zxls_exe;
+    // const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
+    // const zxls_exe = b.addExecutable(.{
+    //     .name = "zxls",
+    //     .root_module = b.createModule(.{
+    //         .root_source_file = b.path("src/lsp/main.zig"),
+    //         .target = target,
+    //         .optimize = optimize,
+    //         .imports = &.{
+    //             .{ .name = "zls", .module = zls_dep.module("zls") },
+    //         },
+    //     }),
+    // });
+    // _ = zxls_exe;
     // b.installArtifact(zxls_exe);
 
     // --- Steps: Run ---
@@ -159,7 +159,8 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     const zx_dep = b.dependency("zx", .{ .target = target, .optimize = optimize });
 
     // --- ZX Transpilation ---
-    const transpile_cmd = b.addSystemCommand(&.{"zx"}); // ZX CLI must installed and in the PATH
+    const transpile_cmd = b.addRunArtifact(zx_dep.artifact("zx")); // ZX CLI must installed and in the PATH
+    // const transpile_cmd = b.addSystemCommand(&.{"zx"}); // ZX CLI must installed and in the PATH
     transpile_cmd.addArg("transpile");
     transpile_cmd.addArg(b.pathJoin(&.{"site"}));
     transpile_cmd.addArg("--outdir");

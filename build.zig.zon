@@ -1,6 +1,6 @@
 .{
     .name = .zx,
-    .version = "0.0.1-dev.221",
+    .version = "0.0.1-dev.222",
     .description = "ZX is a framework for building web applications with Zig.",
     .repository = "https://github.com/nurulhudaapon/zx",
     .fingerprint = 0xcad77a8d2a3389f2,
@@ -11,11 +11,11 @@
             .url = "git+https://github.com/nurulhudaapon/httpz.git#7268154f43f5827bf78668e8e79a00f2ebe4db13",
             .hash = "httpz-0.0.0-PNVzrBgtBwCVkSJyophIX6WHwDR0r8XhBGQr96Kk-1El",
         },
-        // ZX LSP - Language Server Protocol for ZX
-        .zls = .{
-            .url = "git+https://github.com/nurulhudaapon/lspz.git?ref=0.15.x#ce6c8f02c78e622421cfc2405c67c5222819ec03",
-            .hash = "zls-0.15.0-rmm5fkjqIwDZpmDHyKwxa9K2gcI3FPaGVFPwjYWFBM5B",
-        },
+        // // ZX LSP - Language Server Protocol for ZX
+        // .zls = .{
+        //     .url = "git+https://github.com/nurulhudaapon/lspz.git?ref=0.15.x#ce6c8f02c78e622421cfc2405c67c5222819ec03",
+        //     .hash = "zls-0.15.0-rmm5fkjqIwDZpmDHyKwxa9K2gcI3FPaGVFPwjYWFBM5B",
+        // },
         // ZX CLI - Command Line Interface for ZX
         .zli = .{
             .url = "git+https://github.com/nurulhudaapon/cliz.git#aff3b54879e7514afaf8c87f1abe22121b8992d4",
