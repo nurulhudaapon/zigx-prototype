@@ -1,4 +1,4 @@
-import { $ } from "bun";
+import Bun, { $ } from "bun";
 import { copyFileSync, mkdirSync, writeFileSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -25,7 +25,13 @@ async function main() {
   // Build the package
   console.log(`\x1b[33m📦 ${pkgName} - Bundling...\x1b[0m`);
   await $`rm -rf ${pkgDistDir}`.quiet();
-  await $`bun build ${pkgDir}/src/index.ts --outdir ${pkgDistDir} --minify`.quiet();
+  
+  // Build main entry
+  Bun.build({
+    entrypoints: [join(pkgDir, "src/index.ts"), join(pkgDir, "src/react/index.ts"), join(pkgDir, "src/wasm/index.ts")],
+    outdir: pkgDistDir,
+    minify: true,
+  });
 
   // Generate TypeScript declaration files
   console.log(`\x1b[34m🔷 ${pkgName} - Generating types...\x1b[0m`);
@@ -38,7 +44,7 @@ async function main() {
     const tsConfig = {
       compilerOptions: {
         target: "ES2020",
-        module: "CommonJS",
+        module: "esnext",
         lib: ["ES2020", "dom"],
         strict: true,
         esModuleInterop: true,
@@ -53,14 +59,14 @@ async function main() {
         emitDeclarationOnly: true,
       },
       exclude: ["node_modules", "dist", "test"],
-      include: ["./src/index.ts"],
+      include: ["./src/**/*.ts"],
     };
 
     writeFileSync(tempTsConfigPath, JSON.stringify(tsConfig, null, 2));
 
     // Use the temporary tsconfig and run tsc directly in the package directory
     await $`cd ${pkgDir} && tsc --project ${tempTsConfigPath}`;
-    // await $`rm dist/zig.d.ts`;
+    await $`rm dist/zx.d.ts`;
 
     // Clean up temporary tsconfig
     await $`rm ${tempTsConfigPath}`;

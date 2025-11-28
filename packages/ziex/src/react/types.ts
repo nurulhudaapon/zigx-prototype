@@ -79,6 +79,13 @@ export type ComponentMetadata = {
    * ```
    */
   path: string;
+
+  /**
+   * The route of of the component in which page the component was used,
+   * null in case the component was used in other non-page/layout context.
+   * ```
+   */
+  route: string | null;
   
   /**
    * A unique HTML element identifier for the component's root DOM node.

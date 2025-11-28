@@ -135,7 +135,7 @@ export type PreparedComponent = {
  */
 export async function prepareComponent(component: ComponentMetadata): Promise<PreparedComponent> {
   const domNode = document.getElementById(component.id);
-  if (!domNode) throw new Error(`Root element ${component.id} not found`);
+  if (!domNode) throw new Error(`Root element ${component.id} not found`, { cause: component });
 
   const props = JSON.parse(domNode.getAttribute("data-props") || "{}");
   const htmlChildren = domNode.getAttribute("data-children") ?? undefined;
@@ -146,4 +146,9 @@ export async function prepareComponent(component: ComponentMetadata): Promise<Pr
 
   const Component = await component.import();
   return { domNode, props, Component };
+}
+
+export function filterComponents(components: ComponentMetadata[]): ComponentMetadata[] {
+  const currentPath = window.location.pathname;
+  return components.filter((component) => component.route === currentPath || !component.route);
 }

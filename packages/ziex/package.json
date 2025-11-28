@@ -4,6 +4,11 @@
   "description": "ZX is a framework for building web applications with Zig.",
   "main": "src/index.ts",
   "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./react": "./react/index.js",
+    "./wasm": "./wasm/index.js"
+  },
   "homepage": "https://github.com/nurulhudaapon/zx",
   "repository": {
     "type": "git",
@@ -33,7 +38,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "esbuild": "^0.27.0"
+    "zzon": "^1.7.1"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
