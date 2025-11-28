@@ -5,9 +5,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // --- TransformJS Rust Library ---
-    // const transformjs_build_step = buildTransformJs(b, target, optimize);
-
     // --- ZX Core ---
     const mod = b.addModule("zx", .{
         .root_source_file = b.path("src/root.zig"),
@@ -23,6 +20,7 @@ pub fn build(b: *std.Build) void {
     mod.addOptions("zx_info", options);
 
     // --- ZX CLI (Transpiler, Exporter, Dev Server) ---
+    // const transformjs_build_step = buildRustLibs(b, target, optimize);
     const zli_dep = b.dependency("zli", .{ .target = target, .optimize = optimize });
     const exe = b.addExecutable(.{
         .name = "zx",
@@ -38,26 +36,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Link TransformJS Rust library
-    // linkTransformJs(b, exe, transformjs_build_step, optimize);
-
+    // linkRustLibs(b, exe, transformjs_build_step, optimize);
     b.installArtifact(exe);
-
-    // --- ZX LSP ---
-    // const zls_dep = b.dependency("zls", .{ .target = target, .optimize = optimize });
-    // const zxls_exe = b.addExecutable(.{
-    //     .name = "zxls",
-    //     .root_module = b.createModule(.{
-    //         .root_source_file = b.path("src/lsp/main.zig"),
-    //         .target = target,
-    //         .optimize = optimize,
-    //         .imports = &.{
-    //             .{ .name = "zls", .module = zls_dep.module("zls") },
-    //         },
-    //     }),
-    // });
-    // _ = zxls_exe;
-    // b.installArtifact(zxls_exe);
 
     // --- Steps: Run ---
     const run_step = b.step("run", "Run the app");
@@ -67,7 +47,8 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_cmd.addArgs(args);
 
     // --- ZX Site (Docs, Example, sample) ---
-    setupZxDocSite(b, exe, mod, .{
+    const is_zx_docsite = b.option(bool, "zx-docsite", "Build the ZX docsite") orelse false;
+    if (is_zx_docsite) setupZxDocSite(b, exe, mod, .{
         .name = "zx_site",
         .root_module = b.createModule(.{
             .root_source_file = b.path("site/main.zig"),
@@ -86,7 +67,6 @@ pub fn build(b: *std.Build) void {
     const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
-    // Create transpiler test module and test executable
     const testing_mod = b.createModule(.{
         .root_source_file = b.path("test/main.zig"),
         .target = target,
@@ -137,9 +117,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
 
-        // Link TransformJS Rust library for release builds
-        // const release_transformjs_build_step = buildTransformJs(b, resolved_target, .ReleaseFast);
-        // linkTransformJs(b, release_exe, release_transformjs_build_step, .ReleaseFast);
+        // const release_transformjs_build_step = buildRustLibs(b, resolved_target, .ReleaseFast);
+        // linkRustLibs(b, release_exe, release_transformjs_build_step, .ReleaseFast);
 
         const exe_ext = if (resolved_target.result.os.tag == .windows) ".exe" else "";
         const install_release = b.addInstallArtifact(release_exe, .{
@@ -159,7 +138,7 @@ pub fn setup(b: *std.Build, options: std.Build.ExecutableOptions) void {
     const zx_dep = b.dependency("zx", .{ .target = target, .optimize = optimize });
 
     // --- ZX Transpilation ---
-    const transpile_cmd = b.addRunArtifact(zx_dep.artifact("zx")); // ZX CLI must installed and in the PATH
+    const transpile_cmd = b.addRunArtifact(zx_dep.artifact("zx"));
     // const transpile_cmd = b.addSystemCommand(&.{"zx"}); // ZX CLI must installed and in the PATH
     transpile_cmd.addArg("transpile");
     transpile_cmd.addArg(b.pathJoin(&.{"site"}));
@@ -254,11 +233,7 @@ fn setupZxDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.B
     });
 
     exe.step.dependOn(&transpile_cmd.step);
-
-    // --- Steps: Site Build ---
-    const site_step = b.step("site", "Build the site (docs, example, sample)");
-    site_step.dependOn(&transpile_cmd.step);
-    site_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    b.installArtifact(exe);
 
     // --- Steps: Run Docs ---
     const run_docs_step = b.step("serve", "Run the site (docs, example, sample)");
@@ -270,7 +245,7 @@ fn setupZxDocSite(b: *std.Build, zx_exe: *std.Build.Step.Compile, zx_mod: *std.B
 
 /// Build the TransformJS Rust library as a C dynamic library
 /// Returns a build step that must be completed before linking
-fn buildTransformJs(
+fn buildRustLibs(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -328,7 +303,7 @@ fn zigTargetToRustTarget(target: std.Target) ?[]const u8 {
 }
 
 /// Link TransformJS Rust library to an executable
-fn linkTransformJs(
+fn linkRustLibs(
     b: *std.Build,
     exe: *std.Build.Step.Compile,
     build_step: *std.Build.Step,
