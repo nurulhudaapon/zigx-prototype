@@ -135,9 +135,9 @@ function Install-Zx {
   }
 
   $Target = "zx-windows-$Arch"
-  if ($IsBaseline) {
-    $Target = "zx-windows-$Arch-baseline"
-  }
+  # if ($IsBaseline) {
+  #   $Target = "zx-windows-$Arch-baseline"
+  # }
   $BaseURL = "https://github.com/nurulhudaapon/zx/releases"
   $URL = "$BaseURL/$(if ($Version -eq "latest") { "latest/download" } else { "download/$Version" })/$Target.zip"
 

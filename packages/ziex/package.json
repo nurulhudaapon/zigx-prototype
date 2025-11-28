@@ -38,7 +38,8 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "zzon": "^1.7.1"
+    "zzon": "^1.7.1",
+    "jsz": "github:nurulhudaapon/jsz"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
