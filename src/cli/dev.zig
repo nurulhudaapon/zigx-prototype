@@ -75,13 +75,7 @@ fn dev(ctx: zli.CommandContext) !void {
 
         const should_restart = stat.mtime != bin_mtime and bin_mtime != 0;
         if (should_restart) {
-            const cyan = "\x1b[36m";
-            const yellow = "\x1b[33m";
-            const reset = "\x1b[0m";
-            try ctx.writer.print("{s}🔄 Change detected{s}, {s}restarting server...{s}", .{
-                cyan,   reset,
-                yellow, reset,
-            });
+            try ctx.writer.print("{s}Restarting ZX App...{s}", .{ Colors.cyan, Colors.reset });
 
             _ = try runner.kill();
             try runner.spawn();
@@ -121,3 +115,4 @@ const flag = @import("shared/flag.zig");
 const log = std.log.scoped(.cli);
 const zx = @import("zx");
 const jsutil = @import("shared/js.zig");
+const Colors = @import("../tui/Colors.zig");
