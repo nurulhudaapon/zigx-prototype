@@ -126,19 +126,42 @@ fn processRoute(
 
     if (std.mem.eql(u8, route.path, "/")) {
         file_path = "index.html";
-    } else if (route.path[route.path.len - 1] == '/') {
-        // For paths ending in "/", create directory/index.html structure
-        const dir_path = route.path[1 .. route.path.len - 1]; // Remove leading "/" and trailing "/"
-        file_path_owned = try std.fmt.allocPrint(allocator, "{s}/index.html", .{dir_path});
-        file_path = file_path_owned.?;
     } else {
-        const path_without_slash = route.path[1..]; // Remove leading "/"
-        // Add .html extension if it doesn't have one
-        if (std.fs.path.extension(path_without_slash).len == 0) {
-            file_path_owned = try std.fmt.allocPrint(allocator, "{s}.html", .{path_without_slash});
+        // Split the URL path by "/" to get path components
+        // Skip the first empty component (from leading "/")
+        var path_components = std.ArrayList([]const u8).empty;
+        defer path_components.deinit(allocator);
+
+        var path_iter = std.mem.splitScalar(u8, route.path, '/');
+        while (path_iter.next()) |component| {
+            if (component.len > 0) {
+                try path_components.append(allocator, component);
+            }
+        }
+
+        if (route.path[route.path.len - 1] == '/') {
+            // For paths ending in "/", create directory/index.html structure
+            try path_components.append(allocator, "index.html");
+            file_path_owned = try std.fs.path.join(allocator, path_components.items);
             file_path = file_path_owned.?;
         } else {
-            file_path = path_without_slash;
+            // Get the last component (filename)
+            const last_component = path_components.items[path_components.items.len - 1];
+            // Add .html extension if it doesn't have one
+            if (std.fs.path.extension(last_component).len == 0) {
+                const last_with_ext = try std.fmt.allocPrint(allocator, "{s}.html", .{last_component});
+                defer allocator.free(last_with_ext);
+
+                // Replace the last component with the one that has .html extension
+                _ = path_components.pop();
+                try path_components.append(allocator, last_with_ext);
+                file_path_owned = try std.fs.path.join(allocator, path_components.items);
+                file_path = file_path_owned.?;
+            } else {
+                // Path already has an extension, join all components
+                file_path_owned = try std.fs.path.join(allocator, path_components.items);
+                file_path = file_path_owned.?;
+            }
         }
     }
 
