@@ -46,7 +46,7 @@ fn @"export"(ctx: zli.CommandContext) !void {
     var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
 
-    printer.header("{s} Building static ZX site!", .{"○"});
+    printer.header("{s} Building static ZX site!", .{tui.Printer.emoji("○")});
     printer.info("{s}", .{outdir});
     // delete the outdir if it exists
     std.fs.cwd().deleteTree(outdir) catch |err| switch (err) {

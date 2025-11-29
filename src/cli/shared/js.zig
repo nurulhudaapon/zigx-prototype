@@ -160,7 +160,7 @@ pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, is_dev: bool, verbo
         var printer = tui.Printer.init(ctx.allocator, .{});
         defer printer.deinit();
         printer.header("{s} Bundled JS to {s}{s}{s} ({s}{s}{s}) in {s}{s}{s}", .{
-            "📦",
+            tui.Printer.emoji("📦"),
             tui.Colors.cyan,
             esbuild_output.path,
             tui.Colors.reset,

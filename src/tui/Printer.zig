@@ -4,58 +4,9 @@ const Colors = @import("Colors.zig");
 
 pub const Printer = @This();
 
-// Helper to check if a string is likely an emoji
-fn isEmojiString(str: []const u8) bool {
-    // Check if string contains non-ASCII characters (likely emoji)
-    // Simple heuristic: if it's a short string with non-ASCII, it's probably emoji
-    if (str.len == 0) return false;
-
-    var has_non_ascii = false;
-    for (str) |byte| {
-        if (byte > 127) {
-            has_non_ascii = true;
-            break;
-        }
-    }
-
-    // If it's a short string (1-8 bytes typically) with non-ASCII, likely emoji
-    return has_non_ascii and str.len <= 8;
-}
-
-// Helper to print with emoji replacement on Windows
-fn printWithEmojiReplacement(comptime fmt: []const u8, args: anytype) void {
-    const is_windows = builtin.os.tag == .windows;
-
-    if (is_windows) {
-        // Process args to replace emoji strings
-        const ArgsType = @TypeOf(args);
-        const args_info = @typeInfo(ArgsType);
-
-        // In Zig, tuples are anonymous structs, so check for struct
-        if (args_info == .@"struct") {
-            // Create a modified struct/tuple by processing each field
-            var processed_args: ArgsType = args;
-            inline for (args_info.@"struct".fields) |field| {
-                if (field.type == []const u8) {
-                    // Use @field with the field name (which for tuples is like .0, .1, etc.)
-                    const field_ptr = &@field(processed_args, field.name);
-                    if (isEmojiString(field_ptr.*)) {
-                        field_ptr.* = "";
-                    }
-                }
-            }
-            std.debug.print(fmt, processed_args);
-        } else {
-            // Single arg - check if it's a string and emoji
-            if (ArgsType == []const u8 and isEmojiString(args)) {
-                std.debug.print(fmt, .{""});
-            } else {
-                std.debug.print(fmt, args);
-            }
-        }
-    } else {
-        std.debug.print(fmt, args);
-    }
+// Helper to conditionally return emoji or empty string based on OS
+pub fn emoji(comptime emoji_str: []const u8) []const u8 {
+    return if (builtin.os.tag == .windows) "" else emoji_str;
 }
 
 arena: std.heap.ArenaAllocator,
@@ -156,10 +107,10 @@ pub fn header(self: *Printer, comptime fmt: []const u8, args: anytype) void {
 
     if (is_windows) {
         std.debug.print("{s}", .{Colors.cyan});
-        printWithEmojiReplacement(fmt, args);
+        std.debug.print(fmt, args);
         std.debug.print("{s}\n\n", .{Colors.reset});
     } else {
-        printWithEmojiReplacement(fmt, args);
+        std.debug.print(fmt, args);
         std.debug.print("\n\n", .{});
     }
 }
@@ -167,7 +118,7 @@ pub fn header(self: *Printer, comptime fmt: []const u8, args: anytype) void {
 pub fn footer(self: *Printer, comptime fmt: []const u8, args: anytype) void {
     _ = self;
     std.debug.print("\n", .{});
-    printWithEmojiReplacement(fmt, args);
+    std.debug.print(fmt, args);
     std.debug.print("\n\n", .{});
 }
 
@@ -180,13 +131,13 @@ pub fn warning(self: *Printer, comptime fmt: []const u8, args: anytype) void {
     } else {
         std.debug.print("{s}{s} Warning:{s} ", .{ Colors.yellow, "⚠", Colors.reset });
     }
-    printWithEmojiReplacement(fmt, args);
+    std.debug.print(fmt, args);
     std.debug.print("\n", .{});
 }
 
 pub fn info(self: *Printer, comptime fmt: []const u8, args: anytype) void {
     _ = self;
     std.debug.print("  - {s}", .{Colors.gray});
-    printWithEmojiReplacement(fmt, args);
+    std.debug.print(fmt, args);
     std.debug.print("{s}\n", .{Colors.reset});
 }

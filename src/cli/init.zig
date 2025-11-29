@@ -33,7 +33,7 @@ fn init(ctx: zli.CommandContext) !void {
     var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
 
-    printer.header("{s} Initializing ZX project!", .{"○"});
+    printer.header("{s} Initializing ZX project!", .{tui.Printer.emoji("○")});
     printer.info("[{s}]", .{@tagName(template_name)});
     const output_dir = ".";
 
@@ -72,7 +72,7 @@ fn init(ctx: zli.CommandContext) !void {
         try file.writeAll(template.content);
     }
 
-    printer.footer("Now run {s}\n\n{s}zig build serve{s}", .{ "→", tui.Colors.cyan, tui.Colors.reset });
+    printer.footer("Now run {s}\n\n{s}zig build serve{s}", .{ tui.Printer.emoji("→"), tui.Colors.cyan, tui.Colors.reset });
 }
 
 const TemplateFile = struct {

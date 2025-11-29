@@ -62,7 +62,7 @@ fn bundle(ctx: zli.CommandContext) !void {
     var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
 
-    printer.header("{s} Bundling ZX site!", .{"○"});
+    printer.header("{s} Bundling ZX site!", .{tui.Printer.emoji("○")});
     printer.info("{s}", .{outdir});
 
     var aw = std.Io.Writer.Allocating.init(ctx.allocator);
@@ -143,12 +143,12 @@ fn bundle(ctx: zli.CommandContext) !void {
 
     if (docker or docker_compose) {
         if (docker_compose) {
-            printer.footer("Now run {s}\n\n{s}(cd {s} && docker compose up --build){s}", .{ "→", tui.Colors.cyan, outdir, tui.Colors.reset });
+            printer.footer("Now run {s}\n\n{s}(cd {s} && docker compose up --build){s}", .{ tui.Printer.emoji("→"), tui.Colors.cyan, outdir, tui.Colors.reset });
         } else {
-            printer.footer("Now run {s}\n\n{s}docker build -t {s} . -f {s}/Dockerfile \ndocker run -p {d}:{d} {s}{s}", .{ "→", tui.Colors.cyan, bin_name, outdir, port, port, bin_name, tui.Colors.reset });
+            printer.footer("Now run {s}\n\n{s}docker build -t {s} . -f {s}/Dockerfile \ndocker run -p {d}:{d} {s}{s}", .{ tui.Printer.emoji("→"), tui.Colors.cyan, bin_name, outdir, port, port, bin_name, tui.Colors.reset });
         }
     } else {
-        printer.footer("Now run {s}\n\n{s}(cd {s} && ./{s} --rootdir ./){s}", .{ "→", tui.Colors.cyan, outdir, bin_name, tui.Colors.reset });
+        printer.footer("Now run {s}\n\n{s}(cd {s} && ./{s} --rootdir ./){s}", .{ tui.Printer.emoji("→"), tui.Colors.cyan, outdir, bin_name, tui.Colors.reset });
     }
 }
 
