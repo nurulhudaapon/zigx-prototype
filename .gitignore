@@ -17,3 +17,4 @@ test/data/assets/
 /package.json
 /bun.lock
 /src/cli/init/template/bun.lock
+site/main.ts
