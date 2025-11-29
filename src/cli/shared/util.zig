@@ -1,4 +1,4 @@
-const BIN_DIR = "zig-out/bin";
+const BIN_DIR = "zig-out" ++ std.fs.path.sep_str ++ "bin";
 
 /// Find the ZX executable from the bin directory
 pub fn findprogram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App.SerilizableAppMeta {
@@ -68,7 +68,7 @@ pub fn inspectProgram(allocator: std.mem.Allocator, binpath: []const u8) !zx.App
     return app_meta;
 }
 
-const ignore_dirs = [_][]const u8{"assets/_zx"};
+const ignore_dirs = [_][]const u8{"assets" ++ std.fs.path.sep_str ++ "_zx"};
 fn shouldIgnorePath(path: []const u8) bool {
     for (ignore_dirs) |ignore_dir| {
         if (std.mem.startsWith(u8, path, ignore_dir)) return true;
