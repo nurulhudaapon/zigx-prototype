@@ -9,14 +9,14 @@ const features = [_]Feature{
 };
 
 const performances = [_]Performance{
-    .{ .value = "~100x", .label = "Faster SSR than Next.js at SSR" },
+    .{ .value = "~100x", .label = "Faster SSR than Next.js" },
     .{ .value = "0ms", .label = "Runtime Overhead" },
     .{ .value = "100%", .label = "Compile-time Safety" },
     .{ .value = "∞", .label = "Memory Safety" },
 };
 
 const hero_stats = [_]HeroStat{
-    .{ .value = "~100x", .label = "Faster SSR than Next.js at SSR" },
+    .{ .value = "~100x", .label = "Faster SSR than Next.js" },
     .{ .value = "0ms", .label = "Runtime Overhead" },
     .{ .value = "100%", .label = "Compile-time Safety" },
     .{ .value = "∞", .label = "Memory Safety" },
@@ -66,7 +66,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                         Build fast full-stack web apps with Zig.
                     </p>
                     <p class="hero-description">
-                        JSX patterns with native code performance. 
+                        JSX like syntax or just like HTML with having access to Zig's control flow. 
                         No JavaScript runtime, no garbage collection.
                     </p>
                     
@@ -108,7 +108,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                     <div class="code-header">
                         <h2 class="section-title">Familiar Syntax</h2>
                         <p class="section-subtitle">
-                            Write JSX. Get Zig. It's that simple.
+                            Familiar JSX like syntax or just like HTML with having access to Zig's control flow.
                         </p>
                     </div>
                     
@@ -130,7 +130,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                 <div class="performance-header">
                     <h2 class="section-title">The Numbers</h2>
                     <p class="section-subtitle">
-                        Measured, not made up
+                        Real numbers based on some initial benchmarks.
                     </p>
                 </div>
                 
@@ -148,7 +148,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                     <a href="/cli" class="footer-link">CLI Reference</a>
                     <a href="https://github.com/nurulhudaapon/zx" class="footer-link" target="_blank" rel="noopener noreferrer">GitHub</a>
                 </div>
-                <p>© {[current_year:d]} ZX Framework. Built with Zig.</p>
+                <p>© {[current_year:d]} ZX Web Framework. Built with Zig.</p>
             </footer>
         </div>
     );

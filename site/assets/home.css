@@ -42,7 +42,6 @@ body {
     justify-content: center;
     position: relative;
     padding: 2rem;
-    padding-top: 8rem;
     background: var(--zx-bg);
     overflow: hidden;
     border-bottom: 1px solid var(--zx-border);
@@ -280,6 +279,11 @@ body {
     .hero-decoration {
         display: none;
     }
+    .hero {
+        min-height: 90vh;
+        padding: 1rem;
+        padding-top: 8rem;
+    }
 }
 
 .btn {
@@ -397,7 +401,7 @@ body {
 
 /* Features Section */
 .features {
-    padding: 10rem 2rem;
+    padding: 6rem 2rem;
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -506,7 +510,7 @@ body {
 
 /* Code Example Section */
 .code-section {
-    padding: 10rem 2rem;
+    padding: 6rem 2rem;
     background: var(--zx-bg);
     position: relative;
     overflow: hidden;
@@ -611,7 +615,7 @@ body {
 
 /* Performance Section */
 .performance {
-    padding: 10rem 2rem;
+    padding: 6rem 2rem;
     max-width: 1200px;
     margin: 0 auto;
 }
@@ -667,7 +671,7 @@ body {
 
 /* Footer */
 .footer {
-    padding: 6rem 2rem 3rem;
+    padding: 2rem 2rem 2rem;
     text-align: center;
     border-top: 1px solid var(--zx-border);
     margin-top: 0;
@@ -731,11 +735,44 @@ body {
     
     .code-example pre {
         padding: 1.5rem 1rem;
-        font-size: 0.8rem;
+        font-size: 0.7rem;
     }
     
     .code-example-header {
         padding: 0.875rem 1rem;
+    }
+}
+
+/* Custom scrollbar styling */
+.code-example {
+    scrollbar-width: thin;
+    scrollbar-color: var(--zx-primary) var(--zx-code-bg);
+}
+
+.code-example::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.code-example::-webkit-scrollbar-track {
+    background: var(--zx-code-bg);
+}
+
+.code-example::-webkit-scrollbar-thumb {
+    background: var(--zx-border);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.code-example::-webkit-scrollbar-thumb:hover {
+    background: var(--zx-primary);
+}
+
+/* Additional responsive font size for very small screens */
+@media (max-width: 480px) {
+    .code-example pre {
+        font-size: 0.65rem;
+        padding: 1rem 0.75rem;
     }
 }
 
