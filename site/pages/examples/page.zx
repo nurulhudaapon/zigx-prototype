@@ -6,6 +6,8 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
             <h1>Examples</h1>
             <h2>CSR React Example</h2>
             <CsrReactExample />
+            <h2>CSR Zig Example</h2>
+            <CsrZigExample />
             <h2>For Loop</h2>
             <ForExample />
             <hr />
@@ -34,3 +36,4 @@ const SwitchExample = @import("switch.zig").Page;
 const FormExample = @import("form.zig").FormExample;
 const QuickExample = @import("overview.zig").QuickExample;
 const CsrReactExample = @import("csr_react.zig").Page;
+const CsrZigExample = @import("csr_zig.zig").Page;

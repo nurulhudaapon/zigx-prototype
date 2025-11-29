@@ -1,0 +1,13 @@
+pub fn Page(allocator: zx.Allocator) zx.Component {
+    return (
+        <main @allocator={allocator}>
+            <CounterComponent @rendering={.csz}/>
+        </main>
+    );
+}
+
+pub fn CounterComponent(allocator: zx.Allocator) zx.Component {
+    return (<button @allocator={allocator}>Counter</button>);
+}
+
+const zx = @import("zx");

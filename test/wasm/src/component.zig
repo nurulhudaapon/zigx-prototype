@@ -30,7 +30,15 @@ pub fn CounterComponent(allocator: zx.Allocator, count: i32) zx.Component {
                         _zx.txt("Increment"),
                     },
                     .attributes = &.{
-                        .{ .name = "onclick", .value = "window.zx.onclick(1)" },
+                        .{ .name = "onclick", .value = "_zx.onclick(1)" },
+                    },
+                }),
+
+                _zx.zx(.input, .{
+                    .children = &.{},
+                    .attributes = &.{
+                        .{ .name = "type", .value = "text" },
+                        .{ .name = "id", .value = "hello-input" },
                     },
                 }),
             },
@@ -40,3 +48,5 @@ pub fn CounterComponent(allocator: zx.Allocator, count: i32) zx.Component {
 
 const zx = @import("zx");
 const std = @import("std");
+
+export const nurul_turul: i32 = 3;

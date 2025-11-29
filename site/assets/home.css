@@ -1,21 +1,22 @@
 /* ZX Framework Home Page Styles */
 
 :root {
-    --zx-primary: #6366f1;
-    --zx-primary-dark: #4f46e5;
-    --zx-primary-light: #818cf8;
-    --zx-secondary: #8b5cf6;
-    --zx-accent: #ec4899;
-    --zx-dark: #0f172a;
-    --zx-dark-light: #1e293b;
-    --zx-gray: #64748b;
-    --zx-gray-light: #94a3b8;
+    --zx-primary: #00d9ff;
+    --zx-primary-dark: #00a8cc;
+    --zx-primary-light: #33e0ff;
+    --zx-secondary: #ff6b35;
+    --zx-accent: #ffd23f;
+    --zx-dark: #0a0a0a;
+    --zx-dark-light: #141414;
+    --zx-gray: #6b7280;
+    --zx-gray-light: #9ca3af;
     --zx-white: #ffffff;
-    --zx-bg: #0a0e27;
-    --zx-bg-light: #0f172a;
-    --zx-card-bg: #1e293b;
-    --zx-border: #334155;
-    --zx-code-bg: #0f172a;
+    --zx-bg: #000000;
+    --zx-bg-light: #0a0a0a;
+    --zx-card-bg: #111111;
+    --zx-border: #262626;
+    --zx-code-bg: #0a0a0a;
+    --zx-text-muted: #737373;
 }
 
 * {
@@ -25,11 +26,12 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     background: var(--zx-bg);
     color: var(--zx-white);
-    line-height: 1.6;
+    line-height: 1.7;
     overflow-x: hidden;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* Hero Section */
@@ -40,36 +42,58 @@ body {
     justify-content: center;
     position: relative;
     padding: 2rem;
-    background: linear-gradient(135deg, var(--zx-bg) 0%, var(--zx-bg-light) 50%, var(--zx-dark) 100%);
+    background: var(--zx-bg);
     overflow: hidden;
+    border-bottom: 1px solid var(--zx-border);
 }
 
 .hero::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-        radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 40% 20%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
-    animation: pulse 8s ease-in-out infinite;
+    top: 20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(0, 217, 255, 0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: float 20s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
+.hero::after {
+    content: '';
+    position: absolute;
+    bottom: 10%;
+    left: -5%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(255, 107, 53, 0.06) 0%, transparent 70%);
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: float 25s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -30px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
 }
 
 .hero-content {
-    max-width: 1200px;
+    max-width: 1000px;
     width: 100%;
-    text-align: center;
+    text-align: left;
     position: relative;
     z-index: 1;
     animation: fadeInUp 0.8s ease-out;
+    padding-left: 2rem;
+}
+
+@media (max-width: 768px) {
+    .hero-content {
+        text-align: center;
+        padding-left: 0;
+    }
 }
 
 @keyframes fadeInUp {
@@ -85,15 +109,16 @@ body {
 
 .hero-badge {
     display: inline-block;
-    padding: 0.5rem 1rem;
-    background: rgba(99, 102, 241, 0.2);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 50px;
-    color: var(--zx-primary-light);
-    font-size: 0.875rem;
+    padding: 0.375rem 0.875rem;
+    background: transparent;
+    border: 1px solid var(--zx-border);
+    border-radius: 4px;
+    color: var(--zx-text-muted);
+    font-size: 0.75rem;
     font-weight: 500;
-    margin-bottom: 2rem;
-    backdrop-filter: blur(10px);
+    margin-bottom: 3rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
     animation: fadeIn 1s ease-out 0.2s both;
 }
 
@@ -102,36 +127,79 @@ body {
     to { opacity: 1; }
 }
 
-.hero h1 {
-    font-size: clamp(3rem, 8vw, 6rem);
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--zx-white) 0%, var(--zx-primary-light) 50%, var(--zx-secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+.hero-title-wrapper {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
     margin-bottom: 1.5rem;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
     animation: fadeInUp 0.8s ease-out 0.1s both;
 }
 
+.hero-title-main {
+    font-size: clamp(4rem, 12vw, 8rem);
+    font-weight: 900;
+    color: var(--zx-white);
+    line-height: 0.9;
+    letter-spacing: -0.05em;
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+}
+
+.hero-title-accent {
+    font-size: clamp(2rem, 6vw, 4rem);
+    font-weight: 300;
+    color: var(--zx-primary);
+    line-height: 1;
+    opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+    .hero-title-wrapper {
+        justify-content: center;
+    }
+}
+
 .hero-subtitle {
-    font-size: clamp(1.25rem, 3vw, 1.75rem);
-    color: var(--zx-gray-light);
-    margin-bottom: 3rem;
-    max-width: 700px;
-    margin-left: auto;
-    margin-right: auto;
+    font-size: clamp(1.5rem, 4vw, 2.25rem);
+    color: var(--zx-white);
+    margin-bottom: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
     animation: fadeInUp 0.8s ease-out 0.2s both;
+}
+
+.hero-description {
+    font-size: clamp(1rem, 2vw, 1.125rem);
+    color: var(--zx-text-muted);
+    margin-bottom: 3rem;
+    max-width: 600px;
+    line-height: 1.7;
+    animation: fadeInUp 0.8s ease-out 0.25s both;
+}
+
+@media (max-width: 768px) {
+    .hero-description {
+        margin-left: auto;
+        margin-right: auto;
+    }
 }
 
 .hero-stats {
     display: flex;
-    gap: 3rem;
-    justify-content: center;
-    margin-bottom: 3rem;
+    gap: 4rem;
+    justify-content: flex-start;
+    margin-bottom: 4rem;
     flex-wrap: wrap;
     animation: fadeInUp 0.8s ease-out 0.3s both;
+    padding-top: 2rem;
+    border-top: 1px solid var(--zx-border);
+}
+
+@media (max-width: 768px) {
+    .hero-stats {
+        justify-content: center;
+        gap: 2rem;
+    }
 }
 
 .hero-stat {
@@ -141,11 +209,9 @@ body {
 .hero-stat-value {
     font-size: 2.5rem;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--zx-primary-light), var(--zx-secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--zx-primary);
     display: block;
+    font-variant-numeric: tabular-nums;
 }
 
 .hero-stat-label {

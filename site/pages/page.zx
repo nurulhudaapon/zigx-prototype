@@ -1,10 +1,10 @@
 const features = [_]Feature{
-    .{ .icon = "⚡", .title = "You Need Speed", .description = "If performance matters, ZX delivers. Built with Zig, it handles server-side rendering way faster than most frameworks—we're talking 120x faster than Next.js in benchmarks." },
-    .{ .icon = "🛡️", .title = "Type Safety Matters", .description = "Zig's type system catches bugs at compile time, not runtime. You get memory safety without dealing with garbage collection overhead." },
-    .{ .icon = "🎨", .title = "You Like JSX", .description = "If you're comfortable with JSX, ZX will feel familiar. Write components the same way, and it compiles down to efficient Zig code behind the scenes." },
-    .{ .icon = "🚀", .title = "SEO is Important", .description = "Need server-side rendering for SEO? ZX has you covered. It also supports static site generation, so you can pre-render pages when it makes sense." },
-    .{ .icon = "📁", .title = "Simple Routing", .description = "File-based routing means your folder structure is your routes. No need to configure route tables or complex routing logic." },
-    .{ .icon = "🔧", .title = "Real Control Flow", .description = "Use if/else, loops, and switch statements directly in your components. No need to work around framework limitations—just write normal Zig code." },
+    .{ .icon = "⚡", .title = "Speed That Actually Matters", .description = "120x faster SSR than Next.js isn't a marketing claim—it's what happens when you compile to native code instead of running JavaScript." },
+    .{ .icon = "🛡️", .title = "Compile-Time Safety", .description = "Zig's type system eliminates entire classes of bugs before your code runs. No runtime surprises, no memory leaks, no garbage collection pauses." },
+    .{ .icon = "🎨", .title = "JSX Without the JavaScript", .description = "Write components exactly like you're used to, but they compile to Zig. Same syntax, zero runtime overhead." },
+    .{ .icon = "🚀", .title = "SSR Built In", .description = "Server-side rendering isn't an afterthought—it's the default. Your pages render on the server, every time, with zero configuration." },
+    .{ .icon = "📁", .title = "Files Are Routes", .description = "Your folder structure is your API. No route configs, no magic strings, just files in folders." },
+    .{ .icon = "🔧", .title = "Real Code, Not Templates", .description = "if/else, loops, switch—all the control flow you know works exactly as you expect. Because it's just Zig." },
 };
 
 const performances = [_]Performance{
@@ -56,11 +56,17 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
 
             <section class="hero">
                 <div class="hero-content">
-                    <div class="hero-badge">v{zx.info.version_string} • Built with Zig</div>
-                    <h1>ZX</h1>
+                    <div class="hero-badge">v{zx.info.version_string}</div>
+                    <div class="hero-title-wrapper">
+                        <h1 class="hero-title-main">ZX</h1>
+                        <div class="hero-title-accent">/</div>
+                    </div>
                     <p class="hero-subtitle">
-                        A web framework that gives you JSX syntax with Zig's performance and safety. 
-                        Build fast, type-safe apps with server-side rendering that actually performs.
+                        JSX syntax. Zig performance. Zero compromises.
+                    </p>
+                    <p class="hero-description">
+                        Write web apps the way you want—with familiar JSX patterns—and get native code performance. 
+                        No JavaScript runtime, no garbage collection, no excuses.
                     </p>
                     
                     <div class="hero-stats">
@@ -71,16 +77,23 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
 
                     <div class="hero-cta">
                         <a href="/docs" class="btn btn-primary">Get Started</a>
-                        <a href="/examples" class="btn btn-secondary">View Examples</a>
+                        <a href="/examples" class="btn btn-secondary">Examples</a>
                     </div>
+                </div>
+                <div class="hero-decoration">
+                    <div class="hero-decoration-line"></div>
+                    <div class="hero-decoration-line"></div>
+                    <div class="hero-decoration-line"></div>
                 </div>
             </section>
 
             <section class="features">
-                <h2 class="section-title">When to Choose ZX</h2>
-                <p class="section-subtitle">
-                    ZX works great when you need performance without sacrificing developer experience
-                </p>
+                <div class="features-header">
+                    <h2 class="section-title">Why ZX</h2>
+                    <p class="section-subtitle">
+                        Performance isn't optional. Neither is developer experience.
+                    </p>
+                </div>
                 
                 <div class="features-grid">
                     {for (features) |f| (
@@ -91,22 +104,34 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
 
             <section class="code-section">
                 <div class="code-container">
-                    <h2 class="section-title">Write Code Like This</h2>
-                    <p class="section-subtitle">
-                        Use JSX syntax you already know, get Zig performance
-                    </p>
+                    <div class="code-header">
+                        <h2 class="section-title">Familiar Syntax</h2>
+                        <p class="section-subtitle">
+                            Write JSX. Get Zig. It's that simple.
+                        </p>
+                    </div>
                     
                     <div class="code-example">
+                        <div class="code-example-header">
+                            <div class="code-example-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <div class="code-example-title">example.zx</div>
+                        </div>
                         <pre><code class="language-tsx">{overview_code}</code></pre>
                     </div>
                 </div>
             </section>
 
             <section class="performance">
-                <h2 class="section-title">Performance That Matters</h2>
-                <p class="section-subtitle">
-                    Real numbers, not marketing speak
-                </p>
+                <div class="performance-header">
+                    <h2 class="section-title">The Numbers</h2>
+                    <p class="section-subtitle">
+                        Measured, not made up
+                    </p>
+                </div>
                 
                 <div class="performance-grid">
                     {for (performances) |p| (

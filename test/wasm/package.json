@@ -1,11 +1,12 @@
 {
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
   "scripts": {
     "dev": "bun build src/index.html --outdir dist --watch & bunx serve dist"
   },
   "dependencies": {
-    "jsz": "github:mitchellh/zig-js"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
+    "ziex": "^0.0.1-dev.5",
+    "zzon": "^1.7.1"
   }
 }
