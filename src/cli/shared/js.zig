@@ -157,19 +157,20 @@ pub fn buildjs(ctx: zli.CommandContext, binpath: []const u8, is_dev: bool, verbo
 
     // Pretty print esbuild output with colors
     if (verbose and esbuild_output.path.len > 0 and esbuild_output.size.len > 0 and esbuild_output.time.len > 0) {
-        // Colorize the output: path cyan, size green, time yellow, emoji: package 📦
-        const cyan = "\x1b[36m";
-        const green = "\x1b[32m";
-        const yellow = "\x1b[33m";
-        const reset = "\x1b[0m";
-        try ctx.writer.print(
-            "📦 Bundled JS to {s}{s}{s} ({s}{s}{s}) in {s}{s}{s}\n",
-            .{
-                cyan,   esbuild_output.path, reset,
-                green,  esbuild_output.size, reset,
-                yellow, esbuild_output.time, reset,
-            },
-        );
+        var printer = tui.Printer.init(ctx.allocator, .{});
+        defer printer.deinit();
+        printer.header("{s} Bundled JS to {s}{s}{s} ({s}{s}{s}) in {s}{s}{s}", .{
+            "📦",
+            tui.Colors.cyan,
+            esbuild_output.path,
+            tui.Colors.reset,
+            tui.Colors.green,
+            esbuild_output.size,
+            tui.Colors.reset,
+            tui.Colors.yellow,
+            esbuild_output.time,
+            tui.Colors.reset,
+        });
     }
 }
 
@@ -438,4 +439,5 @@ pub const TransformError = error{
 const std = @import("std");
 const zli = @import("zli");
 const util = @import("util.zig");
+const tui = @import("../../tui/main.zig");
 const log = std.log.scoped(.cli);

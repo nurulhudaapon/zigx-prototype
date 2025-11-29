@@ -135,7 +135,10 @@ pub fn build(b: *std.Build) void {
                 .dest_sub_path = b.fmt("release/zx-{s}{s}", .{ release_target.name, exe_ext }),
             });
 
-            const target_step = b.step(b.fmt("release-{s}", .{release_target.name}), b.fmt("Build release binary for {s}", .{release_target.name}));
+            const target_step = b.step(
+                b.fmt("release-{s}", .{release_target.name}),
+                b.fmt("Build release binary for {s}", .{release_target.name}),
+            );
             target_step.dependOn(&install_release.step);
             release_step.dependOn(&install_release.step);
         }

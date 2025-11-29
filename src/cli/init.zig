@@ -33,8 +33,8 @@ fn init(ctx: zli.CommandContext) !void {
     var printer = tui.Printer.init(ctx.allocator, .{ .file_path_mode = .flat, .file_tree_max_depth = 1 });
     defer printer.deinit();
 
-    printer.header("Initializing ZX project!", "○", .{});
-    std.debug.print("  - {s}[{s}]{s}\n", .{ tui.Colors.gray, @tagName(template_name), tui.Colors.reset });
+    printer.header("{s} Initializing ZX project!", .{"○"});
+    printer.info("[{s}]", .{@tagName(template_name)});
     const output_dir = ".";
 
     try std.fs.cwd().makePath(output_dir);
@@ -46,7 +46,7 @@ fn init(ctx: zli.CommandContext) !void {
     const cwd = std.fs.cwd();
     if (cwd.openFile(build_zig_zon_path, .{})) |file| {
         file.close();
-        std.debug.print("\x1b[33m⚠ Warning: build.zig.zon already exists in {s}/. Skipping template initialization.\x1b[0m\n", .{output_dir});
+        printer.warning("build.zig.zon already exists in {s}/. Skipping template initialization.", .{output_dir});
         return;
     } else |err| {
         switch (err) {
@@ -72,7 +72,7 @@ fn init(ctx: zli.CommandContext) !void {
         try file.writeAll(template.content);
     }
 
-    printer.footer("Now run →\n\n{s}zig build serve{s}", .{ tui.Colors.cyan, tui.Colors.reset });
+    printer.footer("Now run {s}\n\n{s}zig build serve{s}", .{ "→", tui.Colors.cyan, tui.Colors.reset });
 }
 
 const TemplateFile = struct {
