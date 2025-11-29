@@ -1,21 +1,22 @@
 const features = [_]Feature{
-    .{ .icon = "⚡", .title = "Speed That Actually Matters", .description = "120x faster SSR than Next.js isn't a marketing claim—it's what happens when you compile to native code instead of running JavaScript." },
-    .{ .icon = "🛡️", .title = "Compile-Time Safety", .description = "Zig's type system eliminates entire classes of bugs before your code runs. No runtime surprises, no memory leaks, no garbage collection pauses." },
-    .{ .icon = "🎨", .title = "JSX Without the JavaScript", .description = "Write components exactly like you're used to, but they compile to Zig. Same syntax, zero runtime overhead." },
-    .{ .icon = "🚀", .title = "SSR Built In", .description = "Server-side rendering isn't an afterthought—it's the default. Your pages render on the server, every time, with zero configuration." },
-    .{ .icon = "📁", .title = "Files Are Routes", .description = "Your folder structure is your API. No route configs, no magic strings, just files in folders." },
-    .{ .icon = "🔧", .title = "Real Code, Not Templates", .description = "if/else, loops, switch—all the control flow you know works exactly as you expect. Because it's just Zig." },
+    .{ .icon = "⚡", .title = "It's Fast", .description = "~100x faster SSR than Next.js. Compiles to native code instead of running JavaScript." },
+    .{ .icon = "🛡️", .title = "Compile-Time Safety", .description = "Zig's type system catches bugs at compile time. No runtime surprises, no memory leaks, no garbage collection." },
+    .{ .icon = "🎨", .title = "JSX Without the JavaScript", .description = "Familiar JSX syntax that compiles to Zig. Same patterns, zero runtime overhead." },
+    .{ .icon = "🚀", .title = "Server-Side Rendering", .description = "Server-side rendering by default. Pages render on the server with zero configuration." },
+    .{ .icon = "🚀", .title = "Static Site Generation", .description = "Static site generation by default. Pages render on the server with zero configuration." },
+    .{ .icon = "📁", .title = "File System Routing", .description = "Folder structure defines routes. No configs, no magic strings, just files in folders." },
+    .{ .icon = "🔧", .title = "Control Flow in Zig's Syntax", .description = "if/else, loops, switch—standard control flow works as expected. It's just Zig." },
 };
 
 const performances = [_]Performance{
-    .{ .value = "120x", .label = "Faster SSR than Next.js" },
+    .{ .value = "~100x", .label = "Faster SSR than Next.js at SSR" },
     .{ .value = "0ms", .label = "Runtime Overhead" },
     .{ .value = "100%", .label = "Compile-time Safety" },
     .{ .value = "∞", .label = "Memory Safety" },
 };
 
 const hero_stats = [_]HeroStat{
-    .{ .value = "120x", .label = "Faster SSR than Next.js" },
+    .{ .value = "~100x", .label = "Faster SSR than Next.js at SSR" },
     .{ .value = "0ms", .label = "Runtime Overhead" },
     .{ .value = "100%", .label = "Compile-time Safety" },
     .{ .value = "∞", .label = "Memory Safety" },
@@ -62,11 +63,11 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                         <div class="hero-title-accent">/</div>
                     </div>
                     <p class="hero-subtitle">
-                        JSX syntax. Zig performance. Zero compromises.
+                        Build fast full-stack web apps with Zig.
                     </p>
                     <p class="hero-description">
-                        Write web apps the way you want—with familiar JSX patterns—and get native code performance. 
-                        No JavaScript runtime, no garbage collection, no excuses.
+                        JSX patterns with native code performance. 
+                        No JavaScript runtime, no garbage collection.
                     </p>
                     
                     <div class="hero-stats">
@@ -91,7 +92,7 @@ pub fn Page(ctx: zx.PageContext) zx.Component {
                 <div class="features-header">
                     <h2 class="section-title">Why ZX</h2>
                     <p class="section-subtitle">
-                        Performance isn't optional. Neither is developer experience.
+                        Performance-focused web apps built with Zig.
                     </p>
                 </div>
                 
